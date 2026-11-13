@@ -70,6 +70,20 @@ def startup():
                 db.add(User(username=username, nombre=nombre, rol="usuario", perms=seed.perfil(perfil), pass_hash=h, must_change=True))
                 auth.audit(db, "sistema", "crear_usuario", username)
         db.commit()
+        # recuperación del administrador: si ADMIN_RESET_PASSWORD está definida, la clave del admin
+        # pasa a ser esa (temporal, hay que cambiarla al entrar). Borrar la variable después de usarla.
+        reset = os.environ.get("ADMIN_RESET_PASSWORD")
+        if reset:
+            username = (os.environ.get("ADMIN_USERNAME") or "admin").strip().lower()
+            u = db.scalar(select(User).where(User.username == username))
+            if u:
+                u.pass_hash = auth.hash_pw(reset)
+                u.must_change = True
+                u.activo = True
+                u.token_ver = (u.token_ver or 0) + 1
+                auth.audit(db, "sistema", "reset_admin", username)
+                db.commit()
+                print(f"Clave del administrador {username} restablecida desde ADMIN_RESET_PASSWORD: borrá la variable.")
 
 
 def user_out(u: User) -> dict:
