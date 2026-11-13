@@ -24,10 +24,10 @@ def perfil(tipo: str) -> dict:
 
 # usuario, nombre, perfil, hash de la contraseña temporal
 USUARIOS = [
-    ("cbertetti", "Bertetti, Cynthia", "todos", "$2b$12$jhMTepuQgN5T67Pm/lgB2uNmN.Ywh40j8DG8t1eMzEYDW42XFpknm"),
-    ("joliva", "Oliva, Joaquín", "todos", "$2b$12$TKN0BZ2J9G6nhFiJuKHi1uBbDg/VZ1UiS90Zr6k5U0J4uNiXKkJIy"),
-    ("lmunoz", "Muñoz, Luis", "sin_ropa", "$2b$12$gPcR/eV9QNaJSGQkeetrHeUn7kC0cJt6mrNASac2hgsw2BSyp3D8S"),
-    ("rcampos", "Campos, Rubén", "sin_ropa", "$2b$12$KCYqVKx9SGenlQLALAP9zudnvuyq7RDCluL50cs7ebCgeG8062V6e"),
-    ("avivone", "Vivone, Aylén", "aylen", "$2b$12$GyH42VWs6VTPI2gb0oSr8e5e.qDK4lNMRwm0W0w5YxURdE3Y4rl02"),
-    ("mmarchioro", "Marchioro, Milagros", "milagros", "$2b$12$QlSsdeRjR60kTgd.f7dVJOEr6KwRx0Hfthgzt5KkoljyaENtYfQ32"),
+    ("cbertetti", "Bertetti, Cynthia", "todos", "$2b$12$ygJmn82KnyVKzw9FuZHiS.bgURITnD5MCSuQNV6NCPGin8ryI0Cze"),
+    ("joliva", "Oliva, Joaquín", "todos", "$2b$12$EK7kl.NTVcbwieI2hb.O/eHenAteFLXxVPfFcr2phK2JXTD7Bug1i"),
+    ("lmunoz", "Muñoz, Luis", "sin_ropa", "$2b$12$BAyGnlyR3En4ZWITncztvOSV1Z4IFcM5MSs6.I4Er62yPt.i7XxoK"),
+    ("rcampos", "Campos, Rubén", "sin_ropa", "$2b$12$1R31TnKWCT2xtJ4hSr0szuwVI67cie3EAqJIvPZ/ex0yXv3PbXkRO"),
+    ("avivone", "Vivone, Aylén", "aylen", "$2b$12$5qmwwOlRlCleVF4kg8.gpeRkNM5OvO4JPYKTR/Opr0zoreH8aLfBq"),
+    ("mmarchioro", "Marchioro, Milagros", "milagros", "$2b$12$EfYydoVP4K3ZRW4ryGGre.uzbEuAitYu1o3gfZlbiiWiP0CMrZ5Ve"),
 ]
