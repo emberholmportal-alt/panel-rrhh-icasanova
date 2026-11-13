@@ -26,3 +26,6 @@ body.srv-locked{overflow:hidden}
 .us-audit{margin-top:12px}
 html.gris #srv-login{background:#eef0f3}
 html.gris .sl-box{background:#fff;border-color:#d6dae1;box-shadow:0 10px 30px rgba(15,23,42,.12)}
+.sl-link{display:block;width:100%;margin-top:14px;background:none;border:0;color:var(--acc);font:inherit;font-size:13px;cursor:pointer;text-align:center;text-decoration:underline;text-underline-offset:3px}
+.sl-box textarea{font-size:14px;resize:vertical;text-transform:none;letter-spacing:0}
+.sl-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}

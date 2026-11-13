@@ -7,7 +7,7 @@ iso=open(W+'isidro.html',encoding='utf-8').read()
 f3=open(W+'f3.html',encoding='utf-8').read()
 shell=open(W+'shell.html',encoding='utf-8').read()
 css=open(W+'shell.css',encoding='utf-8').read()
-app=open(W+'app.js',encoding='utf-8').read(); _k=app.rindex('})();'); app=app[:_k]+'\n'+open(W+'social.js',encoding='utf-8').read()+'\n'+open(W+'server.js',encoding='utf-8').read()+'\n'+app[_k:]
+app=open(W+'app.js',encoding='utf-8').read(); _k=app.rindex('})();'); app=app[:_k]+'\n'+open(W+'social.js',encoding='utf-8').read()+'\n'+open(W+'nomina.js',encoding='utf-8').read()+'\n'+open(W+'comedor.js',encoding='utf-8').read()+'\n'+open(W+'server.js',encoding='utf-8').read()+'\n'+app[_k:]
 
 def one(s,a,b):
     assert s.count(a)==1,('NO UNICO',a[:80],s.count(a)); return s.replace(a,b)

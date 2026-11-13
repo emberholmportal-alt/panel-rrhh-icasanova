@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func, inspect, text
 from sqlalchemy.orm import Session
 
-from . import auth
+from . import auth, seed
 from .auth import current_user, require_admin, can_read, can_write, MODULES, LEVELS, DEFAULT_PERMS
 from .db import Base, engine, get_db, SessionLocal
 from .models import User, Doc, UserDoc, PizarraItem, BuzonItem, Audit, now
@@ -64,6 +64,12 @@ def startup():
             auth.audit(db, "sistema", "admin_inicial", username)
             db.commit()
             print(f"Usuario administrador inicial creado: {username} (tiene que cambiar la contraseña al entrar)")
+        # usuarios iniciales: se crean una sola vez, si no existen
+        for username, nombre, perfil, h in seed.USUARIOS:
+            if not db.scalar(select(User).where(User.username == username)):
+                db.add(User(username=username, nombre=nombre, rol="usuario", perms=seed.perfil(perfil), pass_hash=h, must_change=True))
+                auth.audit(db, "sistema", "crear_usuario", username)
+        db.commit()
 
 
 def user_out(u: User) -> dict:
@@ -446,6 +452,46 @@ def bz_del(bid: str, a: User = Depends(require_admin), db: Session = Depends(get
         db.delete(b)
         auth.audit(db, a, "buzon_borrar", "")
         db.commit()
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ solicitud de acceso (sin sesión)
+class AccesoIn(BaseModel):
+    nombre: str = Field(max_length=120)
+    sector: str = Field(default="", max_length=120)
+    contacto: str = Field(default="", max_length=160)
+    msg: str = Field(default="", max_length=1500)
+    web: str = Field(default="", max_length=200)      # campo trampa para robots: tiene que llegar vacío
+
+
+_acc: dict[str, list[float]] = {}
+
+
+@app.post("/api/acceso")
+def pedir_acceso(body: AccesoIn, request: Request, db: Session = Depends(get_db)):
+    import time
+    ip = request.client.host if request.client else ""
+    t = time.time()
+    _acc[ip] = [x for x in _acc.get(ip, []) if t - x < 3600]
+    total_hoy = sum(1 for v in _acc.values() for x in v if t - x < 86400)
+    if len(_acc[ip]) >= 5 or total_hoy >= 60:
+        raise HTTPException(429, "Ya se enviaron varias solicitudes. Probá más tarde o avisale al administrador por otro medio.")
+    if body.web:
+        return {"ok": True}
+    nombre = body.nombre.strip()
+    if len(nombre) < 3:
+        raise HTTPException(400, "Escribí tu nombre y apellido")
+    _acc[ip].append(t)
+    msg = "\n".join(x for x in [
+        f"Nombre: {nombre}",
+        f"Sector / puesto: {body.sector.strip()}" if body.sector.strip() else "",
+        f"Contacto: {body.contacto.strip()}" if body.contacto.strip() else "",
+        "", body.msg.strip() or "No puedo ingresar al panel."] if x is not None)
+    import secrets as _s
+    db.add(BuzonItem(id="acc-" + _s.token_hex(8), asunto=f"Solicitud de acceso: {nombre}"[:200], cat="acceso", msg=msg[:4000],
+                     estado="nueva", autor_id=None, autor_nombre=None))
+    auth.audit(db, "sin sesión", "solicitud_acceso", nombre)
+    db.commit()
     return {"ok": True}
 
 

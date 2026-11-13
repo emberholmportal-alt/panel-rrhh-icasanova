@@ -322,7 +322,7 @@ async function pzSave(){
    BUZÓN
    ================================================================ */
 const BZ_EST={nueva:'Nueva',leida:'Leída',curso:'En curso',respondida:'Respondida',cerrada:'Cerrada'};
-const BZ_CAT={mejora:'Mejora',problema:'Problema',consulta:'Consulta',otro:'Otro'};
+const BZ_CAT={mejora:'Mejora',problema:'Problema',consulta:'Consulta',otro:'Otro',acceso:'Pedido de acceso'};
 let bzState={sel:'',att:null,fe:'abiertas',fc:'',q:''};
 const bzTag=e=>`<span class="bz-st s-${e}">${BZ_EST[e]||e}</span>`;
 function renderBuzon(){
@@ -347,16 +347,16 @@ function renderBuzon(){
   const cnt=k=>SOC.bz.filter(x=>x.estado===k).length;
   $('#bz-adm-m').textContent=`${SOC.bz.length} en total · ${cnt('nueva')} nueva(s) · ${cnt('curso')} en curso`;
   $('#bz-inbox').innerHTML=L.length?L.map(x=>`<button class="bz-row${x.id===bzState.sel?' on':''}${x.estado==='nueva'?' nueva':''}" data-bz="${esc(x.id)}">
-      <span class="bz-rh"><b>${esc(x.asunto)}</b>${bzTag(x.estado)}</span><span class="bz-rm">${x.autor?esc(x.autor.nombre):'<i>Anónima</i>'} · ${esc(BZ_CAT[x.cat]||x.cat)} · ${fmtAt(x.at)}${x.att?' · 📎':''}</span></button>`).join('')
+      <span class="bz-rh"><b>${esc(x.asunto)}</b>${bzTag(x.estado)}</span><span class="bz-rm">${x.autor?esc(x.autor.nombre):x.cat==='acceso'?'<i>Sin usuario</i>':'<i>Anónima</i>'} · ${esc(BZ_CAT[x.cat]||x.cat)} · ${fmtAt(x.at)}${x.att?' · 📎':''}</span></button>`).join('')
     :'<div class="empty">No hay sugerencias con ese filtro.</div>';
   const s=SOC.bz.find(x=>x.id===bzState.sel);
   $('#bz-det').innerHTML=!s?'<div class="empty">Elegí una sugerencia de la lista para leerla y responder.</div>':`
     <div class="bz-dh"><h4>${esc(s.asunto)}</h4>${bzTag(s.estado)}</div>
-    <div class="bz-im">${s.autor?'De <b>'+esc(s.autor.nombre)+'</b>':'<b>Anónima</b> (no se guardó quién la envió)'} · ${esc(BZ_CAT[s.cat]||s.cat)} · ${fmtAt(s.at)}</div>
+    <div class="bz-im">${s.autor?'De <b>'+esc(s.autor.nombre)+'</b>':s.cat==='acceso'?'<b>Pedido desde la pantalla de ingreso</b> (sin usuario: contestale por el contacto que dejó)':'<b>Anónima</b> (no se guardó quién la envió)'} · ${esc(BZ_CAT[s.cat]||s.cat)} · ${fmtAt(s.at)}</div>
     <div class="bz-msg">${esc(s.msg)}</div>
     ${s.att?(/^data:image\//.test(s.att.data)?`<a class="bz-attv" href="#" data-bzatt="${esc(s.id)}"><img src="${s.att.data}" alt=""><span>📎 ${esc(s.att.name)}</span></a>`:`<a class="bz-attv f" href="#" data-bzatt="${esc(s.id)}">📎 ${esc(s.att.name)} · descargar</a>`):''}
     <div class="filters" style="margin-top:14px"><div class="field"><label>Estado</label><select id="bz-est">${Object.entries(BZ_EST).map(([k,v])=>`<option value="${k}"${k===s.estado?' selected':''}>${v}</option>`).join('')}</select></div></div>
-    ${s.autor?`<div class="field" style="margin-top:10px"><label>Respuesta para ${esc(s.autor.nombre)}</label><textarea id="bz-resp" rows="4" maxlength="4000" placeholder="La verá en “Mis sugerencias”">${esc(s.resp||'')}</textarea></div>`:'<p class="cf-note">Es anónima: no se puede responder. Podés cambiarle el estado para tu seguimiento.</p>'}
+    ${s.autor?`<div class="field" style="margin-top:10px"><label>Respuesta para ${esc(s.autor.nombre)}</label><textarea id="bz-resp" rows="4" maxlength="4000" placeholder="La verá en “Mis sugerencias”">${esc(s.resp||'')}</textarea></div>`:`<p class="cf-note">${s.cat==='acceso'?'No tiene usuario en el panel: respondele por el contacto que dejó y, si corresponde, creale el usuario en Configuración → Usuarios y permisos.':'Es anónima: no se puede responder. Podés cambiarle el estado para tu seguimiento.'}</p>`}
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn primary sm" id="bz-save">${s.autor?'Guardar y responder':'Guardar estado'}</button><button class="btn danger sm" id="bz-del">Eliminar</button></div>`;
 }
 async function bzOpen(id){

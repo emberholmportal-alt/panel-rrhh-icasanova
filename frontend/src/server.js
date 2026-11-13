@@ -26,14 +26,36 @@ const SRVX=(()=>{
         <p class="sl-err" id="sl-e"></p>
         <button class="btn primary" id="sl-go">Ingresar</button>
       </form>
-      <p class="sl-help">¿Olvidaste la contraseña? Pedile al administrador del panel que te la restablezca.</p>`}
+      <button type="button" class="sl-link" id="sl-req">¿No tenés usuario o no podés entrar? Avisale al administrador</button>`}
     </div>`;
     document.body.appendChild(el); document.body.classList.add('srv-locked');
+    const rq=$('#sl-req'); if(rq) rq.onclick=reqScreen;
     const f=$('#sl-f'); if(!f) return;
     f.onsubmit=async e=>{ e.preventDefault(); $('#sl-e').textContent=''; $('#sl-go').disabled=true;
       try{ const u=await api('POST','/api/auth/login',{username:$('#sl-u').value,password:$('#sl-p').value});
         if(u.must_change) passScreen(true); else location.reload(); }
       catch(err){ $('#sl-e').textContent=err.message; $('#sl-go').disabled=false; } };
+  }
+  function reqScreen(){
+    const el=$('#srv-login');
+    el.innerHTML=`<div class="sl-box">
+      <h2>Avisar al administrador</h2>
+      <p class="sl-help">Si no tenés usuario, te olvidaste la contraseña o no podés entrar, dejá tus datos y el administrador del panel se comunica con vos.</p>
+      <form id="sr-f">
+        <label>Nombre y apellido<input id="sr-n" maxlength="120" required autocomplete="name"></label>
+        <label>Sector o puesto<input id="sr-s" maxlength="120" placeholder="ej: Coordinación turno noche"></label>
+        <label>Cómo contactarte (opcional)<input id="sr-c" maxlength="160" placeholder="mail, teléfono o interno"></label>
+        <label>Mensaje<textarea id="sr-m" rows="3" maxlength="1500">No puedo acceder al panel.</textarea></label>
+        <input id="sr-w" tabindex="-1" autocomplete="off" class="sl-hp" aria-hidden="true">
+        <p class="sl-err" id="sr-e"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn ghost" id="sr-x">Volver</button><button class="btn primary" id="sr-go">Enviar</button></div>
+      </form></div>`;
+    $('#sr-x').onclick=()=>{ el.remove(); loginScreen(); };
+    $('#sr-f').onsubmit=async e=>{ e.preventDefault(); $('#sr-e').textContent=''; $('#sr-go').disabled=true;
+      try{ await api('POST','/api/acceso',{nombre:$('#sr-n').value,sector:$('#sr-s').value,contacto:$('#sr-c').value,msg:$('#sr-m').value,web:$('#sr-w').value});
+        el.querySelector('.sl-box').innerHTML=`<h2>Mensaje enviado</h2><p class="sl-help">El administrador del panel ya lo recibió y se va a comunicar con vos.</p><button class="btn primary" id="sr-ok" style="width:100%;margin-top:14px">Volver al ingreso</button>`;
+        $('#sr-ok').onclick=()=>{ el.remove(); loginScreen(); }; }
+      catch(err){ $('#sr-e').textContent=err.message; $('#sr-go').disabled=false; } };
   }
   function passScreen(forzada){
     let el=$('#srv-login'); if(!el){ el=document.createElement('div'); el.id='srv-login'; document.body.appendChild(el); }
@@ -63,7 +85,7 @@ const SRVX=(()=>{
 
   /* ---------------- permisos ---------------- */
   const U=S.user, isAdm=U.rol==='admin';
-  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda'};
+  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
   const lvl=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
   const canW=m=>m==='otros'?isAdm:lvl(m)==='editar';
   for(const v in VIEW_MOD){ if(!lvl(VIEW_MOD[v])){ const n=document.querySelector(`.nav-item[data-v="${v}"]`); if(n) n.style.display='none'; } }
@@ -93,12 +115,13 @@ const SRVX=(()=>{
   ver.otros=(S.docs.otros||{}).version||0; snap.otros=JSON.stringify(otrosOf(S.initial));
   ver.f3=(S.docs.f3||{}).version||0; snap.f3=JSON.stringify(f3Of());
   snap.fich=JSON.stringify(S.initial.fich||{});
+  let lastAct=0; ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ lastAct=Date.now(); },true));
   const roWarned={}; let pending=null, saving=false, again=false, lastDB=null;
   const stEl=()=>$('#srv-st');
   const setSt=(t,c)=>{ const e=stEl(); if(e){ e.textContent=t; e.className='srv-st '+(c||''); } };
   const LBL=m=>(S.modules&&S.modules[m])||(m==='otros'?'Configuración general':m);
   async function putDoc(m,data,json){
-    if(!canW(m)){ if(!roWarned[m]){ roWarned[m]=1; App.toast(`Solo lectura en ${LBL(m)}: tus cambios no se guardan en el servidor.`,true); } snap[m]=json; return; }
+    if(!canW(m)){ if(lvl(m)==='ver'&&Date.now()-lastAct<5000&&!roWarned[m]){ roWarned[m]=1; App.toast(`Solo lectura en ${LBL(m)}: tus cambios no se guardan en el servidor.`,true); } snap[m]=json; return; }
     try{ const r=await api('PUT','/api/docs/'+m,{data,base:ver[m]}); ver[m]=r.version; snap[m]=json; }
     catch(err){
       if(err.status===409){ App.toast((err.message||'Otro usuario modificó '+LBL(m))+'. Se cargó su versión; repetí tu último cambio.',true); await pullDoc(m,true); }
@@ -209,6 +232,11 @@ const SRVX=(()=>{
   const fn=NOMBRE(); document.querySelectorAll('#v-home h2 .grad').forEach(e=>e.textContent=fn);
   const lk=document.querySelector('.lk-user'); if(lk){ const sp=lk.querySelector('span'), b=lk.querySelector('b'); if(sp) sp.textContent=ini(U.nombre); if(b) b.textContent=U.nombre; }
   document.querySelectorAll('.nav-lab').forEach(l=>{ let n=l.nextElementSibling, vis=false; while(n&&!n.classList.contains('nav-lab')){ if(n.classList.contains('nav-item')&&n.style.display!=='none') vis=true; n=n.nextElementSibling; } if(!vis) l.style.display='none'; });
+  // los usuarios que no administran no cargan archivos: se ocultan los avisos de fuentes sin cargar
+  if(!isAdm){ const sp=$('#m365pill'); if(sp) sp.style.display='none'; const hs=$('#h-src'); if(hs&&hs.closest('.card')) hs.closest('.card').style.display='none'; }
+  const ft=$('footer.foot'); if(ft) ft.textContent='PANEL DE TRABAJO RRHH I.CASANOVA · Grupo Gestión · datos guardados en el servidor, con acceso por usuario';
+  // sin avisos de "subí tal archivo" para quien no administra la carga
+  if(!isAdm){ const _caS=computeAvisos; computeAvisos=function(){ return _caS().filter(x=>!/^Actualización/.test(x.t||'')); }; App.refresh(); }
   if(U.must_change) passScreen(true);
   return {online:true,user:U,logout,passScreen,api,isAdm};
 })();

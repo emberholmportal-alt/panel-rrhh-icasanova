@@ -26,8 +26,13 @@ MODULES = {
     "indumentaria": "Indumentaria",
     "f3": "Novedades F3",
     "anticipos": "Anticipos",
+    "nomina": "Nómina",
+    "cumpleanos": "Cumpleaños",
+    "menu": "Menú semanal",
     "agenda": "Agenda y recordatorios",
 }
+# módulos que todos ven aunque no tengan permiso asignado
+DEFAULT_LEVEL = {"menu": "ver"}
 LEVELS = ("", "ver", "editar")
 DEFAULT_PERMS = {"agenda": "editar"}
 
@@ -94,7 +99,7 @@ def require_admin(u: User = Depends(current_user)) -> User:
 def level(u: User, modulo: str) -> str:
     if u.rol == "admin":
         return "editar"
-    return (u.perms or {}).get(modulo, "")
+    return (u.perms or {}).get(modulo, "") or DEFAULT_LEVEL.get(modulo, "")
 
 
 def can_read(u: User, modulo: str) -> bool:
