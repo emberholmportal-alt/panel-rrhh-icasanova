@@ -1,0 +1,2054 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de trabajo — CD Isidro Casanova</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#2E2E2B; --slate:#58595B; --mute:#82837E;
+  --lime:#8DB53E; --lime-d:#6E9130; --ochre:#C8873A; --alert:#B03A2E;
+  --canvas:#EAEAE3; --surface:#FFFFFF; --line:#D5D5CC; --line-2:#E6E6DE;
+  --r:3px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--canvas); color:var(--ink);
+  font-family:'Barlow',system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.cond{font-family:'Barlow Condensed','Barlow',sans-serif;letter-spacing:.01em}
+.mono,td.mono,.num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;font-size:14px;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 80px}
+header.top{border-bottom:2px solid var(--ink);background:var(--surface)}
+.top-in{max-width:1240px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.logo{height:34px;width:auto;display:block}
+.title-block{border-left:1px solid var(--line);padding-left:18px;flex:1;min-width:220px}
+.title-block h1{margin:0;font-size:23px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.title-block p{margin:0;font-size:12.5px;color:var(--mute);letter-spacing:.03em}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- buttons ---------- */
+.btn{border:1px solid var(--ink);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:var(--r);
+     font-weight:500;transition:.12s;white-space:nowrap;font-family:'Barlow Condensed',sans-serif;font-size:15px;
+     text-transform:uppercase;letter-spacing:.04em}
+.btn:hover{background:var(--ink);color:#fff}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.primary:hover{background:var(--lime-d);border-color:var(--lime-d)}
+.btn.lime{background:var(--lime);border-color:var(--lime-d);color:#1e2a0c}
+.btn.lime:hover{background:var(--lime-d);color:#fff}
+.btn.ghost{border-color:var(--line);color:var(--slate)}
+.btn.ghost:hover{background:var(--slate);border-color:var(--slate);color:#fff}
+.btn.danger{border-color:var(--alert);color:var(--alert)}
+.btn.danger:hover{background:var(--alert);color:#fff}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.sm{padding:4px 9px;font-size:13px}
+
+/* ---------- dropzone ---------- */
+.drop{margin:22px 0 0;border:2px dashed var(--line);background:var(--surface);border-radius:var(--r);
+      padding:26px 22px;text-align:center;transition:.15s}
+.drop.hot{border-color:var(--lime);background:#f6faee}
+.drop h2{margin:0 0 4px;font-size:19px;text-transform:uppercase;letter-spacing:.05em}
+.drop p{margin:0 0 14px;color:var(--mute);font-size:13.5px}
+.drop .hint{font-size:12px;color:var(--mute);margin-top:10px}
+
+/* ---------- kpis ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
+      border:1px solid var(--line);margin:22px 0 0;border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:13px 15px}
+.kpi .lab{font-family:'Barlow Condensed',sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--mute)}
+.kpi .val{font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:11.5px;color:var(--mute)}
+.kpi.acc-alert .val{color:var(--alert)} .kpi.acc-ochre .val{color:var(--ochre)} .kpi.acc-lime .val{color:var(--lime-d)}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:0;margin:26px 0 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tab{background:none;border:none;border-bottom:3px solid transparent;padding:9px 15px;color:var(--mute);
+     font-family:'Barlow Condensed',sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--lime)}
+.tab .badge{display:inline-block;background:var(--line-2);color:var(--slate);border-radius:9px;padding:0 6px;
+     font-size:11px;margin-left:5px;font-family:'IBM Plex Mono',monospace;vertical-align:1px}
+.tab.on .badge{background:var(--ink);color:#fff}
+.panel{display:none;padding-top:20px}
+.panel.on{display:block}
+
+/* ---------- cards / tables ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:18px}
+.card-h{padding:11px 16px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.card-h h3{margin:0;font-size:17px;text-transform:uppercase;letter-spacing:.05em;flex:1}
+.card-b{padding:16px}
+.card-b.flush{padding:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;
+   color:var(--mute);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;
+   background:var(--surface);position:sticky;top:0;z-index:2}
+th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--ink)}
+td{padding:8px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tbody tr:hover{background:#fafaf6}
+tbody tr:last-child td{border-bottom:none}
+.tscroll{max-height:560px;overflow:auto}
+.empty{padding:38px 20px;text-align:center;color:var(--mute);font-size:14px}
+
+.tag{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-size:12px;text-transform:uppercase;
+     letter-spacing:.06em;padding:1px 7px;border-radius:2px;border:1px solid;white-space:nowrap}
+.tag.tarde{color:#fff;background:var(--alert);border-color:var(--alert)}
+.tag.ok{color:var(--lime-d);border-color:var(--lime)}
+.tag.sinf{color:var(--ochre);border-color:var(--ochre)}
+.tag.nov{color:var(--slate);border-color:var(--line)}
+.tag.n{color:var(--slate);border-color:var(--line-2);background:var(--canvas)}
+.late-min{color:var(--alert);font-weight:600}
+
+/* signature element: franja de fichada */
+.strip{position:relative;height:16px;background:var(--line-2);border-radius:2px;min-width:150px;overflow:hidden}
+.strip .tol{position:absolute;top:0;bottom:0;background:#dceab8}
+.strip .start{position:absolute;top:0;bottom:0;width:2px;background:var(--lime-d)}
+.strip .pin{position:absolute;top:1px;bottom:1px;width:3px;background:var(--alert);border-radius:1px}
+.strip .pin.okp{background:var(--slate)}
+.striplab{font-size:10.5px;color:var(--mute);font-family:'IBM Plex Mono',monospace;display:flex;justify-content:space-between;margin-top:2px}
+
+/* chart */
+.chart{width:100%;height:auto;display:block}
+.chart .bar{fill:var(--slate)} .chart .bar:hover{fill:var(--alert)}
+.chart .grid{stroke:var(--line-2);stroke-width:1}
+.chart .axl{fill:var(--mute);font-size:10px;font-family:'IBM Plex Mono',monospace}
+.hbar-row{display:grid;grid-template-columns:1fr 200px 44px;gap:10px;align-items:center;padding:5px 0;font-size:13.5px}
+.hbar{height:14px;background:var(--line-2);border-radius:2px;overflow:hidden}
+.hbar i{display:block;height:100%;background:var(--ochre)}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+.field label{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mute)}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  border:1px solid var(--line);border-radius:var(--r);padding:7px 9px;background:var(--surface);width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--lime);outline-offset:-1px;border-color:var(--lime)}
+textarea{font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.6;min-height:340px;resize:vertical}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0 14px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.filters .field{margin-bottom:0;min-width:135px}
+.chk{display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--lime-d);cursor:pointer}
+
+.note{background:#fdf6ea;border:1px solid #e8d3a8;border-left:3px solid var(--ochre);padding:11px 14px;
+      border-radius:var(--r);font-size:13.5px;margin-bottom:16px}
+.note b{font-weight:600}
+.note.warn{background:#fdefed;border-color:#eec3bd;border-left-color:var(--alert)}
+.note.info{background:#f4f8ec;border-color:#d5e3b8;border-left-color:var(--lime-d)}
+
+/* toast + preview */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;
+  padding:11px 20px;border-radius:var(--r);font-size:14px;transition:.25s;z-index:999;max-width:90vw;text-align:center;opacity:0}
+#toast.on{transform:translateX(-50%) translateY(0);opacity:1}
+#modal{position:fixed;inset:0;background:rgba(46,46,43,.55);display:none;z-index:900;padding:24px;overflow:auto}
+#modal.on{display:block}
+.modal-box{background:#fff;max-width:830px;margin:0 auto;border-radius:var(--r);overflow:hidden}
+.modal-box .card-h{position:sticky;top:0;background:#fff;z-index:3}
+#previewBody{padding:0;background:#dcdcd4}
+.sheet{background:#fff;width:100%;max-width:794px;margin:16px auto;padding:38px 44px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+
+
+/* ---------- navegación de módulos ---------- */
+.modnav{max-width:1240px;margin:0 auto;padding:0 20px;display:flex;gap:0;flex-wrap:wrap;border-top:1px solid var(--line-2)}
+.mod{background:none;border:none;border-bottom:3px solid transparent;padding:10px 16px;color:var(--mute);
+  font-family:'Barlow Condensed',sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.mod:hover{color:var(--ink)}
+.mod.on{color:var(--ink);border-bottom-color:var(--ochre)}
+.view{display:none} .view.on{display:block}
+
+/* ---------- inicio ---------- */
+.hero{padding:30px 0 6px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.hero h2{margin:0;font-size:34px;font-weight:700;letter-spacing:-.01em}
+.hero p{margin:2px 0 14px;color:var(--mute);font-size:15px}
+.avisos{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin-bottom:22px}
+.aviso{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--slate);border-radius:var(--r);
+  padding:12px 15px;cursor:pointer;text-align:left;font-family:inherit;transition:.12s;display:block;width:100%}
+.aviso:hover{border-color:var(--ink);transform:translateY(-1px)}
+.aviso.alta{border-left-color:var(--alert)} .aviso.media{border-left-color:var(--ochre)} .aviso.baja{border-left-color:var(--lime)}
+.aviso .at{font-family:'Barlow Condensed',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.aviso .av{font-size:15px;font-weight:600;margin:1px 0 2px;line-height:1.3}
+.aviso .ad{font-size:12.5px;color:var(--mute)}
+.avisos .empty{grid-column:1/-1}
+.modcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.modcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;text-align:left;
+  font-family:inherit;position:relative;transition:.14s}
+.modcard:hover{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+.modcard .mc-k{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ochre);letter-spacing:.1em}
+.modcard h3{margin:6px 0 6px;font-size:22px;text-transform:uppercase;letter-spacing:.03em}
+.modcard p{margin:0 0 14px;font-size:13.5px;color:var(--mute);line-height:1.45}
+.modcard .mc-st{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--slate);
+  border-top:1px solid var(--line-2);padding-top:9px;display:block}
+
+/* ---------- barras de dotación ---------- */
+.dbar-row{display:grid;grid-template-columns:150px 1fr 52px;gap:12px;align-items:center;padding:5px 0;font-size:13.5px}
+.dbar{height:18px;background:var(--line-2);border-radius:2px;overflow:hidden}
+.dbar i{display:block;height:100%;background:var(--slate)}
+.dbar i.t-manana{background:var(--lime)} .dbar i.t-tarde{background:var(--ochre)}
+.dbar i.t-noche{background:#4A5A6E} .dbar i.t-intermedio{background:#8E8E86}
+td.cell0{color:var(--line)}
+td.editable input{border:1px solid transparent;background:transparent;padding:2px 4px;width:100%;font-size:13px}
+td.editable input:hover{border-color:var(--line)}
+.mailbox{background:#fff;border:1px solid var(--line);padding:16px;font-family:Calibri,Arial,sans-serif;font-size:13px}
+.mailbox table{border-collapse:collapse;width:100%;margin:10px 0}
+.mailbox th{background:#000;color:#fff;border:1px solid #000;padding:4px 8px;font-family:Calibri,Arial,sans-serif;
+  font-size:12.5px;text-transform:none;letter-spacing:0;position:static;text-align:center}
+.mailbox td{border:1px solid #000;padding:3px 8px;text-align:center;font-size:12.5px}
+.mailbox td.l{text-align:left}
+
+footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;color:var(--mute);font-size:12px;text-align:center}
+@media(max-width:640px){
+  .title-block{border-left:none;padding-left:0;flex-basis:100%}
+  .hbar-row{grid-template-columns:1fr 90px 36px}
+  td,th{padding:7px 8px;font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" alt="Grupo Gestión" src="data:image/png;base64,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swPBmbHnkQ3n8qRofrbgFcsHusm45O5wNy6STWjDZcj6xKWUU/HBE+37px20bKFe0WjbHLVLJwYTqcyFi8HhnNmIV8szlObkG/W7jdawLjPWvBEutN3L7w4LMy58+muUlfNQxtUvRz76doaPDhKfuYH9ssWhrKlOpKFs0+RlD4wzaPWkx00SeItOXI4j6ol9qrjgKTc1cPWRK7GaW1yNCSot5mgbivR9G/jLOJyHuB5KN44xzL7uZT3r3RmEQv63JeEJHOjkxmVPwhpLdflQOFBrePJm1678An35mhei1z75Qhpynf5SlaLjQrs86xPc1fQ01j11cWch5lr1sudID1zG17OdEQQOnXHjsh4ftpDrCk9fOU0R6VSWJ226urt/UPtF18YHa74fTraxZvEiKsb8T3hCzQ5cFuALpa5YkxHd4afBRSSl3jj2PWANDNnTW7opxzrA4NQyvbmlA51ycg0ELhh+ajGmb2xOlbrwnFfeHZq2NJyuziTP3rE+SRRkCrAND+LaTkUjJhDkylVpts1GJxjFzRWAqTwCbsHWLdpNg4kdN2jThqET1n39rpCqN2bf5LlZSmf9BOnYoFQULynq7TLraE+tyraSwWHAazgnF+/8ulC+RkyJSiLF6N2Wpu14pyu4o2j2VP80jSBufigTVhxraTVUHf2JpiPVbO9sqitd+wy4pJFrR+5aq6PrqmlX2OqYAriediXyttpX/wfblCBXLF3tTwAAAABJRU5ErkJggg==">
+    <div class="title-block">
+      <h1>Panel de trabajo · CD Isidro Casanova</h1>
+      <p id="subhead">Bienvenido Ariel</p>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost sm" id="btnExportDB">Exportar base</button>
+      <button class="btn ghost sm" id="btnImportDB">Importar base</button>
+      <button class="btn danger sm" id="btnReset">Borrar todo</button>
+    </div>
+  </div>
+  <nav class="modnav" id="modnav">
+    <button class="mod on" data-v="v-home">Inicio</button>
+    <button class="mod" data-v="v-ausentismo">Ausentismo</button>
+    <button class="mod" data-v="v-vacaciones">Vacaciones</button>
+    <button class="mod" data-v="v-bajas">Bajas y dotación</button>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<!-- ==================== INICIO ==================== -->
+<section class="view on" id="v-home">
+  <div class="hero">
+    <h2>Bienvenido Ariel</h2>
+    <p id="heroSub">Elegí con qué querés trabajar hoy.</p>
+  </div>
+  <div class="avisos" id="avisos"></div>
+  <div class="modcards">
+    <button class="modcard" data-v="v-ausentismo">
+      <span class="mc-k">01</span><h3>Controlar ausentismo</h3>
+      <p>Llegadas tarde, reincidencias y pedidos de explicación, apercibimientos y suspensiones.</p>
+      <span class="mc-st" id="stAus">sin datos</span>
+    </button>
+    <button class="modcard" data-v="v-vacaciones">
+      <span class="mc-k">02</span><h3>Revisar vacaciones</h3>
+      <p>Próximas salidas, planillas de notificación para firmar y el reporte para liquidar.</p>
+      <span class="mc-st" id="stVac">sin datos</span>
+    </button>
+    <button class="modcard" data-v="v-bajas">
+      <span class="mc-k">03</span><h3>Revisar próximas bajas</h3>
+      <p>Dotación de eventuales por turno y tarea, y bajas por fin de período de prueba.</p>
+      <span class="mc-st" id="stAnt">sin datos</span>
+    </button>
+  </div>
+</section>
+
+<!-- ==================== AUSENTISMO ==================== -->
+<section class="view" id="v-ausentismo">
+  <div class="drop" id="drop">
+    <h2>Cargar reporte diario</h2>
+    <p>Arrastrá acá el .xlsx del reloj, o elegí el archivo. Podés subir varios días juntos.</p>
+    <button class="btn primary" id="btnPick">Elegir archivo…</button>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple hidden>
+    <input type="file" id="fileDB" accept=".json" hidden>
+    <div class="hint">Se acumula por legajo + fecha. Volver a subir el mismo día actualiza los datos, no los duplica.</div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-p="p-tarde">Llegadas tarde <span class="badge" id="bTarde">0</span></button>
+    <button class="tab" data-p="p-rank">Reincidencias <span class="badge" id="bRank">0</span></button>
+    <button class="tab" data-p="p-pedidos">Pedidos de explicación <span class="badge" id="bPed">0</span></button>
+    <button class="tab" data-p="p-sinf">Sin fichada <span class="badge" id="bSinf">0</span></button>
+    <button class="tab" data-p="p-turnos">Turnos <span class="badge" id="bTurnos">0</span></button>
+    <button class="tab" data-p="p-plantilla">Plantilla</button>
+  </div>
+
+  <!-- ============ LLEGADAS TARDE ============ -->
+  <div class="panel on" id="p-tarde">
+    <div class="card">
+      <div class="card-h">
+        <h3>Evolución diaria</h3>
+        <span class="cond" style="color:var(--mute);font-size:13px" id="chartNote"></span>
+      </div>
+      <div class="card-b"><svg class="chart" id="chart"></svg></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <h3>Detalle de llegadas tarde</h3>
+        <button class="btn ghost sm" id="btnCsvTarde">Descargar CSV</button>
+      </div>
+      <div class="card-b">
+        <div class="filters">
+          <div class="field"><label>Desde</label><input type="date" id="fDesde"></div>
+          <div class="field"><label>Hasta</label><input type="date" id="fHasta"></div>
+          <div class="field" style="min-width:200px"><label>Buscar</label><input type="text" id="fBusca" placeholder="apellido o legajo"></div>
+          <div class="field" style="min-width:230px"><label>Turno</label><select id="fTurno"></select></div>
+          <button class="btn ghost sm" id="btnLimpiaF">Limpiar</button>
+        </div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tTarde"></table></div></div>
+    </div>
+  </div>
+
+  <!-- ============ RANKING ============ -->
+  <div class="panel" id="p-rank">
+    <div class="card">
+      <div class="card-h"><h3>Top reincidentes</h3></div>
+      <div class="card-b" id="hbars"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Acumulado por persona</h3>
+        <button class="btn ghost sm" id="btnCsvRank">Descargar CSV</button>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tRank"></table></div></div>
+    </div>
+  </div>
+
+  <!-- ============ PEDIDOS ============ -->
+  <div class="panel" id="p-pedidos">
+    <div class="note info">
+      <b>Escalada automática.</b> El sistema cuenta la tardanza número N de cada persona y elige el documento solo:
+      las primeras <b id="ePed">3</b> van con pedido de explicación, las siguientes <b id="eApe">1</b> con apercibimiento,
+      y de ahí en adelante suspensión. Podés cambiar los cortes acá abajo o forzar un tipo puntual.
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Generar documentos</h3>
+        <select id="selPlantilla" style="width:auto;min-width:250px">
+          <option value="auto">Automático según antecedentes</option>
+          <option value="descargo">Forzar: pedido de explicación</option>
+          <option value="apercibimiento">Forzar: apercibimiento</option>
+          <option value="sancion">Forzar: suspensión</option>
+        </select>
+        <button class="btn ghost sm" id="btnPrev">Vista previa</button>
+        <button class="btn ghost sm" id="btnPrint">Imprimir / PDF</button>
+        <button class="btn lime" id="btnDocAll">Descargar seleccionados (Word)</button>
+      </div>
+      <div class="card-b">
+        <div class="filters">
+          <div class="field"><label>Desde</label><input type="date" id="pDesde"></div>
+          <div class="field"><label>Hasta</label><input type="date" id="pHasta"></div>
+          <div class="field"><label>Fecha del documento</label><input type="date" id="pFechaDoc"></div>
+          <div class="field" style="max-width:110px"><label>Días susp.</label><input type="number" id="pDiasSusp" value="3" min="1"></div>
+          <div class="field"><label>Cumple el día</label><input type="date" id="pFechaSusp"></div>
+        </div>
+        <div class="filters" style="margin-top:12px;border-top:1px solid var(--line-2);padding-top:12px">
+          <div class="field" style="max-width:150px"><label>Pedidos antes de apercibir</label><input type="number" id="cfgPed" min="0" max="20"></div>
+          <div class="field" style="max-width:150px"><label>Apercibim. antes de suspender</label><input type="number" id="cfgApe" min="0" max="20"></div>
+          <div class="field" style="max-width:150px"><label>Renglones de descargo</label><input type="number" id="cfgRen" min="1" max="30"></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <label class="chk"><input type="checkbox" id="pSoloReinc"> Solo con 2 o más tardanzas acumuladas</label>
+          <label class="chk"><input type="checkbox" id="pTodos" checked> Seleccionar todos</label>
+          <span style="color:var(--mute);font-size:13px" id="pCount"></span>
+        </div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tPed"></table></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>CUIL por legajo</h3></div>
+      <div class="card-b">
+        <p style="margin-top:0;color:var(--mute);font-size:13.5px">
+          Si el reporte trae una columna CUIL, se completa solo. Si no, cargalo acá una vez por legajo y queda guardado.
+        </p>
+        <div class="tscroll" style="max-height:300px"><table id="tPeople"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SIN FICHADA ============ -->
+  <div class="panel" id="p-sinf">
+    <div class="note info">
+      Gente del turno activo que ese día <b>no registró ninguna marca de entrada</b>. No es lo mismo que llegar tarde:
+      puede ser ausencia, franco, licencia o falla del reloj. Revisalo antes de sancionar.<br>
+      Los marcados <b>“Turno no exportado”</b> no son ausentes: en esa fecha casi nadie de ese turno tiene fichada,
+      así que el reporte se generó antes de que entraran. No cuentan en ningún indicador.
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Sin fichada y novedades</h3><button class="btn ghost sm" id="btnCsvSinf">Descargar CSV</button></div>
+      <div class="card-b flush"><div class="tscroll"><table id="tSinf"></table></div></div>
+    </div>
+  </div>
+
+  <!-- ============ TURNOS ============ -->
+  <div class="panel" id="p-turnos">
+    <div class="note">
+      Cada jornada que aparece en los archivos se lista acá. El sistema adivina la hora de ingreso, pero <b>vos mandás</b>:
+      corregí lo que haga falta y tildá qué turnos querés controlar. Vienen activos mañana y tarde. Los
+      <b>nocturnos quedan apagados</b> porque cruzan la medianoche y la fichada puede caer en otra fecha del reporte:
+      antes de activarlos, mirá unos casos a mano.
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Jornadas detectadas</h3>
+        <div class="field" style="margin:0;max-width:150px"><label>Tolerancia (min)</label><input type="number" id="cfgTol" min="0" max="120"></div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tTurnos"></table></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Archivos cargados</h3></div>
+      <div class="card-b flush"><div class="tscroll" style="max-height:260px"><table id="tFiles"></table></div></div>
+    </div>
+  </div>
+
+  <!-- ============ PLANTILLA ============ -->
+  <div class="panel" id="p-plantilla">
+    <div class="note">
+      Variables disponibles:
+      <span class="mono" style="font-size:12px">{{NOMBRE}} {{LEGAJO}} {{CUIL}} {{EMPRESA}} {{JORNADA}} {{FECHA_DOC}} {{FECHA_TARDE}} {{HORA}} {{HORA_TURNO}} {{MINUTOS}} {{TOLERANCIA}} {{ORDEN}} {{CANT}} {{PREVIAS}} {{TIPO}} {{DIAS_SUSP}} {{FECHA_SUSP}} {{HISTORIAL}}</span><br>
+      El primer párrafo es el título. Un párrafo entre <span class="mono">##...##</span> sale resaltado como el hecho imputado.
+      <span class="mono">%%DESCARGO%%</span> inserta los renglones en blanco para que el trabajador escriba.
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Texto del documento</h3>
+        <select id="selEditTpl" style="width:auto"><option value="descargo">Pedido de explicación</option><option value="apercibimiento">Apercibimiento</option><option value="sancion">Suspensión</option></select>
+        <button class="btn ghost sm" id="btnTplReset">Restaurar original</button>
+        <button class="btn primary sm" id="btnTplSave">Guardar</button>
+      </div>
+      <div class="card-b"><textarea id="tplText" spellcheck="false"></textarea></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ==================== VACACIONES ==================== -->
+<section class="view" id="v-vacaciones">
+  <div class="drop" id="dropVac">
+    <h2>Plan de vacaciones</h2>
+    <p>Subí el <b>Plan de vacaciones</b> (.xlsx). Se lee la hoja GENERAL con las cuatro salidas de cada persona.</p>
+    <button class="btn primary" id="btnPickVac">Elegir archivo…</button>
+    <input type="file" id="fileVac" accept=".xlsx,.xls" hidden>
+    <div class="hint">Cada vez que subas una versión nueva reemplaza la anterior. Lo notificado a mano se conserva.</div>
+  </div>
+
+  <div class="kpis" id="kpisVac"></div>
+
+  <div class="tabs" id="tabsVac">
+    <button class="tab on" data-p="pv-prox">Próximas salidas <span class="badge" id="bvProx">0</span></button>
+    <button class="tab" data-p="pv-liq">Reporte para liquidar</button>
+    <button class="tab" data-p="pv-todas">Todas las salidas <span class="badge" id="bvTodas">0</span></button>
+  </div>
+
+  <div class="panel on" id="pv-prox">
+    <div class="card">
+      <div class="card-h">
+        <h3>Próximos a salir de vacaciones</h3>
+        <button class="btn ghost sm" id="btnVacCsv">CSV</button>
+        <button class="btn ghost sm" id="btnVacPrint">Imprimir planillas</button>
+        <button class="btn lime" id="btnVacDoc">Descargar planillas (PDF)</button>
+      </div>
+      <div class="card-b">
+        <div class="filters">
+          <div class="field"><label>Desde</label><input type="date" id="vDesde"></div>
+          <div class="field"><label>Hasta</label><input type="date" id="vHasta"></div>
+          <div class="field" style="min-width:190px"><label>Buscar</label><input type="text" id="vBusca" placeholder="apellido o legajo"></div>
+          <div class="field"><label>Ventana</label><select id="vVentana">
+            <option value="30">Próximos 30 días</option><option value="60">Próximos 60 días</option>
+            <option value="90">Próximos 90 días</option><option value="9999">Todo lo que viene</option></select></div>
+          <label class="chk" style="padding-bottom:7px"><input type="checkbox" id="vSinNotif"> Solo sin notificar</label>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <label class="chk"><input type="checkbox" id="vTodos" checked> Seleccionar todas</label>
+          <span style="color:var(--mute);font-size:13px" id="vCount"></span>
+          <span style="color:var(--mute);font-size:13px">Fecha de la nota:</span>
+          <input type="date" id="vFechaNota" style="width:150px">
+        </div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tVac"></table></div></div>
+    </div>
+  </div>
+
+  <div class="panel" id="pv-liq">
+    <div class="note info">
+      Agrupa las salidas por fecha de inicio. Elegí la fecha, copiás la tabla y la pegás en el mail.
+      El <b>plus vacacional</b> viene igualado a los días; si en algún caso no corresponde, editalo en la celda.
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Reporte para liquidar</h3>
+        <div class="field" style="margin:0;max-width:170px"><label>Fecha de salida</label><select id="liqFecha"></select></div>
+        <button class="btn ghost sm" id="btnLiqCopy">Copiar para el mail</button>
+        <button class="btn ghost sm" id="btnLiqCsv">CSV</button>
+        <button class="btn lime" id="btnLiqDoc">Descargar (Word)</button>
+      </div>
+      <div class="card-b" id="liqPrev"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="pv-todas">
+    <div class="card">
+      <div class="card-h"><h3>Historial completo de salidas</h3>
+        <div class="field" style="margin:0;min-width:190px"><label>Buscar</label><input type="text" id="vBusca2" placeholder="apellido o legajo"></div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tVacAll"></table></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== BAJAS Y DOTACIÓN ==================== -->
+<section class="view" id="v-bajas">
+  <div class="drop" id="dropAnt">
+    <h2>Control de antigüedad de eventuales</h2>
+    <p>Subí el <b>Control de antigüedad</b> (.xlsx). Se lee la hoja CONTROL DE ANTIGUEDAD.</p>
+    <button class="btn primary" id="btnPickAnt">Elegir archivo…</button>
+    <input type="file" id="fileAnt" accept=".xlsx,.xls" hidden>
+    <div class="hint">Cada carga reemplaza la anterior. El motivo y el detalle que edites a mano se conservan.</div>
+  </div>
+
+  <div class="kpis" id="kpisAnt"></div>
+
+  <div class="tabs" id="tabsAnt">
+    <button class="tab on" data-p="pa-prox">Próximas bajas <span class="badge" id="baProx">0</span></button>
+    <button class="tab" data-p="pa-dot">Dotación por turno y tarea</button>
+    <button class="tab" data-p="pa-plantel">Plantel activo <span class="badge" id="baAct">0</span></button>
+  </div>
+
+  <div class="panel on" id="pa-prox">
+    <div class="note">
+      Eventuales activos cuyo <b>último día</b> cae dentro de la ventana elegida. El motivo viene precargado como
+      <b>FPP</b> (fin de período de prueba) y el detalle como <b>Sin Reemplazo</b>: cambialos en la tabla cuando no corresponda.
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Próximas bajas</h3>
+        <button class="btn ghost sm" id="btnBajaCopy">Copiar para el mail</button>
+        <button class="btn ghost sm" id="btnBajaCsv">CSV</button>
+        <button class="btn lime" id="btnBajaDoc">Descargar (Word)</button>
+      </div>
+      <div class="card-b">
+        <div class="filters">
+          <div class="field"><label>Ventana</label><select id="aVentana">
+            <option value="7">Próximos 7 días</option><option value="15" selected>Próximos 15 días</option>
+            <option value="30">Próximos 30 días</option><option value="60">Próximos 60 días</option></select></div>
+          <div class="field"><label>Turno</label><select id="aTurno"><option value="">Todos</option></select></div>
+          <div class="field"><label>Tarea</label><select id="aTarea"><option value="">Todas</option></select></div>
+          <div class="field" style="min-width:190px"><label>Buscar</label><input type="text" id="aBusca" placeholder="apellido o legajo"></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <label class="chk"><input type="checkbox" id="aTodos" checked> Seleccionar todas</label>
+          <span style="color:var(--mute);font-size:13px" id="aCount"></span>
+        </div>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tBajas"></table></div></div>
+      <div class="card-b" id="bajaMailWrap" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="pa-dot">
+    <div class="card">
+      <div class="card-h"><h3>Eventuales activos por turno</h3></div>
+      <div class="card-b" id="dotTurno"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Eventuales activos por tarea</h3></div>
+      <div class="card-b" id="dotTarea"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Matriz turno × tarea</h3><button class="btn ghost sm" id="btnMatCsv">CSV</button></div>
+      <div class="card-b flush"><div class="tscroll"><table id="tMatriz"></table></div></div>
+    </div>
+  </div>
+
+  <div class="panel" id="pa-plantel">
+    <div class="card">
+      <div class="card-h"><h3>Plantel activo</h3>
+        <div class="field" style="margin:0;min-width:190px"><label>Buscar</label><input type="text" id="aBusca2" placeholder="apellido o legajo"></div>
+        <button class="btn ghost sm" id="btnPlantelCsv">CSV</button>
+      </div>
+      <div class="card-b flush"><div class="tscroll"><table id="tPlantel"></table></div></div>
+    </div>
+  </div>
+</section>
+
+
+  <footer class="foot">Panel de trabajo CD Isidro Casanova · Grupo Gestión · los datos se guardan solo en este navegador</footer>
+</div>
+
+<div id="modal"><div class="modal-box">
+  <div class="card-h"><h3>Vista previa</h3><button class="btn ghost sm" id="btnCloseModal">Cerrar</button></div>
+  <div id="previewBody"></div>
+</div></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   1. ALMACENAMIENTO  (window.storage → localStorage → memoria)
+   ============================================================ */
+const KEY='ctrl-tarde-v1';
+const Store=(()=>{
+  let mem=null, mode='solo memoria';
+  const hasWS = typeof window!=='undefined' && window.storage && typeof window.storage.get==='function';
+  return {
+    get mode(){return mode},
+    async load(){
+      if(hasWS){ try{ const r=await window.storage.get(KEY); mode='este chat'; return r&&r.value?JSON.parse(r.value):null; }catch(e){ mode='este chat'; return null; } }
+      try{ const v=localStorage.getItem(KEY); mode='este navegador'; return v?JSON.parse(v):null; }catch(e){}
+      mode='solo memoria'; return mem;
+    },
+    async save(db){
+      const s=JSON.stringify(db);
+      if(hasWS){ try{ await window.storage.set(KEY,s); return true; }catch(e){} }
+      try{ localStorage.setItem(KEY,s); return true; }catch(e){}
+      mem=db; return false;
+    },
+    async clear(){
+      if(hasWS){ try{ await window.storage.delete(KEY); }catch(e){} }
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      mem=null;
+    }
+  };
+})();
+
+/* ============================================================
+   2. PLANTILLAS
+   ============================================================ */
+const TPL={};
+TPL.descargo=`PEDIDO DE EXPLICACION
+
+Nombre y Apellido:   {{NOMBRE}}
+Legajo:   {{LEGAJO}}
+CUIL:   {{CUIL}}
+
+FECHA:   {{FECHA_DOC}}
+
+En uso de las facultades estatuidas por los Arts. 67 y 68 de la Ley de Contrato de Trabajo, por la presente se le solicita que en el plazo de cuarenta y ocho (48) horas hábiles de recibida esta notificación presente por escrito las explicaciones que estime corresponder respecto de los hechos que se transcriben a continuación:
+
+##Debido a llegar tarde el día y hora: {{FECHA_TARDE}} — {{HORA}} hs. Su horario de ingreso es a las {{HORA_TURNO}} hs, con una tolerancia de {{TOLERANCIA}} minutos. Registró {{MINUTOS}} minutos de atraso.##
+
+La conducta descripta podría configurar una infracción a la normativa laboral vigente y a las políticas y procedimientos internos de la Empresa, que resultan de su conocimiento conforme constancias que obran en nuestros registros, así como un incumplimiento de los deberes previstos en los Arts. 62 (deber de conducta), 63 (buena fe), 84 (diligencia y colaboración), 85 (fidelidad), 86 (órdenes e instrucciones) y 87 (responsabilidad por daños) de la LCT.
+
+%%DESCARGO%%
+
+Vencido el plazo otorgado sin que se reciban explicaciones, o resultando éstas insuficientes, la Empresa resolverá lo que corresponda conforme la normativa vigente.
+
+Se deja expresa constancia de que la reiteración de conductas similares podrá dar lugar a la aplicación de sanciones disciplinarias.
+
+RRHH
+
+Firma del trabajador:
+
+Aclaración:
+
+DNI:`;
+
+TPL.apercibimiento=`APERCIBIMIENTO DISCIPLINARIO
+
+Nombre y Apellido:   {{NOMBRE}}
+Legajo:   {{LEGAJO}}
+CUIL:   {{CUIL}}
+
+FECHA:   {{FECHA_DOC}}
+
+En uso de las facultades estatuidas por los Arts. 67 y 68 de la Ley de Contrato de Trabajo a través de la presente notificamos a Ud. que la empresa ha resuelto aplicarle una sanción disciplinaria, con fundamento en los hechos que transcribimos a continuación:
+
+##EL COLABORADOR REGISTRÓ LLEGADA TARDE EL DÍA {{FECHA_TARDE}}, FICHANDO SU INGRESO A LAS {{HORA}} HS, SIENDO SU HORARIO DE ENTRADA {{HORA_TURNO}} HS CON UNA TOLERANCIA DE {{TOLERANCIA}} MINUTOS. ATRASO REGISTRADO: {{MINUTOS}} MINUTOS. ANTECEDENTE N° {{ORDEN}} POR EL MISMO INCUMPLIMIENTO. NOTIFICACIONES PREVIAS: {{PREVIAS}}.##
+
+Por lo expuesto, se advierte que su conducta configura una infracción a la normativa laboral vigente y a las políticas y procedimientos internos de la Empresa, que resultan de su conocimiento conforme constancias que obran en nuestros registros.
+
+Asimismo, su accionar constituye un incumplimiento de las obligaciones a su cargo, vulnerando los deberes previstos en los Arts. 62 (deber de conducta), 63 (buena fe), 84 (diligencia y colaboración), 85 (fidelidad), 86 (órdenes e instrucciones) y 87 (responsabilidad por daños) de la LCT, en tanto es su obligación desempeñar sus tareas en forma adecuada y conforme las instrucciones impartidas, con la debida diligencia que como todo buen trabajador debe adoptar.
+
+En virtud de lo expuesto, se ha resuelto aplicarle un APERCIBIMIENTO DISCIPLINARIO, exhortándolo a adecuar de inmediato su conducta laboral y a abstenerse de reiterar hechos como los aquí descriptos.
+
+Se deja expresa constancia de que la reiteración de conductas similares o cualquier nuevo incumplimiento podrá dar lugar a la aplicación de sanciones disciplinarias mucho más severas, conforme lo previsto en la normativa vigente.
+
+RRHH
+
+Firma del trabajador:
+
+Aclaración:
+
+DNI:`;
+
+TPL.sancion=`SANCIÓN DISCIPLINARIA
+
+Nombre y Apellido:   {{NOMBRE}}
+Legajo:   {{LEGAJO}}
+CUIL:   {{CUIL}}
+
+FECHA:   {{FECHA_DOC}}
+
+En uso de las facultades estatuidas por los Arts. 67 y 68 de la Ley de Contrato de Trabajo a través de la presente notificamos a Ud. que la empresa ha resuelto aplicarle una sanción disciplinaria, con fundamento en los hechos que transcribimos a continuación:
+
+##Debido a llegar tarde el día y hora: {{FECHA_TARDE}} — {{HORA}} hs. Horario de ingreso {{HORA_TURNO}} hs, tolerancia {{TOLERANCIA}} minutos, atraso registrado {{MINUTOS}} minutos. Se trata del antecedente N° {{ORDEN}} por el mismo incumplimiento. Notificaciones previas: {{PREVIAS}}. Detalle de los hechos registrados: {{HISTORIAL}}.##
+
+Por lo expuesto, se advierte que su conducta configura una infracción a la normativa laboral vigente y a las políticas y procedimientos internos de la Empresa, que resultan de su conocimiento conforme constancias que obran en nuestros registros.
+
+Asimismo, su accionar constituye un incumplimiento de las obligaciones a su cargo, vulnerando los deberes previstos en los Arts. 62 (deber de conducta), 63 (buena fe), 84 (diligencia y colaboración), 85 (fidelidad), 86 (órdenes e instrucciones) y 87 (responsabilidad por daños) de la LCT, en tanto es su obligación desempeñar sus tareas en forma adecuada y conforme las instrucciones impartidas, con la debida diligencia que como todo buen trabajador debe adoptar.
+
+En virtud de lo expuesto, se ha resuelto aplicarle una SUSPENSIÓN de {{DIAS_SUSP}} días, a cumplirse el día {{FECHA_SUSP}}, exhortándolo a adecuar de inmediato su conducta laboral y a abstenerse de reiterar hechos como los aquí descriptos.
+
+Se deja expresa constancia de que la reiteración de conductas similares o cualquier nuevo incumplimiento podrá dar lugar a la aplicación de sanciones disciplinarias mucho más severas, conforme lo previsto en la normativa vigente.
+
+RRHH
+
+Firma del trabajador:
+
+Aclaración:
+
+DNI:`;
+
+/* ============================================================
+   3. ESTADO
+   ============================================================ */
+let DB={version:2,tolerancia:10,escPedidos:3,escApercib:1,renglones:8,shifts:{},records:{},people:{},templates:{},files:[],vac:null,vacOv:{},ant:null,antOv:{}};
+let sortTarde={k:'fecha',dir:-1}, sortRank={k:'cant',dir:-1}, selPed=new Set(), manualSel=false;
+const LOGO='data:image/png;base64,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swPBmbHnkQ3n8qRofrbgFcsHusm45O5wNy6STWjDZcj6xKWUU/HBE+37px20bKFe0WjbHLVLJwYTqcyFi8HhnNmIV8szlObkG/W7jdawLjPWvBEutN3L7w4LMy58+muUlfNQxtUvRz76doaPDhKfuYH9ssWhrKlOpKFs0+RlD4wzaPWkx00SeItOXI4j6ol9qrjgKTc1cPWRK7GaW1yNCSot5mgbivR9G/jLOJyHuB5KN44xzL7uZT3r3RmEQv63JeEJHOjkxmVPwhpLdflQOFBrePJm1678An35mhei1z75Qhpynf5SlaLjQrs86xPc1fQ01j11cWch5lr1sudID1zG17OdEQQOnXHjsh4ftpDrCk9fOU0R6VSWJ226urt/UPtF18YHa74fTraxZvEiKsb8T3hCzQ5cFuALpa5YkxHd4afBRSSl3jj2PWANDNnTW7opxzrA4NQyvbmlA51ycg0ELhh+ajGmb2xOlbrwnFfeHZq2NJyuziTP3rE+SRRkCrAND+LaTkUjJhDkylVpts1GJxjFzRWAqTwCbsHWLdpNg4kdN2jThqET1n39rpCqN2bf5LlZSmf9BOnYoFQULynq7TLraE+tyraSwWHAazgnF+/8ulC+RkyJSiLF6N2Wpu14pyu4o2j2VP80jSBufigTVhxraTVUHf2JpiPVbO9sqitd+wy4pJFrR+5aq6PrqmlX2OqYAriediXyttpX/wfblCBXLF3tTwAAAABJRU5ErkJggg==';
+
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const hhmm=m=>pad(Math.floor(((m%1440)+1440)%1440/60))+':'+pad(((m%1440)+1440)%1440%60);
+const dmy=iso=>{if(!iso)return'';const[a,b,c]=iso.split('-');return `${c}/${b}/${a}`};
+const dmyDots=iso=>{if(!iso)return'';const[a,b,c]=iso.split('-');return `${c}.${b}.${a}`};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),3200)}
+const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+
+/* ============================================================
+   4. TURNOS: inferencia de hora de ingreso
+   ============================================================ */
+function guessStart(j){
+  const s=(j||'').replace(/\s+/g,' ').trim();
+  if(/franco/i.test(s)) return null;
+  if(/24\s*hs/i.test(s)) return null;
+  if(/flexible/i.test(s)) return null;
+  let m;
+  if(m=s.match(/\bTM\s*0?(\d{1,2})\b/i))  return +m[1]*60;
+  if(m=s.match(/\bTT\s*0?(\d{1,2})\b/i))  return +m[1]*60;
+  if(m=s.match(/\bTN\s*0?(\d{1,2})\s*HS/i)) return +m[1]*60;
+  if(m=s.match(/\b(\d{1,2})\s*a\s*(\d{1,2})\b/i)) return +m[1]*60;
+  if(m=s.match(/\b(\d{1,2})\s*A\s*\+/i))  return +m[1]*60;
+  if(m=s.match(/\b(\d{1,2})\s*(AM|PM)\b/i)){let h=+m[1];if(/PM/i.test(m[2])&&h<12)h+=12;return h*60}
+  if(m=s.match(/\b(\d{1,2}):(\d{2})\b/))  return +m[1]*60+ +m[2];
+  return null;
+}
+function ensureShift(j){
+  if(!j) return;
+  if(!DB.shifts[j]){
+    const g=guessStart(j);
+    DB.shifts[j]={start:g, active:g!=null&&g<20*60, auto:true};
+  }
+}
+const shiftOf=j=>DB.shifts[j]||null;
+
+/* ============================================================
+   5. PARSEO DEL EXCEL
+   ============================================================ */
+const HDR={legajo:/c[oó]digo\s*de\s*empleado|legajo/i, nombre:/apellidos?\s*,?\s*nombre/i,
+  empresa:/c[oó]digo\s*de\s*empresa|empresa/i, fecha:/^fecha$/i, dia:/^d[ií]a$/i,
+  jornada:/jornada\s*efectiva|jornada/i, mov:/movimiento/i, cuil:/cuil|cuit/i};
+
+function excelDateToISO(v){
+  if(v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
+  if(typeof v==='number'){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`}
+  const s=String(v||'').trim(); let m;
+  if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)) return `${m[1]}-${m[2]}-${m[3]}`;
+  if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/)){let y=m[3];if(y.length===2)y='20'+y;return `${y}-${pad(m[2])}-${pad(m[1])}`}
+  return '';
+}
+
+function parseMov(raw){
+  const txt=String(raw||'').replace(/\u00a0/g,' ').trim();
+  const marks=[], eventos=[];
+  if(!txt) return {marks,eventos};
+  for(const tk of txt.split('|').map(t=>t.trim()).filter(Boolean)){
+    const m=tk.match(/^\.?\S*\s*([EeCcSs])\s+(\d{1,2}):(\d{2})/);
+    if(m) marks.push({tipo:m[1].toUpperCase(),min:+m[2]*60+ +m[3]});
+    else eventos.push(tk.replace(/^\.{0,2}\d*\s*/,'').trim());
+  }
+  marks.sort((a,b)=>a.min-b.min);
+  return {marks,eventos};
+}
+
+// diferencia circular: sirve para turnos que cruzan medianoche
+function delta(entry,start){let d=entry-start;if(d>720)d-=1440;if(d<-720)d+=1440;return d}
+
+function evaluate(rec){
+  const sh=shiftOf(rec.jornada);
+  rec.start = sh? sh.start : null;
+  if(rec.start==null){rec.status='sin_turno';rec.atraso=null;return rec}
+  if(rec.entrada==null){rec.status = rec.eventos.length? 'novedad':'sin_fichada'; rec.atraso=null; return rec}
+  rec.atraso = delta(rec.entrada, rec.start);
+  rec.status = rec.atraso > DB.tolerancia ? 'tarde' : 'ok';
+  return rec;
+}
+
+function importRows(rows,fileName){
+  if(!rows.length) return {added:0,fechas:[]};
+  // localizar fila de encabezado
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const j=rows[i].map(c=>String(c||''));
+    if(j.some(c=>HDR.nombre.test(c))&&j.some(c=>HDR.mov.test(c)||HDR.jornada.test(c))){hi=i;break}
+  }
+  if(hi<0) throw new Error('No encontré el encabezado. Esperaba columnas "Apellidos, Nombre" y "Movimientos".');
+  const head=rows[hi].map(c=>String(c||'').trim());
+  const col={};
+  for(const k in HDR) col[k]=head.findIndex(h=>HDR[k].test(h));
+  if(col.nombre<0) throw new Error('Falta la columna "Apellidos, Nombre".');
+
+  let added=0; const fechas=new Set();
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const nombre=String(r[col.nombre]??'').trim();
+    const legajo=String(r[col.legajo]??'').trim();
+    if(!nombre||!legajo) continue;
+    if(HDR.nombre.test(nombre)||HDR.legajo.test(legajo)) continue; // encabezado repetido
+    if(col.cuil>=0){
+      const cu=String(r[col.cuil]??'').trim();
+      if(cu) (DB.people[legajo]||(DB.people[legajo]={})).cuil=cu;
+    }
+    const fecha=excelDateToISO(r[col.fecha]);
+    if(!fecha) continue;
+    const jornada=String(r[col.jornada]??'').replace(/\s+/g,' ').trim();
+    ensureShift(jornada);
+    const {marks,eventos}=parseMov(r[col.mov]);
+    const ent=marks.find(m=>m.tipo==='E') || marks[0] || null;
+    const rec={legajo,nombre,empresa:String(r[col.empresa]??'').trim(),fecha,
+      dia:String(r[col.dia]??'').trim(),jornada,
+      entrada:ent?ent.min:null, marcas:marks.map(m=>m.tipo+m.min), eventos};
+    DB.records[legajo+'|'+fecha]=evaluate(rec);
+    fechas.add(fecha); added++;
+  }
+  DB.files.push({name:fileName,fechas:[...fechas].sort(),rows:added,at:new Date().toISOString()});
+  return {added,fechas:[...fechas]};
+}
+
+function recompute(){
+  const R=Object.values(DB.records);
+  for(const r of R) evaluate(r);
+  // Si en una fecha+jornada casi nadie fichó, el reporte no cubre ese turno:
+  // no son ausentes, es que la exportación se hizo antes de que entraran.
+  const cov={};
+  for(const r of R){ if(r.start==null) continue;
+    const k=r.fecha+'|'+r.jornada; (cov[k]||(cov[k]={t:0,e:0}));
+    cov[k].t++; if(r.entrada!=null) cov[k].e++; }
+  for(const r of R){ if(r.start==null||r.status!=='sin_fichada') continue;
+    const c=cov[r.fecha+'|'+r.jornada];
+    if(c && ((c.e===0&&c.t>=2) || (c.t>=5 && c.e/c.t<0.2))) r.status='no_cubierto'; }
+}
+
+/* ============================================================
+   6. CONSULTAS
+   ============================================================ */
+const allRecs=()=>Object.values(DB.records);
+const activeRecs=()=>allRecs().filter(r=>{const s=shiftOf(r.jornada);return s&&s.active&&s.start!=null});
+const lateRecs=()=>activeRecs().filter(r=>r.status==='tarde');
+
+const BANDAS=[{k:'manana',t:'Mañana',a:4*60,b:12*60},{k:'tarde',t:'Tarde',a:12*60,b:20*60},{k:'noche',t:'Noche',a:20*60,b:28*60}];
+const bandaDe=m=>m==null?null:(m<4*60?'noche':m<12*60?'manana':m<20*60?'tarde':'noche');
+
+function matchTurno(r,f){
+  if(!f) return true;
+  if(f.startsWith('banda:')) return bandaDe(r.start)===f.slice(6);
+  return r.jornada===f;
+}
+
+function inRange(r,d,h){ if(d&&r.fecha<d)return false; if(h&&r.fecha>h)return false; return true }
+
+function ranking(){
+  const m={};
+  for(const r of lateRecs()){
+    const p=m[r.legajo]||(m[r.legajo]={legajo:r.legajo,nombre:r.nombre,empresa:r.empresa,jornada:r.jornada,cant:0,mins:0,peor:0,ultima:'',fechas:[]});
+    p.cant++; p.mins+=r.atraso; p.peor=Math.max(p.peor,r.atraso);
+    if(r.fecha>p.ultima)p.ultima=r.fecha;
+    p.fechas.push(r.fecha+' '+hhmm(r.entrada));
+    p.nombre=r.nombre;
+  }
+  return Object.values(m).map(p=>(p.prom=Math.round(p.mins/p.cant),p)).sort((a,b)=>b.cant-a.cant||b.mins-a.mins);
+}
+const rankMap=()=>Object.fromEntries(ranking().map(p=>[p.legajo,p]));
+
+// n-esima tardanza de cada persona, en orden cronologico
+function ordinals(){
+  const g={}, map={};
+  for(const r of lateRecs()) (g[r.legajo]||(g[r.legajo]=[])).push(r);
+  for(const l in g){
+    g[l].sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:a.entrada-b.entrada);
+    g[l].forEach((r,i)=>map[r.legajo+'|'+r.fecha]=i+1);
+  }
+  return map;
+}
+const KINDS={descargo:'Pedido de explicación',apercibimiento:'Apercibimiento',sancion:'Suspensión'};
+function kindFor(n){
+  const a=+DB.escPedidos||0, b=a+(+DB.escApercib||0);
+  if(n<=a) return 'descargo';
+  if(n<=b) return 'apercibimiento';
+  return 'sancion';
+}
+
+function byDate(){
+  const m={};
+  for(const r of activeRecs()){ (m[r.fecha]||(m[r.fecha]={f:r.fecha,tarde:0,total:0,sinf:0}));
+    m[r.fecha].total++; if(r.status==='tarde')m[r.fecha].tarde++; if(r.status==='sin_fichada')m[r.fecha].sinf++; }
+  return Object.values(m).sort((a,b)=>a.f<b.f?-1:1);
+}
+
+/* ============================================================
+   7. RENDER
+   ============================================================ */
+function render(){ fillTurnoSel(); renderHead(); renderKpis(); renderChart(); renderTarde(); renderRank(); renderPed(); renderSinf(); renderTurnos(); renderFiles(); renderPeople(); }
+
+function renderHead(){
+  const d=byDate(), n=allRecs().length;
+  $('#subhead').textContent = n? `${n} registros · ${d.length} día(s) cargados · último ${d.length?dmy(d[d.length-1].f):'—'} · guardado en ${Store.mode}`
+                               : 'Base vacía — subí el primer reporte para empezar';
+}
+
+function renderKpis(){
+  const d=byDate(), last=d[d.length-1], tot=lateRecs().length;
+  const sinf=activeRecs().filter(r=>r.status==='sin_fichada').length;
+  const rk=ranking(), reinc=rk.filter(p=>p.cant>=2).length;
+  const puntual=activeRecs().length? Math.round(activeRecs().filter(r=>r.status==='ok').length/activeRecs().filter(r=>r.status==='ok'||r.status==='tarde').length*100):0;
+  const K=[
+    {l:'Último día',v:last?dmy(last.f):'—',s:last?`${last.tarde} tarde de ${last.total}`:'sin datos'},
+    {l:'Tardanzas acumuladas',v:tot,s:`en ${d.length} día(s)`,c:'acc-alert'},
+    {l:'Personas con tardanza',v:rk.length,s:`${reinc} reincidentes`,c:'acc-ochre'},
+    {l:'Puntualidad',v:(isFinite(puntual)?puntual:0)+'%',s:'sobre fichadas del turno',c:'acc-lime'},
+    {l:'Sin fichada',v:sinf,s:'a revisar'},
+    {l:'No exportado',v:activeRecs().filter(r=>r.status==='no_cubierto').length,s:'turnos fuera del reporte'},
+    {l:'Turnos activos',v:Object.values(DB.shifts).filter(s=>s.active&&s.start!=null).length,s:`de ${Object.keys(DB.shifts).length} detectados`}
+  ];
+  $('#kpis').innerHTML=K.map(k=>`<div class="kpi ${k.c||''}"><div class="lab">${k.l}</div><div class="val">${esc(k.v)}</div><div class="sub">${esc(k.s)}</div></div>`).join('');
+  $('#bTarde').textContent=tot; $('#bRank').textContent=rk.length; $('#bSinf').textContent=sinf;
+  $('#bTurnos').textContent=Object.keys(DB.shifts).length;
+}
+
+function renderChart(){
+  const data=byDate(), svg=$('#chart');
+  if(!data.length){svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" class="axl">Todavía no hay días cargados</text>';$('#chartNote').textContent='';return}
+  $('#chartNote').textContent=`${data.length} día(s) · tolerancia ${DB.tolerancia} min`;
+  const W=1000,H=210,ml=34,mr=8,mt=12,mb=26, iw=W-ml-mr, ih=H-mt-mb;
+  const max=Math.max(3,...data.map(d=>d.tarde));
+  const bw=Math.min(46,iw/data.length*0.62), step=iw/data.length;
+  let g='';
+  for(let i=0;i<=4;i++){const y=mt+ih-ih*i/4, v=Math.round(max*i/4);
+    g+=`<line class="grid" x1="${ml}" y1="${y}" x2="${W-mr}" y2="${y}"/><text class="axl" x="${ml-6}" y="${y+3}" text-anchor="end">${v}</text>`}
+  data.forEach((d,i)=>{
+    const h=ih*d.tarde/max, x=ml+step*i+(step-bw)/2, y=mt+ih-h;
+    g+=`<rect class="bar" x="${x}" y="${y}" width="${bw}" height="${Math.max(h,d.tarde?2:0)}" rx="1"><title>${dmy(d.f)} — ${d.tarde} tarde de ${d.total}</title></rect>`;
+    if(d.tarde) g+=`<text class="axl" x="${x+bw/2}" y="${y-3}" text-anchor="middle">${d.tarde}</text>`;
+    if(data.length<=22||i%Math.ceil(data.length/18)===0)
+      g+=`<text class="axl" x="${x+bw/2}" y="${H-8}" text-anchor="middle">${d.f.slice(8)}/${d.f.slice(5,7)}</text>`;
+  });
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.removeAttribute('preserveAspectRatio'); svg.innerHTML=g;
+}
+
+function stripHTML(r){
+  const A=r.start-25, B=r.start+95, span=B-A;
+  const x=v=>Math.max(0,Math.min(100,(v-A)/span*100));
+  const tolW=x(r.start+DB.tolerancia)-x(r.start);
+  return `<div class="strip">
+    <div class="tol" style="left:${x(r.start)}%;width:${tolW}%"></div>
+    <div class="start" style="left:${x(r.start)}%"></div>
+    <div class="pin ${r.status==='tarde'?'':'okp'}" style="left:${x(r.entrada)}%"></div>
+  </div><div class="striplab"><span>${hhmm(A)}</span><span>${hhmm(r.start)}</span><span>${hhmm(B)}</span></div>`;
+}
+
+function filtTarde(){
+  const d=$('#fDesde').value,h=$('#fHasta').value,q=$('#fBusca').value.trim().toLowerCase(),t=$('#fTurno').value;
+  return lateRecs().filter(r=>inRange(r,d,h)
+    &&(!q||r.nombre.toLowerCase().includes(q)||r.legajo.includes(q))
+    &&matchTurno(r,t))
+    .sort((a,b)=>{const k=sortTarde.k;let v=0;
+      if(k==='fecha')v=a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0;
+      else if(k==='nombre')v=a.nombre.localeCompare(b.nombre);
+      else if(k==='atraso')v=a.atraso-b.atraso;
+      else if(k==='legajo')v=a.legajo.localeCompare(b.legajo,undefined,{numeric:true});
+      return v*sortTarde.dir});
+}
+
+function th(cols,st,on){return '<thead><tr>'+cols.map(c=>c.k
+  ?`<th class="sortable" data-k="${c.k}" data-t="${on}">${c.t}${st.k===c.k?(st.dir>0?' ▲':' ▼'):''}</th>`
+  :`<th>${c.t}</th>`).join('')+'</tr></thead>'}
+
+function renderTarde(){
+  const rows=filtTarde();
+  const cols=[{t:'Fecha',k:'fecha'},{t:'Legajo',k:'legajo'},{t:'Apellido y nombre',k:'nombre'},{t:'Turno'},
+    {t:'Ingreso',k:null},{t:'Fichó',k:null},{t:'Atraso',k:'atraso'},{t:'Franja de fichada'},{t:'Acum.'}];
+  const rk=rankMap();
+  $('#tTarde').innerHTML = th(cols,sortTarde,'tarde') + (rows.length?'<tbody>'+rows.map(r=>`<tr>
+    <td class="mono">${dmy(r.fecha)}</td><td class="mono">${esc(r.legajo)}</td>
+    <td>${esc(r.nombre)}</td><td style="font-size:12.5px;color:var(--mute)">${esc(r.jornada.replace(/^IS - /,''))}</td>
+    <td class="mono">${hhmm(r.start)}</td><td class="mono" style="font-weight:600">${hhmm(r.entrada)}</td>
+    <td class="mono late-min">+${r.atraso}′</td>
+    <td style="min-width:170px">${stripHTML(r)}</td>
+    <td><span class="tag n">${rk[r.legajo]?rk[r.legajo].cant:1}</span></td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="9"><div class="empty">Ninguna llegada tarde con estos filtros.</div></td></tr></tbody>');
+}
+
+function renderRank(){
+  const rk=ranking();
+  const top=rk.slice(0,10), max=top.length?top[0].cant:1;
+  $('#hbars').innerHTML = top.length? top.map(p=>`<div class="hbar-row">
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nombre)}</div>
+      <div class="hbar"><i style="width:${p.cant/max*100}%"></i></div>
+      <div class="mono" style="text-align:right;font-weight:600">${p.cant}</div></div>`).join('')
+    : '<div class="empty">Sin datos todavía.</div>';
+  const sorted=[...rk].sort((a,b)=>{const k=sortRank.k;let v=0;
+    if(k==='nombre')v=a.nombre.localeCompare(b.nombre);
+    else if(k==='legajo')v=a.legajo.localeCompare(b.legajo,undefined,{numeric:true});
+    else if(k==='ultima')v=a.ultima<b.ultima?-1:1;
+    else v=(a[k]||0)-(b[k]||0); return v*sortRank.dir});
+  const cols=[{t:'Legajo',k:'legajo'},{t:'Apellido y nombre',k:'nombre'},{t:'Turno'},{t:'Tardanzas',k:'cant'},
+    {t:'Min. totales',k:'mins'},{t:'Prom.',k:'prom'},{t:'Peor',k:'peor'},{t:'Última',k:'ultima'},{t:'Fechas'}];
+  $('#tRank').innerHTML = th(cols,sortRank,'rank') + (sorted.length?'<tbody>'+sorted.map(p=>`<tr>
+    <td class="mono">${esc(p.legajo)}</td><td>${esc(p.nombre)}</td>
+    <td style="font-size:12.5px;color:var(--mute)">${esc(p.jornada.replace(/^IS - /,''))}</td>
+    <td><span class="tag ${p.cant>=3?'tarde':p.cant>=2?'sinf':'n'}">${p.cant}</span></td>
+    <td class="mono">${p.mins}′</td><td class="mono">${p.prom}′</td><td class="mono">${p.peor}′</td>
+    <td class="mono">${dmy(p.ultima)}</td>
+    <td style="font-size:11.5px;color:var(--mute)" class="mono">${esc(p.fechas.map(f=>dmy(f.slice(0,10))+' '+f.slice(11)).join(' · '))}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="9"><div class="empty">Sin tardanzas registradas.</div></td></tr></tbody>');
+}
+
+function pedRows(){
+  const d=$('#pDesde').value,h=$('#pHasta').value,rk=rankMap();
+  return lateRecs().filter(r=>inRange(r,d,h)&&(!$('#pSoloReinc').checked||(rk[r.legajo]&&rk[r.legajo].cant>=2)))
+    .sort((a,b)=>a.fecha<b.fecha?1:a.fecha>b.fecha?-1:a.nombre.localeCompare(b.nombre));
+}
+const rid=r=>r.legajo+'|'+r.fecha;
+
+function kindOf(r){ const f=$('#selPlantilla').value; return f==='auto'? kindFor(ordinals()[rid(r)]||1) : f }
+
+function renderPed(){
+  const rows=pedRows(), ord=ordinals();
+  if(!manualSel) selPed=new Set(rows.map(rid));
+  $('#bPed').textContent=rows.length;
+  $('#ePed').textContent=DB.escPedidos; $('#eApe').textContent=DB.escApercib;
+  $('#cfgPed').value=DB.escPedidos; $('#cfgApe').value=DB.escApercib; $('#cfgRen').value=DB.renglones;
+  const cnt={descargo:0,apercibimiento:0,sancion:0};
+  rows.forEach(r=>{ if(selPed.has(rid(r))) cnt[kindOf(r)]++ });
+  $('#pCount').textContent=`${selPed.size} de ${rows.length} seleccionados — `
+    +`${cnt.descargo} pedido(s), ${cnt.apercibimiento} apercibimiento(s), ${cnt.sancion} suspensión(es)`;
+  $('#tPed').innerHTML=`<thead><tr><th style="width:34px"></th><th>Fecha</th><th>Legajo</th><th>Apellido y nombre</th>
+    <th>CUIL</th><th>Hora</th><th>Atraso</th><th>N°</th><th>Documento</th><th></th></tr></thead>`+
+    (rows.length?'<tbody>'+rows.map(r=>{const p=DB.people[r.legajo]||{}, n=ord[rid(r)]||1, k=kindOf(r);
+      const cls=k==='sancion'?'tarde':k==='apercibimiento'?'sinf':'ok';
+      return `<tr>
+      <td><input type="checkbox" class="pchk" data-id="${rid(r)}" ${selPed.has(rid(r))?'checked':''}></td>
+      <td class="mono">${dmy(r.fecha)}</td><td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td>
+      <td class="mono" style="${p.cuil?'':'color:var(--ochre)'}">${esc(p.cuil||'falta')}</td>
+      <td class="mono">${hhmm(r.entrada)}</td><td class="mono late-min">+${r.atraso}′</td>
+      <td class="mono" style="font-weight:600">${n}</td>
+      <td><span class="tag ${cls}">${KINDS[k]}</span></td>
+      <td><button class="btn ghost sm" data-one="${rid(r)}">Descargar</button></td></tr>`}).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="10"><div class="empty">No hay tardanzas en el rango elegido.</div></td></tr></tbody>');
+}
+
+function renderSinf(){
+  const rows=activeRecs().filter(r=>r.status==='sin_fichada'||r.status==='novedad'||r.status==='no_cubierto')
+    .sort((a,b)=>a.fecha<b.fecha?1:a.fecha>b.fecha?-1:a.nombre.localeCompare(b.nombre));
+  $('#tSinf').innerHTML=`<thead><tr><th>Fecha</th><th>Legajo</th><th>Apellido y nombre</th><th>Turno</th><th>Estado</th><th>Observado en el reloj</th></tr></thead>`+
+    (rows.length?'<tbody>'+rows.map(r=>`<tr><td class="mono">${dmy(r.fecha)}</td><td class="mono">${esc(r.legajo)}</td>
+      <td>${esc(r.nombre)}</td><td style="font-size:12.5px;color:var(--mute)">${esc(r.jornada.replace(/^IS - /,''))}</td>
+      <td><span class="tag ${r.status==='novedad'?'nov':r.status==='no_cubierto'?'n':'sinf'}">${r.status==='novedad'?'Novedad':r.status==='no_cubierto'?'Turno no exportado':'Sin fichada'}</span></td>
+      <td style="font-size:12.5px">${esc(r.eventos.join(' · ')||'—')}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="6"><div class="empty">Nadie sin fichada en los turnos activos.</div></td></tr></tbody>');
+}
+
+function renderTurnos(){
+  const counts={}; for(const r of allRecs()) counts[r.jornada]=(counts[r.jornada]||0)+1;
+  const ks=Object.keys(DB.shifts).sort((a,b)=>(counts[b]||0)-(counts[a]||0));
+  $('#cfgTol').value=DB.tolerancia;
+  $('#tTurnos').innerHTML=`<thead><tr><th style="width:46px">Activo</th><th>Jornada (tal cual viene del reloj)</th>
+    <th style="width:120px">Hora ingreso</th><th style="width:110px">Registros</th><th style="width:120px">Tardanzas</th></tr></thead>`+
+    (ks.length?'<tbody>'+ks.map(j=>{const s=DB.shifts[j];
+      const t=allRecs().filter(r=>r.jornada===j&&r.status==='tarde').length;
+      const noc = s.start!=null && s.start>=20*60;
+      return `<tr><td><input type="checkbox" class="shchk" data-j="${esc(j)}" ${s.active?'checked':''} ${s.start==null?'disabled':''}></td>
+        <td>${esc(j)}${noc?' <span class="tag sinf" title="El turno cruza la medianoche">nocturno</span>':''}</td>
+        <td><input type="text" class="shtime mono" data-j="${esc(j)}" value="${s.start==null?'':hhmm(s.start)}" placeholder="sin horario" style="padding:3px 6px"></td>
+        <td class="mono">${counts[j]||0}</td>
+        <td class="mono">${s.active?t:'—'}</td></tr>`}).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="5"><div class="empty">Todavía no cargaste ningún archivo.</div></td></tr></tbody>');
+}
+
+function renderFiles(){
+  $('#tFiles').innerHTML=`<thead><tr><th>Archivo</th><th>Fechas</th><th>Filas</th><th>Importado</th></tr></thead>`+
+    (DB.files.length?'<tbody>'+[...DB.files].reverse().map(f=>`<tr><td>${esc(f.name)}</td>
+      <td class="mono" style="font-size:12px">${esc(f.fechas.map(dmy).join(', '))}</td><td class="mono">${f.rows}</td>
+      <td class="mono" style="font-size:12px">${esc(new Date(f.at).toLocaleString('es-AR'))}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="4"><div class="empty">Sin archivos.</div></td></tr></tbody>');
+}
+
+function renderPeople(){
+  const legs=[...new Set(lateRecs().map(r=>r.legajo))].sort();
+  const nm={}; for(const r of lateRecs()) nm[r.legajo]=r.nombre;
+  $('#tPeople').innerHTML=`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th style="width:200px">CUIL</th></tr></thead>`+
+    (legs.length?'<tbody>'+legs.map(l=>{const p=DB.people[l]||{};return `<tr><td class="mono">${esc(l)}</td><td>${esc(nm[l])}</td>
+      <td><input type="text" class="pfield mono" data-l="${esc(l)}" data-f="cuil" value="${esc(p.cuil||'')}" placeholder="20-12345678-9" style="padding:3px 6px"></td></tr>`}).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="3"><div class="empty">Sin personas con tardanza.</div></td></tr></tbody>');
+}
+
+/* ============================================================
+   8. DOCUMENTOS WORD
+   ============================================================ */
+function fillTpl(kind,r){
+  const tpl=(DB.templates&&DB.templates[kind])||TPL[kind];
+  const p=DB.people[r.legajo]||{}, rk=rankMap(), ord=ordinals()[rid(r)]||1;
+  const prev=[]; for(let i=1;i<ord;i++) prev.push(KINDS[kindFor(i)]);
+  const cnt={}; prev.forEach(x=>cnt[x]=(cnt[x]||0)+1);
+  const map={
+    NOMBRE:r.nombre, LEGAJO:r.legajo,
+    CUIL:p.cuil||'_____________________', DNI:p.cuil||'_____________________',
+    ORDEN:String(ord),
+    PREVIAS:prev.length?Object.entries(cnt).map(([k,v])=>v+' '+k+(v>1?'s':'')).join(', '):'ninguna',
+    TIPO:KINDS[kindFor(ord)],
+    EMPRESA:r.empresa, JORNADA:r.jornada.replace(/^IS - /,''),
+    FECHA_DOC:dmyDots($('#pFechaDoc').value||todayISO()),
+    FECHA_TARDE:dmy(r.fecha), HORA:hhmm(r.entrada), HORA_TURNO:hhmm(r.start),
+    MINUTOS:String(r.atraso), TOLERANCIA:String(DB.tolerancia),
+    CANT:String(rk[r.legajo]?rk[r.legajo].cant:1),
+    DIAS_SUSP:$('#pDiasSusp').value||'3',
+    FECHA_SUSP:dmy($('#pFechaSusp').value)||'____/____/________',
+    HISTORIAL:(rk[r.legajo]?rk[r.legajo].fechas.map(f=>dmy(f.slice(0,10))+' '+f.slice(11)).join(' · '):'')
+  };
+  return tpl.replace(/\{\{(\w+)\}\}/g,(m,k)=>k in map?map[k]:m);
+}
+
+function keepSp(s){ return s.replace(/ {2,}/g,m=>'&nbsp;'.repeat(m.length)) }
+function tplToHTML(txt){
+  const blocks=txt.split(/\n{2,}/).map(b=>b.trim()).filter(Boolean);
+  return blocks.map((t,i)=>{
+    if(i===0) return `<p class="tt">${esc(t)}</p>`;
+    if(/^%%DESCARGO%%$/i.test(t)){
+      const n=Math.max(1,+DB.renglones||8);
+      return '<p class="dsc">Descargo del trabajador (a completar de puño y letra):</p>'
+        + new Array(n).fill('<p class="dsp">&nbsp;</p><hr class="dlr" size="1" noshade>').join('');
+    }
+    if(t.startsWith('##')&&t.endsWith('##'))
+      return `<p class="hi">${esc(t.slice(2,-2).trim())}</p>`;
+    if(/^(Firma del trabajador|Aclaraci[oó]n|DNI)\s*:$/i.test(t))
+      return `<p class="sig">${esc(t)} ______________________________________</p>`;
+    if(/^RRHH$/i.test(t)) return `<p class="rr">${esc(t)}</p>`;
+    if(t.includes('\n')) return `<p class="dat">${keepSp(esc(t)).replace(/\n/g,'<br>')}</p>`;
+    return `<p>${keepSp(esc(t))}</p>`;
+  }).join('');
+}
+
+const DOC_CSS=`
+@page{size:A4;margin:2.2cm 2.2cm 2.4cm}
+body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000;line-height:1.45}
+img.lg{width:170px;height:auto}
+.hd{border-bottom:1.5pt solid #58595B;padding-bottom:6pt;margin-bottom:14pt}
+p{margin:0 0 9pt;text-align:justify}
+p.tt{text-align:center;font-size:14pt;font-weight:bold;letter-spacing:1pt;margin:0 0 14pt;text-transform:uppercase}
+p.hi{font-weight:bold;font-style:italic;border-left:2.5pt solid #8DB53E;padding:4pt 0 4pt 9pt;background:#F5F8EC;text-align:left}
+p.dat{text-align:left}
+p.dsc{font-weight:bold;margin:14pt 0 9pt;text-align:left}
+p.dsp{margin:0;font-size:11pt;line-height:22pt}
+hr.dlr{margin:0 0 7pt;border:none;height:1pt;color:#8A8A83;background-color:#8A8A83}
+table.nt{width:100%;border-collapse:collapse;table-layout:fixed}
+table.nt>tbody>tr>td{vertical-align:top;padding:0 10pt;width:50%}
+table.nt td.sep{width:1pt;padding:0;border-left:.75pt dashed #9A9A93}
+p.ntt{text-align:center;font-weight:bold;font-size:12pt;margin:0 0 12pt;text-transform:uppercase;letter-spacing:.5pt}
+p.nsm{font-size:10pt;margin:0 0 7pt;text-align:justify}
+
+p.nlb{font-size:8pt;margin:0;text-align:center;color:#55554F}
+hr.nfl{margin:34pt 0 2pt;border:none;height:1pt;color:#000;background-color:#000}
+table.fw{width:100%;border-collapse:collapse}
+table.fw td{width:50%;padding:0 8pt;vertical-align:top}
+.rep{border-collapse:collapse;width:100%;margin:10pt 0}
+.rep th{border:.75pt solid #000;padding:3pt 5pt;font-size:8pt;text-align:center;font-weight:bold;color:#FFFFFF}
+.rep td{border:.75pt solid #000;padding:2pt 5pt;font-size:8pt;text-align:center}
+.rep td.l,.rep th.l{text-align:left}
+p.rr{text-align:right;margin-top:20pt;font-weight:bold}
+p.sig{margin-top:16pt;text-align:left}
+.ft{border-top:.75pt solid #C9C9C1;margin-top:26pt;padding-top:5pt;font-size:7.5pt;color:#7A7B76;text-align:center}
+p.vlg{text-align:center;margin:0 0 8pt}
+table.vbn{width:100%;border-collapse:collapse;margin:0 0 18pt}
+table.vbn td{background:#808080;color:#FFFFFF;text-align:center;font-weight:bold;font-size:13pt;padding:3pt 0;letter-spacing:.3pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+p.vfe{text-align:right;margin:0 0 22pt}
+p.vlb{font-weight:bold;margin:0;text-align:left}
+p.vnm{margin:0 0 2pt;text-align:left;text-transform:uppercase}
+table.vleg{border-collapse:collapse;margin:0 0 24pt}
+table.vleg td{border:1pt solid #000;padding:1pt 8pt;font-size:11pt}
+p.vtx{text-align:left;margin:0 0 10pt}
+p.vsp{margin-top:34pt}
+table.vfw{width:100%;border-collapse:collapse;margin:58pt 0 30pt}
+table.vfw td{width:44%;vertical-align:top;padding:0}
+table.vfw td.vgap{width:12%}
+p.vsl{border-top:1.5pt dotted #000;padding-top:2pt;margin:0;text-align:center;font-size:10pt}
+.pb{page-break-after:always}`;
+
+function docFor(kind,r){
+  return `<div class="hd"><img class="lg" src="${LOGO}"></div>${tplToHTML(fillTpl(kind,r))}
+  <div class="ft">Lima 1.111 · Piso 3° · (C1073AAW) C.A.B.A. · 0810-345-4378 · info@grupo-gestion.com.ar · www.grupo-gestion.com.ar</div>`;
+}
+
+// --- Word: HTML con el membrete embebido; lo abren Word, LibreOffice y Google Docs ---
+function docHTML(inner,title,imgSrc){
+  return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+   +`<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>${esc(title)}</title>`
+   +'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
+   +`<style>${DOC_CSS}</style></head><body>${inner.split(LOGO).join(imgSrc)}</body></html>`;
+}
+
+function wordFile(inner,title){
+  return '\ufeff'+docHTML(inner,title,LOGO);
+}
+
+// --- Impresion directa: garantiza el membrete aunque Word haga cualquier cosa ---
+function printDocs(inner){
+  let fr=document.getElementById('printFrame');
+  if(fr) fr.remove();
+  fr=document.createElement('iframe');
+  fr.id='printFrame';
+  fr.setAttribute('style','position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0');
+  document.body.appendChild(fr);
+  const d=fr.contentWindow.document;
+  d.open(); d.write(docHTML(inner,'Pedidos',LOGO)); d.close();
+  setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+    catch(e){ toast('El navegador bloqueó la impresión. Descargá el HTML y abrilo aparte.') } },400);
+}
+
+function download(content,name,mime){
+  try{
+    const b=new Blob([content],{type:mime}), u=URL.createObjectURL(b), a=document.createElement('a');
+    a.href=u; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500);
+  }catch(e){ toast('El navegador bloqueó la descarga. Abrí el HTML fuera de la vista previa.') }
+}
+const slug=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,44);
+
+/* ============================================================
+   9. CSV
+   ============================================================ */
+function csv(rows){ return '\ufeff'+rows.map(r=>r.map(c=>{const s=String(c==null?'':c);
+  return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(';')).join('\r\n') }
+
+/* ============================================================
+   10. EVENTOS
+   ============================================================ */
+$('#btnPick').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{ handleFiles([...e.target.files]); e.target.value='' };
+const dz=$('#drop');
+['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('hot')}));
+['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('hot')}));
+dz.addEventListener('drop',e=>handleFiles([...e.dataTransfer.files]));
+
+async function handleFiles(files){
+  if(!files.length) return;
+  if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel. Revisá la conexión y recargá.');return}
+  let tot=0, fech=new Set(), errs=[];
+  for(const f of files){
+    try{
+      const buf=await f.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:false});
+      const res=importRows(rows,f.name);
+      tot+=res.added; res.fechas.forEach(x=>fech.add(x));
+    }catch(err){ errs.push(f.name+': '+err.message) }
+  }
+  recompute(); manualSel=false; await persist(); render();
+  if(!$('#pFechaDoc').value) $('#pFechaDoc').value=todayISO();
+  if(tot) toast(`${tot} registros cargados · ${[...fech].sort().map(dmy).join(', ')}`);
+  if(errs.length) toast(errs[0]);
+}
+
+$('#tabs').onclick=e=>{const b=e.target.closest('.tab'); if(!b)return;
+  $$('.tab').forEach(t=>t.classList.toggle('on',t===b));
+  $$('.panel').forEach(p=>p.classList.toggle('on',p.id===b.dataset.p))};
+
+document.addEventListener('click',e=>{
+  const s=e.target.closest('th.sortable');
+  if(s){ const st=s.dataset.t==='tarde'?sortTarde:sortRank;
+    if(st.k===s.dataset.k) st.dir*=-1; else {st.k=s.dataset.k; st.dir=s.dataset.k==='nombre'||s.dataset.k==='legajo'?1:-1}
+    s.dataset.t==='tarde'?renderTarde():renderRank(); return }
+  const one=e.target.closest('[data-one]');
+  if(one){ const r=DB.records[one.dataset.one]; if(!r)return;
+    const kind=kindOf(r), pre={descargo:'Pedido',apercibimiento:'Apercibimiento',sancion:'Suspension'}[kind];
+    download(wordFile(docFor(kind,r),pre),`${pre}_${slug(r.nombre)}_${r.fecha}.doc`,'application/msword');
+    toast(KINDS[kind]+' descargado'); }
+});
+
+['#fDesde','#fHasta','#fBusca','#fTurno'].forEach(s=>$(s).oninput=renderTarde);
+$('#btnLimpiaF').onclick=()=>{['#fDesde','#fHasta','#fBusca'].forEach(s=>$(s).value='');$('#fTurno').value='';renderTarde()};
+$('#fTurno').onchange=renderTarde;
+
+['#pDesde','#pHasta','#pSoloReinc'].forEach(s=>$(s).oninput=()=>{manualSel=false;$('#pTodos').checked=true;renderPed()});
+$('#pTodos').onchange=e=>{ const rows=pedRows(); manualSel=true;
+  selPed = e.target.checked? new Set(rows.map(rid)) : new Set(); renderPed() };
+$('#tPed').addEventListener('change',e=>{ const c=e.target.closest('.pchk'); if(!c)return;
+  manualSel=true; c.checked?selPed.add(c.dataset.id):selPed.delete(c.dataset.id);
+  $('#pCount').textContent=`${selPed.size} de ${pedRows().length} seleccionados` });
+
+let peopleT=null;
+$('#tPeople').addEventListener('input',e=>{ const i=e.target.closest('.pfield'); if(!i)return;
+  const l=i.dataset.l; (DB.people[l]||(DB.people[l]={}))[i.dataset.f]=i.value.trim();
+  clearTimeout(peopleT); peopleT=setTimeout(()=>{persist(); renderPed()},700) });
+
+['#cfgPed','#cfgApe','#cfgRen'].forEach(id=>$(id).onchange=async e=>{
+  const v=Math.max(id==='#cfgRen'?1:0,+e.target.value||0);
+  if(id==='#cfgPed')DB.escPedidos=v; else if(id==='#cfgApe')DB.escApercib=v; else DB.renglones=v;
+  await persist(); renderPed();
+});
+$('#selPlantilla').onchange=renderPed;
+$('#cfgTol').onchange=async e=>{ DB.tolerancia=Math.max(0,+e.target.value||0); recompute(); await persist(); render() };
+$('#tTurnos').addEventListener('change',async e=>{
+  const c=e.target.closest('.shchk');
+  if(c){ DB.shifts[c.dataset.j].active=c.checked; recompute(); await persist(); render(); fillTurnoSel(); return }
+  const t=e.target.closest('.shtime');
+  if(t){ const v=t.value.trim(), m=v.match(/^(\d{1,2})[:.]?(\d{2})?$/);
+    DB.shifts[t.dataset.j].start = v===''? null : (m? (+m[1]*60 + (+(m[2]||0))) : DB.shifts[t.dataset.j].start);
+    DB.shifts[t.dataset.j].auto=false;
+    if(DB.shifts[t.dataset.j].start==null) DB.shifts[t.dataset.j].active=false;
+    recompute(); await persist(); render(); fillTurnoSel(); }
+});
+
+function fillTurnoSel(){
+  const cnt={}; for(const r of lateRecs()) cnt[r.jornada]=(cnt[r.jornada]||0)+1;
+  const act=Object.keys(DB.shifts).filter(j=>DB.shifts[j].active&&DB.shifts[j].start!=null)
+    .sort((a,b)=>DB.shifts[a].start-DB.shifts[b].start||a.localeCompare(b));
+  const cur=$('#fTurno').value;
+  let h='<option value="">Todos los turnos activos</option>';
+  for(const B of BANDAS){
+    const js=act.filter(j=>bandaDe(DB.shifts[j].start)===B.k);
+    if(!js.length) continue;
+    const tot=js.reduce((a,j)=>a+(cnt[j]||0),0);
+    h+=`<optgroup label="${B.t}">`
+      +`<option value="banda:${B.k}">Todo el turno ${B.t.toLowerCase()} (${tot})</option>`
+      +js.map(j=>`<option value="${esc(j)}">&nbsp;&nbsp;${hhmm(DB.shifts[j].start)} · ${esc(j.replace(/^IS - /,''))} (${cnt[j]||0})</option>`).join('')
+      +'</optgroup>';
+  }
+  $('#fTurno').innerHTML=h;
+  if([...$('#fTurno').options].some(o=>o.value===cur)) $('#fTurno').value=cur;
+}
+
+/* plantilla */
+$('#selEditTpl').onchange=loadTpl;
+function loadTpl(){ const k=$('#selEditTpl').value; $('#tplText').value=(DB.templates&&DB.templates[k])||TPL[k] }
+$('#btnTplSave').onclick=async()=>{ DB.templates=DB.templates||{}; DB.templates[$('#selEditTpl').value]=$('#tplText').value; await persist(); toast('Plantilla guardada') };
+$('#btnTplReset').onclick=async()=>{ const k=$('#selEditTpl').value; if(DB.templates) delete DB.templates[k]; loadTpl(); await persist(); toast('Plantilla restaurada') };
+
+/* descargas */
+function selectedDocs(){
+  const rows=pedRows().filter(r=>selPed.has(rid(r)));
+  if(!rows.length) return null;
+  // agrupados por tipo: primero pedidos, despues apercibimientos, despues suspensiones
+  const ordK={descargo:0,apercibimiento:1,sancion:2};
+  rows.sort((a,b)=>ordK[kindOf(a)]-ordK[kindOf(b)]||a.nombre.localeCompare(b.nombre));
+  return {rows,inner:rows.map((r,i)=>docFor(kindOf(r),r)+(i<rows.length-1?'<div class="pb"></div>':'')).join('')};
+}
+$('#btnDocAll').onclick=()=>{
+  const d=selectedDocs(); if(!d){toast('No hay documentos seleccionados');return}
+  const ks=[...new Set(d.rows.map(kindOf))];
+  const nm=(ks.length===1?{descargo:'Pedidos_de_explicacion',apercibimiento:'Apercibimientos',sancion:'Suspensiones'}[ks[0]]:'Documentos_disciplinarios')
+    +`_${d.rows.length}_${todayISO()}.doc`;
+  download(wordFile(d.inner,'Documentos'),nm,'application/msword');
+  toast(`${d.rows.length} documento(s) en un solo archivo Word`);
+};
+$('#btnPrint').onclick=()=>{
+  const d=selectedDocs(); if(!d){toast('No hay documentos seleccionados');return}
+  printDocs(d.inner);
+};
+$('#btnPrev').onclick=()=>{
+  const kind=$('#selPlantilla').value, rows=pedRows().filter(r=>selPed.has(rid(r))).slice(0,3);
+  if(!rows.length){toast('No hay nada seleccionado');return}
+  $('#previewBody').innerHTML=`<style>${DOC_CSS.replace(/@page[^}]+}/,'')}</style>`+rows.map(r=>`<div class="sheet">${docFor(kind,r)}</div>`).join('');
+  $('#modal').classList.add('on');
+};
+$('#btnCloseModal').onclick=()=>$('#modal').classList.remove('on');
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('on')};
+
+$('#btnCsvTarde').onclick=()=>{
+  const rows=[['Fecha','Legajo','Apellido y Nombre','Empresa','Jornada','Ingreso','Fichada','Atraso (min)','Tardanzas acum.']];
+  const rk=rankMap();
+  filtTarde().forEach(r=>rows.push([dmy(r.fecha),r.legajo,r.nombre,r.empresa,r.jornada,hhmm(r.start),hhmm(r.entrada),r.atraso,rk[r.legajo]?rk[r.legajo].cant:1]));
+  download(csv(rows),`llegadas_tarde_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+$('#btnCsvRank').onclick=()=>{
+  const rows=[['Legajo','Apellido y Nombre','Jornada','Tardanzas','Min. totales','Promedio','Peor','Última','Detalle']];
+  ranking().forEach(p=>rows.push([p.legajo,p.nombre,p.jornada,p.cant,p.mins,p.prom,p.peor,dmy(p.ultima),p.fechas.map(f=>dmy(f.slice(0,10))+' '+f.slice(11)).join(' | ')]));
+  download(csv(rows),`reincidencias_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+$('#btnCsvSinf').onclick=()=>{
+  const rows=[['Fecha','Legajo','Apellido y Nombre','Jornada','Estado','Observaciones']];
+  const E={novedad:'Novedad',no_cubierto:'Turno no exportado',sin_fichada:'Sin fichada'};
+  activeRecs().filter(r=>r.status==='sin_fichada'||r.status==='novedad'||r.status==='no_cubierto')
+    .forEach(r=>rows.push([dmy(r.fecha),r.legajo,r.nombre,r.jornada,E[r.status],r.eventos.join(' | ')]));
+  download(csv(rows),`sin_fichada_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+
+/* base */
+$('#btnExportDB').onclick=()=>download(JSON.stringify(DB),`base_asistencia_${todayISO()}.json`,'application/json');
+$('#btnImportDB').onclick=()=>$('#fileDB').click();
+$('#fileDB').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
+  try{ const j=JSON.parse(await f.text());
+    if(!j.records) throw new Error('archivo inválido');
+    DB=Object.assign({version:2,tolerancia:10,escPedidos:3,escApercib:1,renglones:8,shifts:{},records:{},people:{},templates:{},files:[],vac:null,vacOv:{},ant:null,antOv:{}},j);
+    recompute(); manualSel=false; vacManual=false; antManual=false;
+    await persist(); boot2(); toast('Base importada');
+  }catch(err){ toast('No pude leer ese archivo: '+err.message) }
+  e.target.value='' };
+$('#btnReset').onclick=async()=>{
+  if(!confirm('Se borran todos los registros, turnos y plantillas guardadas. ¿Seguir?')) return;
+  await Store.clear();
+  DB={version:2,tolerancia:10,escPedidos:3,escApercib:1,renglones:8,shifts:{},records:{},people:{},templates:{},files:[],vac:null,vacOv:{},ant:null,antOv:{}};
+  manualSel=false; vacManual=false; antManual=false;
+  vacSel=new Set(); antSel=new Set(); boot2(); toast('Base borrada');
+};
+
+async function persist(){ const ok=await Store.save(DB); if(!ok) toast('No pude guardar. Usá "Exportar base" para no perder datos.') }
+
+/* ============================================================
+   12. VACACIONES
+   ============================================================ */
+const HV={legajo:/legajo/i,uo:/u\.?\s*o\.?|cliente/i,nombre:/apellido/i,cat:/categor/i,
+  ingreso:/fecha\s*ingreso/i,doc:/documento/i,sector:/sector/i,dias:/^d[ií]as$/i};
+
+function parseVac(rows){
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,20);i++){
+    const j=(rows[i]||[]).map(c=>String(c||''));
+    if(j.some(c=>HV.legajo.test(c))&&j.some(c=>HV.nombre.test(c))){hi=i;break}
+  }
+  if(hi<0) throw new Error('No encontré el encabezado. Esperaba "Legajo" y "APELLIDO Y NOMBRE".');
+  const head=rows[hi].map(c=>String(c||'').trim());
+  const col={}; for(const k in HV) col[k]=head.findIndex(h=>HV[k].test(h));
+  // cada salida es un bloque: NOTIFICADO | FECHA NOTIF | ACREDITADO | DESDE | HASTA | DIAS
+  const desdes=head.map((h,i)=>/^desde/i.test(h)?i:-1).filter(i=>i>=0);
+  if(!desdes.length) throw new Error('No encontré columnas "DESDE" con las salidas.');
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const legajo=String(r[col.legajo]??'').trim(), nombre=String(r[col.nombre]??'').trim();
+    if(!legajo||!nombre||HV.legajo.test(legajo)) continue;
+    const base={legajo,nombre,uo:String(r[col.uo]??'').trim(),cat:String(r[col.cat]??'').trim(),
+      ingreso:excelDateToISO(r[col.ingreso]),doc:String(r[col.doc]??'').trim(),
+      sector:String(r[col.sector]??'').trim(),diasAno:+r[col.dias]||0};
+    desdes.forEach((d,n)=>{
+      const desde=excelDateToISO(r[d]), hasta=excelDateToISO(r[d+1]);
+      if(!desde) return;
+      out.push(Object.assign({},base,{n:n+1,id:legajo+'|'+desde,desde,hasta,
+        dias:+r[d+2]||0, notif:String(r[d-3]??'').trim(), fnotif:excelDateToISO(r[d-2])}));
+    });
+  }
+  return out;
+}
+
+const vacRows=()=>(DB.vac&&DB.vac.rows)||[];
+const vacOv=id=>(DB.vacOv&&DB.vacOv[id])||{};
+function vacPlus(s){ const o=vacOv(s.id); return o.plus!=null?o.plus:s.dias }
+const esNotif=s=>{const o=vacOv(s.id); return o.notif!=null?o.notif:/^s[ií]$/i.test(s.notif)};
+
+function vacProx(){
+  const hoy=todayISO(), v=+$('#vVentana').value||30;
+  const lim=new Date(Date.now()+v*864e5).toISOString().slice(0,10);
+  const d=$('#vDesde').value, h=$('#vHasta').value, q=$('#vBusca').value.trim().toLowerCase();
+  return vacRows().filter(s=>s.desde>=(d||hoy) && s.desde<=(h||lim)
+      && (!q||s.nombre.toLowerCase().includes(q)||s.legajo.includes(q))
+      && (!$('#vSinNotif').checked||!esNotif(s)))
+    .sort((a,b)=>a.desde<b.desde?-1:a.desde>b.desde?1:a.nombre.localeCompare(b.nombre));
+}
+
+function renderVac(){
+  const rows=vacProx(), all=vacRows(), hoy=todayISO();
+  const fut=all.filter(s=>s.desde>=hoy);
+  const sinN=fut.filter(s=>!esNotif(s)).length;
+  const en7=fut.filter(s=>s.desde<=new Date(Date.now()+7*864e5).toISOString().slice(0,10)).length;
+  $('#kpisVac').innerHTML=[
+    {l:'Salidas cargadas',v:all.length,s:`${new Set(all.map(s=>s.legajo)).size} personas`},
+    {l:'Salidas por venir',v:fut.length,s:'desde hoy'},
+    {l:'Sale esta semana',v:en7,s:'próximos 7 días',c:'acc-ochre'},
+    {l:'Sin notificar',v:sinN,s:'de las que vienen',c:sinN?'acc-alert':'acc-lime'},
+    {l:'Días a liquidar',v:fut.reduce((a,s)=>a+s.dias,0),s:'total pendiente'}
+  ].map(k=>`<div class="kpi ${k.c||''}"><div class="lab">${k.l}</div><div class="val">${k.v}</div><div class="sub">${k.s}</div></div>`).join('');
+  $('#bvProx').textContent=rows.length; $('#bvTodas').textContent=all.length;
+  if(!vacManual) vacSel=new Set(rows.map(s=>s.id));
+  $('#vCount').textContent=`${vacSel.size} de ${rows.length} seleccionadas`;
+
+  $('#tVac').innerHTML=`<thead><tr><th style="width:34px"></th><th>Desde</th><th>Hasta</th><th>Días</th><th>Plus</th>
+    <th>Legajo</th><th>Apellido y nombre</th><th>Categoría</th><th>Salida N°</th><th>Notificado</th><th></th></tr></thead>`+
+    (rows.length?'<tbody>'+rows.map(s=>{const n=esNotif(s);return `<tr>
+      <td><input type="checkbox" class="vchk" data-id="${esc(s.id)}" ${vacSel.has(s.id)?'checked':''}></td>
+      <td class="mono" style="font-weight:600">${dmy(s.desde)}</td><td class="mono">${dmy(s.hasta)}</td>
+      <td class="mono">${s.dias}</td>
+      <td class="editable"><input type="number" class="vplus mono" data-id="${esc(s.id)}" value="${vacPlus(s)}" min="0"></td>
+      <td class="mono">${esc(s.legajo)}</td><td>${esc(s.nombre)}</td>
+      <td style="font-size:12.5px;color:var(--mute)">${esc(s.cat)}</td>
+      <td class="mono">${s.n}</td>
+      <td><label class="chk"><input type="checkbox" class="vnot" data-id="${esc(s.id)}" ${n?'checked':''}>
+        <span class="tag ${n?'ok':'sinf'}">${n?'Sí':'Falta'}</span></label></td>
+      <td><button class="btn ghost sm" data-vone="${esc(s.id)}">Planilla</button></td></tr>`}).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="11"><div class="empty">No hay salidas en esa ventana.</div></td></tr></tbody>');
+
+  const q2=$('#vBusca2').value.trim().toLowerCase();
+  const todas=all.filter(s=>!q2||s.nombre.toLowerCase().includes(q2)||s.legajo.includes(q2))
+    .sort((a,b)=>a.desde<b.desde?1:-1).slice(0,600);
+  $('#tVacAll').innerHTML=`<thead><tr><th>Desde</th><th>Hasta</th><th>Días</th><th>Legajo</th><th>Apellido y nombre</th>
+    <th>Salida N°</th><th>Notificado</th><th>Estado</th></tr></thead>`+
+    (todas.length?'<tbody>'+todas.map(s=>`<tr><td class="mono">${dmy(s.desde)}</td><td class="mono">${dmy(s.hasta)}</td>
+      <td class="mono">${s.dias}</td><td class="mono">${esc(s.legajo)}</td><td>${esc(s.nombre)}</td><td class="mono">${s.n}</td>
+      <td>${esNotif(s)?'<span class="tag ok">Sí</span>':'<span class="tag sinf">Falta</span>'}</td>
+      <td>${s.desde<hoy?'<span class="tag n">Gozada</span>':'<span class="tag nov">Pendiente</span>'}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="8"><div class="empty">Sin datos.</div></td></tr></tbody>');
+
+  fillLiq(); renderLiq();
+}
+
+function fillLiq(){
+  const hoy=todayISO();
+  const fechas=[...new Set(vacRows().filter(s=>s.desde>=hoy).map(s=>s.desde))].sort();
+  const cur=$('#liqFecha').value;
+  $('#liqFecha').innerHTML=fechas.length?fechas.map(f=>{
+    const n=vacRows().filter(s=>s.desde===f).length;
+    return `<option value="${f}">${dmy(f)} (${n})</option>`}).join(''):'<option value="">sin salidas</option>';
+  if(fechas.includes(cur)) $('#liqFecha').value=cur;
+}
+const liqRows=()=>{const f=$('#liqFecha').value; return f?vacRows().filter(s=>s.desde===f).sort((a,b)=>a.nombre.localeCompare(b.nombre)):[]};
+
+function liqHTML(){
+  const f=$('#liqFecha').value, rows=liqRows();
+  if(!rows.length) return '<div class="empty">Elegí una fecha de salida.</div>';
+  return `<div class="mailbox" id="liqMail"><p>Buenas días Seba, te paso las vacaciones con fecha de salida del ${dmyDots(f)}</p>
+    <table><thead><tr><th>Legajo ®</th><th>U.O. Cliente (R)</th><th>APELLIDO Y NOMBRE</th>
+    <th>DESDE 2</th><th>HASTA</th><th>DIAS</th><th>PLUS</th></tr></thead><tbody>`
+    +rows.map(s=>`<tr><td>${esc(s.legajo)}</td><td class="l">${esc(s.uo)}</td><td class="l">${esc(s.nombre)}</td>
+      <td>${diaCorto(s.desde)}</td><td>${diaCorto(s.hasta)}</td><td>${s.dias}</td><td>${vacPlus(s)}</td></tr>`).join('')
+    +`</tbody></table><p>Saludos.</p></div>`;
+}
+const DIAS_AR=['do.','lu.','ma.','mi.','ju.','vi.','sá.'];
+function diaCorto(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-').map(Number);
+  return DIAS_AR[new Date(y,m-1,d).getDay()]+' '+dmy(iso) }
+const renderLiq=()=>{ $('#liqPrev').innerHTML=liqHTML() };
+
+/* --- planilla de notificación (modelo Grupo Gestión: hoja 1 empleado + reintegro, hoja 2 empleador) --- */
+const MESES_L=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS_L=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function fLarga(iso,dia){ if(!iso) return ''; const [y,m,d]=iso.split('-').map(Number), o=new Date(y,m-1,d);
+  return (dia?DIAS_L[o.getDay()]+' ':'')+d+' de '+MESES_L[m-1]+' de '+y; }
+function vacAnio(s){ const m=String((DB.vac&&DB.vac.file)||'').match(/20\d\d/); if(m) return m[0];
+  const [y,mm]=s.desde.split('-').map(Number); return String(mm<=4?y-1:y); }
+function notaHTML(s){
+  const fn=$('#vFechaNota').value||todayISO();
+  const ret=s.hasta? new Date(new Date(s.hasta+'T12:00').getTime()+864e5).toISOString().slice(0,10):'';
+  const B=t=>`<b><i>${t}</i></b>`;
+  const firmas=(a,b)=>`<table class="vfw"><tr><td><p class="vsl">${a}</p></td><td class="vgap"></td><td><p class="vsl">${b}</p></td></tr></table>`;
+  const cab=`<p class="vlg"><img class="lg" src="${LOGO}"></p>
+    <table class="vbn" width="100%" cellpadding="0" cellspacing="0"><tr><td bgcolor="#808080" style="background:#808080">NOTIFICACION DE VACACIONES</td></tr></table>
+    <p class="vfe">${B('Isidro Casanova, '+fLarga(fn))}</p>
+    <p class="vlb">Señor/a</p><p class="vnm">${esc(s.nombre)}</p>
+    <p class="vlb">Legajo</p><table class="vleg"><tr><td>${esc(s.legajo)}</td></tr></table>
+    <p class="vtx">En cumplimiento con lo dispuesto por la Ley de Contrato de Trabajo Art. 150 y modificaciones, se le notifica que el período de
+    descanso anual del año <b>${vacAnio(s)}</b> es de <b>${s.dias}</b> días, comenzando el ${B(fLarga(s.desde,1))}
+    hasta el ${B(fLarga(s.hasta,1))}, inclusive, debiendo retomar tareas el día ${B(fLarga(ret,1))}.</p>`;
+  const emp=cab+`<p class="vtx vsp">Me notifico de la comunicación de mi período de descanso anual, tomando debida nota que me reintegraré a mis tareas el ${B(fLarga(ret,1))}.</p>
+    ${firmas('Firma del empleado','Aclaración de firma')}
+    <p class="vtx vsp">Certifico haber gozado del período de vacaciones arriba mencionado, reintegrándome a mis ocupaciones en la fecha ${B(fLarga(ret))}, de conformidad.</p>
+    ${firmas('Firma del empleado','Aclaración de firma')}`;
+  const pat=cab+`<p class="vtx vsp">Autorizo a gozar el período de vacaciones más arriba indicado.</p>
+    ${firmas('Firma del empleador','Aclaración de firma o sello')}`;
+  return emp+'<div class="pb"></div>'+pat;
+}
+/* --- planilla de vacaciones en PDF: por empleado, hoja 1 firma el colaborador, hoja 2 firma el empleador y se la lleva el colaborador --- */
+let _logoDim=null;
+function logoDim(){ return _logoDim?Promise.resolve(_logoDim):new Promise(res=>{ const i=new Image(); i.onload=()=>res(_logoDim={w:i.naturalWidth,h:i.naturalHeight}); i.onerror=()=>res(_logoDim={w:430,h:115}); i.src=LOGO; }); }
+async function vacPDF(rows){
+  if(!window.jspdf||!window.jspdf.jsPDF){ toast('No cargó la librería de PDF: revisá la conexión y recargá el panel.'); return null; }
+  const {jsPDF}=window.jspdf, doc=new jsPDF({unit:'mm',format:'a4'}), L=20, R=190, W=R-L, ld=await logoDim();
+  const fn=$('#vFechaNota').value||todayISO();
+  const ST={n:['helvetica','normal'],b:['helvetica','bold'],bi:['helvetica','bolditalic'],i:['helvetica','italic']};
+  // párrafo con negritas/itálicas mezcladas: segs=[[texto,estilo],...]
+  function rich(segs,y,size=10.5,lh=5.6){
+    doc.setFontSize(size); const words=[];
+    segs.forEach(([t,st])=>String(t).split(/(\s+)/).forEach(w=>{ if(w==='') return; words.push([w,st]); }));
+    const lines=[[]]; let x=0;
+    for(const [w,st] of words){ doc.setFont(...ST[st]); const ww=doc.getTextWidth(w);
+      if(/^\s+$/.test(w)){ if(x>0){ lines[lines.length-1].push([' ',st,ww]); x+=ww; } continue; }
+      if(x+ww>W&&x>0){ const ln=lines[lines.length-1]; while(ln.length&&/^\s+$/.test(ln[ln.length-1][0])) ln.pop(); lines.push([]); x=0; }
+      lines[lines.length-1].push([w,st,ww]); x+=ww; }
+    lines.forEach((ln,k)=>{ let cx=L; ln.forEach(([w,st,ww])=>{ doc.setFont(...ST[st]); doc.text(w,cx,y+k*lh); cx+=ww; }); });
+    return y+lines.length*lh;
+  }
+  function firmas(y,a,b){
+    doc.setLineDashPattern([0.6,0.9],0); doc.setLineWidth(0.4); doc.setDrawColor(0);
+    doc.line(L,y,L+70,y); doc.line(R-70,y,R,y); doc.setLineDashPattern([],0);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.text(a,L+35,y+4.5,{align:'center'}); doc.text(b,R-35,y+4.5,{align:'center'});
+    return y+4.5;
+  }
+  function cabecera(s,ret){
+    const lw=58, lh=lw*ld.h/ld.w; try{ doc.addImage(LOGO,'PNG',105-lw/2,14,lw,lh); }catch(e){}
+    let y=14+lh+6;
+    doc.setFillColor(128,128,128); doc.rect(L,y,W,8,'F'); doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('NOTIFICACION DE VACACIONES',105,y+5.7,{align:'center'}); doc.setTextColor(0);
+    y+=20; doc.setFont('helvetica','bolditalic'); doc.setFontSize(10.5); doc.text('Isidro Casanova, '+fLarga(fn),R,y,{align:'right'});
+    y+=14; doc.setFont('helvetica','bold'); doc.text('Señor/a',L,y);
+    y+=5.5; doc.setFont('helvetica','normal'); doc.text(String(s.nombre||'').toUpperCase(),L,y);
+    y+=6.5; doc.setFont('helvetica','bold'); doc.text('Legajo',L,y);
+    y+=2; doc.setLineWidth(0.3); doc.rect(L,y,26,7); doc.setFont('helvetica','normal'); doc.text(String(s.legajo||''),L+13,y+5,{align:'center'});
+    y+=20;
+    return rich([['En cumplimiento con lo dispuesto por la Ley de Contrato de Trabajo Art. 150 y modificaciones, se le notifica que el período de descanso anual del año ','n'],[vacAnio(s),'b'],[' es de ','n'],[String(s.dias),'b'],[' días, comenzando el ','n'],[fLarga(s.desde,1),'bi'],[' hasta el ','n'],[fLarga(s.hasta,1),'bi'],[', inclusive, debiendo retomar tareas el día ','n'],[fLarga(ret,1),'bi'],['.','n']],y);
+  }
+  rows.forEach((s,i)=>{
+    const ret=s.hasta? new Date(new Date(s.hasta+'T12:00').getTime()+864e5).toISOString().slice(0,10):'';
+    if(i>0) doc.addPage();
+    // hoja 1: firma el colaborador (queda en la empresa)
+    let y=cabecera(s,ret)+14;
+    y=rich([['Me notifico de la comunicación de mi período de descanso anual, tomando debida nota que me reintegraré a mis tareas el ','n'],[fLarga(ret,1),'bi'],['.','n']],y);
+    y=firmas(y+30,'Firma del empleado','Aclaración de firma')+22;
+    y=rich([['Certifico haber gozado del período de vacaciones arriba mencionado, reintegrándome a mis ocupaciones en la fecha ','n'],[fLarga(ret),'bi'],[', de conformidad.','n']],y);
+    firmas(y+30,'Firma del empleado','Aclaración de firma');
+    doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Copia para la empresa · firma el colaborador',105,287,{align:'center'}); doc.setTextColor(0);
+    // hoja 2: firma el empleador (se la lleva el colaborador)
+    doc.addPage();
+    y=cabecera(s,ret)+14;
+    y=rich([['Autorizo a gozar el período de vacaciones más arriba indicado.','n']],y);
+    firmas(y+30,'Firma del empleador','Aclaración de firma o sello');
+    doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Copia para el colaborador · firma el empleador',105,287,{align:'center'}); doc.setTextColor(0);
+  });
+  return doc;
+}
+async function vacPDFDescargar(rows,name){ const d=await vacPDF(rows); if(!d) return; d.save(name); toast(`${rows.length} planilla(s) en PDF · 2 hojas por colaborador`); }
+async function vacPDFImprimir(rows){ const d=await vacPDF(rows); if(!d) return;
+  d.autoPrint(); const u=d.output('bloburl'); const w=window.open(u,'_blank');
+  if(!w){ d.save(`Notificaciones_vacaciones_${todayISO()}.pdf`); toast('El navegador bloqueó la ventana: se descargó el PDF para imprimir.'); } }
+function notasSel(){
+  const rows=vacProx().filter(s=>vacSel.has(s.id));
+  return rows.length? {rows,inner:rows.map((s,i)=>notaHTML(s)+(i<rows.length-1?'<div class="pb"></div>':'')).join('')} : null;
+}
+
+/* ============================================================
+   13. ANTIGÜEDAD / BAJAS
+   ============================================================ */
+const HA={legajo:/legajo/i,nombre:/apellido/i,nac:/nacimiento/i,doc:/dni|cuil/i,
+  ingreso:/f\.?\s*ingreso/i,egreso:/f\.?\s*egreso/i,uo:/u\.?\s*o\.?|cliente/i,
+  antig:/antig/i,ultimo:/[uú]ltimo\s*d[ií]a/i,tarea:/tarea/i,turno:/turno/i,detalle:/detalle/i};
+const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():'';
+
+function parseAnt(rows){
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,20);i++){
+    const j=(rows[i]||[]).map(c=>String(c||''));
+    if(j.some(c=>HA.legajo.test(c))&&j.some(c=>HA.nombre.test(c))){hi=i;break}
+  }
+  if(hi<0) throw new Error('No encontré el encabezado. Esperaba "Legajo" y "Apellido y nombre".');
+  const head=rows[hi].map(c=>String(c||'').trim());
+  const col={}; for(const k in HA) col[k]=head.findIndex(h=>HA[k].test(h));
+  // hay dos columnas "Estado": la primera es el motivo, la última el estado activo/baja
+  const est=head.map((h,i)=>/^estado$/i.test(h)?i:-1).filter(i=>i>=0);
+  const cMotivo=est.length>1?est[0]:-1, cEstado=est.length?est[est.length-1]:-1;
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const legajo=String(r[col.legajo]??'').trim(), nombre=String(r[col.nombre]??'').trim();
+    if(!legajo||!nombre||HA.legajo.test(legajo)) continue;
+    const estRaw=String(r[cEstado]??'').trim();
+    out.push({legajo,nombre,doc:String(r[col.doc]??'').trim(),
+      ingreso:excelDateToISO(r[col.ingreso]), egreso:excelDateToISO(r[col.egreso]),
+      uo:String(r[col.uo]??'').trim(), antig:+r[col.antig]||0, ultimo:excelDateToISO(r[col.ultimo]),
+      activo:/^activo$/i.test(estRaw), estRaw,
+      motivoRaw:String(r[cMotivo]??'').trim(),
+      tarea:String(r[col.tarea]??'').trim().toUpperCase()||'SIN DATO',
+      turno:String(r[col.turno]??'').trim().toUpperCase()||'SIN DATO',
+      detalle:String(r[col.detalle]??'').trim()});
+  }
+  return out;
+}
+
+const antRows=()=>(DB.ant&&DB.ant.rows)||[];
+const antAct=()=>antRows().filter(r=>r.activo);
+const antOv=l=>(DB.antOv&&DB.antOv[l])||{};
+const motivoDe=r=>{const o=antOv(r.legajo); return o.motivo!=null?o.motivo:'FPP'};
+const detalleDe=r=>{const o=antOv(r.legajo); return o.detalle!=null?o.detalle:'Sin Reemplazo'};
+
+function bajasProx(){
+  const hoy=todayISO(), v=+$('#aVentana').value||15;
+  const lim=new Date(Date.now()+v*864e5).toISOString().slice(0,10);
+  const t=$('#aTurno').value, k=$('#aTarea').value, q=$('#aBusca').value.trim().toLowerCase();
+  return antAct().filter(r=>r.ultimo&&r.ultimo>=hoy&&r.ultimo<=lim
+      &&(!t||r.turno===t)&&(!k||r.tarea===k)
+      &&(!q||r.nombre.toLowerCase().includes(q)||r.legajo.includes(q)))
+    .sort((a,b)=>a.ultimo<b.ultimo?-1:a.ultimo>b.ultimo?1:a.nombre.localeCompare(b.nombre));
+}
+
+function renderAnt(){
+  const all=antRows(), act=antAct(), hoy=todayISO();
+  const en7=act.filter(r=>r.ultimo&&r.ultimo>=hoy&&r.ultimo<=new Date(Date.now()+7*864e5).toISOString().slice(0,10)).length;
+  const vencidos=act.filter(r=>r.ultimo&&r.ultimo<hoy).length;
+  $('#kpisAnt').innerHTML=[
+    {l:'Eventuales activos',v:act.length,s:`${all.length} en el archivo`},
+    {l:'Bajan esta semana',v:en7,s:'próximos 7 días',c:en7?'acc-alert':'acc-lime'},
+    {l:'Ya vencidos',v:vencidos,s:'último día pasado',c:vencidos?'acc-ochre':''},
+    {l:'Turnos',v:new Set(act.map(r=>r.turno)).size,s:'con gente activa'},
+    {l:'Tareas',v:new Set(act.map(r=>r.tarea)).size,s:'distintas'}
+  ].map(k=>`<div class="kpi ${k.c||''}"><div class="lab">${k.l}</div><div class="val">${k.v}</div><div class="sub">${k.s}</div></div>`).join('');
+  $('#baAct').textContent=act.length;
+
+  fillSel('#aTurno',[...new Set(act.map(r=>r.turno))].sort(),'Todos');
+  fillSel('#aTarea',[...new Set(act.map(r=>r.tarea))].sort(),'Todas');
+
+  const rows=bajasProx();
+  $('#baProx').textContent=rows.length;
+  if(!antManual) antSel=new Set(rows.map(r=>r.legajo));
+  $('#aCount').textContent=`${antSel.size} de ${rows.length} seleccionadas`;
+  $('#tBajas').innerHTML=`<thead><tr><th style="width:34px"></th><th>Último día</th><th>Faltan</th><th>Legajo</th>
+    <th>Apellido y nombre</th><th>F. Ingreso</th><th>Tarea</th><th>Turno</th><th style="width:110px">Motivo</th>
+    <th style="width:150px">Detalle</th></tr></thead>`+
+    (rows.length?'<tbody>'+rows.map(r=>{
+      const d=Math.round((new Date(r.ultimo+'T12:00')-new Date(hoy+'T12:00'))/864e5);
+      return `<tr><td><input type="checkbox" class="achk" data-l="${esc(r.legajo)}" ${antSel.has(r.legajo)?'checked':''}></td>
+      <td class="mono" style="font-weight:600">${dmy(r.ultimo)}</td>
+      <td><span class="tag ${d<=3?'tarde':d<=7?'sinf':'n'}">${d===0?'hoy':d+' d'}</span></td>
+      <td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td><td class="mono">${dmy(r.ingreso)}</td>
+      <td style="font-size:12.5px">${esc(cap(r.tarea))}</td><td style="font-size:12.5px">${esc(cap(r.turno))}</td>
+      <td class="editable"><input type="text" class="afield" data-l="${esc(r.legajo)}" data-f="motivo" value="${esc(motivoDe(r))}"></td>
+      <td class="editable"><input type="text" class="afield" data-l="${esc(r.legajo)}" data-f="detalle" value="${esc(detalleDe(r))}"></td></tr>`}).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="10"><div class="empty">No hay bajas en esa ventana.</div></td></tr></tbody>');
+
+  renderDot();
+
+  const q2=$('#aBusca2').value.trim().toLowerCase();
+  const pl=act.filter(r=>!q2||r.nombre.toLowerCase().includes(q2)||r.legajo.includes(q2))
+    .sort((a,b)=>(a.ultimo||'9')<(b.ultimo||'9')?-1:1);
+  $('#tPlantel').innerHTML=`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>F. Ingreso</th><th>Antigüedad</th>
+    <th>Último día</th><th>Tarea</th><th>Turno</th><th>U.O.</th></tr></thead>`+
+    (pl.length?'<tbody>'+pl.map(r=>`<tr><td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td>
+      <td class="mono">${dmy(r.ingreso)}</td><td class="mono">${r.antig} d</td>
+      <td class="mono ${r.ultimo&&r.ultimo<hoy?'late-min':''}">${dmy(r.ultimo)}</td>
+      <td style="font-size:12.5px">${esc(cap(r.tarea))}</td><td style="font-size:12.5px">${esc(cap(r.turno))}</td>
+      <td style="font-size:11.5px;color:var(--mute)">${esc(r.uo)}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td colspan="8"><div class="empty">Sin plantel activo cargado.</div></td></tr></tbody>');
+}
+
+function fillSel(sel,vals,todos){
+  const cur=$(sel).value;
+  $(sel).innerHTML=`<option value="">${todos}</option>`+vals.map(v=>`<option value="${esc(v)}">${esc(cap(v))}</option>`).join('');
+  if(vals.includes(cur)) $(sel).value=cur;
+}
+const TCLS=t=>/MAÑANA|MANANA/.test(t)?'t-manana':/TARDE/.test(t)?'t-tarde':/NOCHE/.test(t)?'t-noche':'t-intermedio';
+
+function bars(cont,map,cls){
+  const ks=Object.keys(map).sort((a,b)=>map[b]-map[a]);
+  const max=ks.length?map[ks[0]]:1;
+  $(cont).innerHTML=ks.length?ks.map(k=>`<div class="dbar-row"><div>${esc(cap(k))}</div>
+    <div class="dbar"><i class="${cls?TCLS(k):''}" style="width:${map[k]/max*100}%"></i></div>
+    <div class="mono" style="text-align:right;font-weight:600">${map[k]}</div></div>`).join('')
+    :'<div class="empty">Sin datos.</div>';
+}
+
+function renderDot(){
+  const act=antAct(), t={}, k={}, m={};
+  for(const r of act){ t[r.turno]=(t[r.turno]||0)+1; k[r.tarea]=(k[r.tarea]||0)+1;
+    (m[r.turno]||(m[r.turno]={}))[r.tarea]=((m[r.turno]||{})[r.tarea]||0)+1 }
+  bars('#dotTurno',t,true); bars('#dotTarea',k,false);
+  const turnos=Object.keys(t).sort(), tareas=Object.keys(k).sort();
+  $('#tMatriz').innerHTML=`<thead><tr><th>Turno</th>${tareas.map(x=>`<th style="text-align:center">${esc(cap(x))}</th>`).join('')}<th style="text-align:center">Total</th></tr></thead>`+
+    (turnos.length?'<tbody>'+turnos.map(tu=>`<tr><td style="font-weight:600">${esc(cap(tu))}</td>`
+      +tareas.map(ta=>{const v=(m[tu]||{})[ta]||0;
+        return `<td class="mono ${v?'':'cell0'}" style="text-align:center">${v||'·'}</td>`}).join('')
+      +`<td class="mono" style="text-align:center;font-weight:600">${t[tu]}</td></tr>`).join('')
+      +`<tr><td style="font-weight:600">Total</td>${tareas.map(ta=>`<td class="mono" style="text-align:center;font-weight:600">${k[ta]}</td>`).join('')}
+        <td class="mono" style="text-align:center;font-weight:600">${act.length}</td></tr></tbody>`
+    :'<tbody><tr><td><div class="empty">Sin datos.</div></td></tr></tbody>');
+}
+
+function bajasHTML(){
+  const rows=bajasProx().filter(r=>antSel.has(r.legajo));
+  if(!rows.length) return '<div class="empty">No hay bajas seleccionadas.</div>';
+  return `<div class="mailbox" id="bajaMail"><p>Buenos días,<br>Informo las siguientes bajas:</p>
+    <table><thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>F. Ingreso</th><th>F. Egreso</th>
+    <th>TAREA</th><th>turno</th><th>Motivo</th><th>Detalle</th></tr></thead><tbody>`
+    +rows.map(r=>`<tr><td>${esc(r.legajo)}</td><td class="l">${esc(r.nombre)}</td><td>${dmy(r.ingreso)}</td>
+      <td>${dmy(r.ultimo)}</td><td>${esc(r.tarea)}</td><td>${esc(r.turno)}</td>
+      <td>${esc(motivoDe(r))}</td><td>${esc(detalleDe(r))}</td></tr>`).join('')
+    +`</tbody></table><p>Saludos</p></div>`;
+}
+
+/* --- reportes en Word --- */
+// cols: [{t:'Legajo'} | {t:'Apellido y nombre', l:true}]  -> l = alineado a izquierda y con quiebre de línea
+function repDoc(titulo, intro, cols, filas, pie){
+  // los estilos van inline: al exportar, Word y LibreOffice convierten el texto de cada celda
+  // en un párrafo y le aplican el text-align general, pisando cualquier clase
+  const th=cols.map(c=>`<th bgcolor="#000000"${c.w?` width="${c.w}"`:''} style="text-align:center;color:#FFFFFF">`
+      +`<font color="#FFFFFF">${esc(c.t)}</font></th>`).join('');
+  const tb=filas.map(f=>'<tr>'+f.map((c,i)=>{
+      const d=cols[i]||{};
+      return `<td${d.l?'':' nowrap'} style="text-align:${d.l?'left':'center'}">${esc(c)}</td>`;
+    }).join('')+'</tr>').join('');
+  return `<div class="hd"><img class="lg" src="${LOGO}"></div>
+    <p class="tt">${esc(titulo)}</p><p class="dat">${intro}</p>
+    <table class="rep" border="1" cellspacing="0" cellpadding="3">
+      <thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>
+    <p class="dat">Saludos.</p>${pie||''}`;
+}
+function copiar(sel,msg){
+  const el=document.querySelector(sel);
+  if(!el){toast('No hay nada para copiar');return}
+  try{
+    const r=document.createRange(); r.selectNode(el);
+    const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    document.execCommand('copy'); s.removeAllRanges(); toast(msg);
+  }catch(e){ toast('El navegador no dejó copiar. Seleccioná la tabla a mano.') }
+}
+
+/* ============================================================
+   14. AVISOS DE LA PANTALLA DE INICIO
+   ============================================================ */
+function avisos(){
+  const A=[], hoy=todayISO(), en=d=>new Date(Date.now()+d*864e5).toISOString().slice(0,10);
+  // bajas
+  const act=antAct();
+  const b7=act.filter(r=>r.ultimo&&r.ultimo>=hoy&&r.ultimo<=en(7));
+  const bVenc=act.filter(r=>r.ultimo&&r.ultimo<hoy);
+  if(b7.length) A.push({p:'alta',t:'Controlar próximas bajas',v:`${b7.length} eventual(es) terminan período de prueba en 7 días`,
+    d:`Primera: ${dmy(b7.sort((a,b)=>a.ultimo<b.ultimo?-1:1)[0].ultimo)}`,go:'v-bajas'});
+  if(bVenc.length) A.push({p:'alta',t:'Bajas vencidas',v:`${bVenc.length} activo(s) con último día ya pasado`,
+    d:'Figuran activos pero el contrato venció',go:'v-bajas'});
+  // vacaciones
+  const fut=vacRows().filter(s=>s.desde>=hoy);
+  const v7=fut.filter(s=>s.desde<=en(7));
+  const vSin=fut.filter(s=>!esNotif(s));
+  if(v7.length) A.push({p:'media',t:'Vacaciones a liquidar',v:`${v7.length} salida(s) en los próximos 7 días`,
+    d:`${v7.reduce((a,s)=>a+s.dias,0)} días a informar`,go:'v-vacaciones'});
+  const vSin15=vSin.filter(s=>s.desde<=en(15));
+  if(vSin15.length) A.push({p:'alta',t:'Notificaciones pendientes',v:`${vSin15.length} salida(s) sin notificar a menos de 15 días`,
+    d:'Hay que entregar la planilla firmada',go:'v-vacaciones'});
+  // ausentismo
+  const ord=ordinals(), pend={};
+  for(const r of lateRecs()){ const k=kindFor(ord[rid(r)]||1); pend[k]=(pend[k]||0)+1 }
+  if(pend.sancion) A.push({p:'alta',t:'Suspensiones a emitir',v:`${pend.sancion} caso(s) alcanzaron el tope`,
+    d:'Ya pasaron pedidos y apercibimiento',go:'v-ausentismo'});
+  if(pend.apercibimiento) A.push({p:'media',t:'Apercibimientos a emitir',v:`${pend.apercibimiento} caso(s) corresponden apercibimiento`,
+    d:'Cuarta tardanza acumulada',go:'v-ausentismo'});
+  if(pend.descargo) A.push({p:'baja',t:'Pedidos de explicación',v:`${pend.descargo} caso(s) para pedir descargo`,
+    d:'Dentro de las primeras tardanzas',go:'v-ausentismo'});
+  const nc=activeRecs().filter(r=>r.status==='no_cubierto').length;
+  if(nc) A.push({p:'media',t:'Reporte incompleto',v:`${nc} registro(s) de turnos que no vinieron en la exportación`,
+    d:'Volvé a exportar incluyendo todos los turnos',go:'v-ausentismo'});
+
+  const rank={alta:0,media:1,baja:2};
+  A.sort((a,b)=>rank[a.p]-rank[b.p]);
+  $('#avisos').innerHTML = A.length
+    ? A.map(a=>`<button class="aviso ${a.p}" data-v="${a.go}"><div class="at">${esc(a.t)}</div>
+        <div class="av">${esc(a.v)}</div><div class="ad">${esc(a.d)}</div></button>`).join('')
+    : '<div class="empty">Sin avisos. Cargá los archivos de cada módulo para ver el estado.</div>';
+
+  const nAus=allRecs().length, nVac=vacRows().length, nAnt=antRows().length;
+  $('#stAus').textContent = nAus? `${nAus} registros · ${lateRecs().length} tardanzas` : 'sin datos — subí el reporte del reloj';
+  $('#stVac').textContent = nVac? `${nVac} salidas · ${fut.length} por venir` : 'sin datos — subí el plan de vacaciones';
+  $('#stAnt').textContent = nAnt? `${act.length} activos · ${b7.length} bajan esta semana` : 'sin datos — subí el control de antigüedad';
+  $('#heroSub').textContent = (nAus||nVac||nAnt)
+    ? `${A.filter(a=>a.p==='alta').length} tema(s) urgente(s) para mirar hoy.`
+    : 'Elegí con qué querés trabajar hoy.';
+}
+
+/* ============================================================
+   15. ROUTER Y EVENTOS DE LOS MÓDULOS NUEVOS
+   ============================================================ */
+let vacSel=new Set(), vacManual=false, antSel=new Set(), antManual=false;
+
+function goView(id){
+  $$('.view').forEach(v=>v.classList.toggle('on',v.id===id));
+  $$('.mod').forEach(m=>m.classList.toggle('on',m.dataset.v===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(id==='v-home') avisos();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-v]'); if(!b) return;
+  goView(b.dataset.v);
+});
+
+/* --- pestañas internas de los módulos nuevos --- */
+['#tabsVac','#tabsAnt'].forEach(t=>$(t).onclick=e=>{
+  const b=e.target.closest('.tab'); if(!b) return;
+  [...$(t).children].forEach(x=>x.classList.toggle('on',x===b));
+  const cont=$(t).parentElement;
+  [...cont.querySelectorAll('.panel')].forEach(p=>p.classList.toggle('on',p.id===b.dataset.p));
+});
+
+/* --- carga de archivos --- */
+async function readSheet(f,pick){
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+  const name=wb.SheetNames.find(n=>pick.test(n))||wb.SheetNames[0];
+  return XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null,blankrows:false});
+}
+function hookDrop(zone,input,btn,handler){
+  $(btn).onclick=()=>$(input).click();
+  $(input).onchange=e=>{ if(e.target.files[0]) handler(e.target.files[0]); e.target.value='' };
+  const z=$(zone);
+  ['dragenter','dragover'].forEach(v=>z.addEventListener(v,e=>{e.preventDefault();z.classList.add('hot')}));
+  ['dragleave','drop'].forEach(v=>z.addEventListener(v,e=>{e.preventDefault();z.classList.remove('hot')}));
+  z.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) handler(e.dataTransfer.files[0]) });
+}
+hookDrop('#dropVac','#fileVac','#btnPickVac',async f=>{
+  if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.');return}
+  try{
+    const rows=await readSheet(f,/general/i);
+    DB.vac={rows:parseVac(rows),file:f.name,at:new Date().toISOString()};
+    vacManual=false; await persist(); renderVac(); avisos();
+    toast(`${DB.vac.rows.length} salidas cargadas de ${f.name}`);
+  }catch(err){ toast('No pude leer el plan: '+err.message) }
+});
+hookDrop('#dropAnt','#fileAnt','#btnPickAnt',async f=>{
+  if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.');return}
+  try{
+    const rows=await readSheet(f,/antig/i);
+    DB.ant={rows:parseAnt(rows),file:f.name,at:new Date().toISOString()};
+    antManual=false; await persist(); renderAnt(); avisos();
+    toast(`${DB.ant.rows.length} legajos cargados · ${antAct().length} activos`);
+  }catch(err){ toast('No pude leer el control: '+err.message) }
+});
+
+/* --- filtros --- */
+['#vDesde','#vHasta','#vBusca','#vVentana','#vSinNotif'].forEach(s=>$(s).oninput=()=>{vacManual=false;$('#vTodos').checked=true;renderVac()});
+$('#vBusca2').oninput=renderVac;
+$('#vTodos').onchange=e=>{ vacManual=true; vacSel=e.target.checked?new Set(vacProx().map(s=>s.id)):new Set(); renderVac() };
+$('#liqFecha').onchange=renderLiq;
+$('#vFechaNota').onchange=()=>{};
+
+['#aVentana','#aTurno','#aTarea','#aBusca'].forEach(s=>$(s).oninput=()=>{antManual=false;$('#aTodos').checked=true;renderAnt()});
+$('#aBusca2').oninput=renderAnt;
+$('#aTodos').onchange=e=>{ antManual=true; antSel=e.target.checked?new Set(bajasProx().map(r=>r.legajo)):new Set(); renderAnt() };
+
+/* --- ediciones en tabla --- */
+let vacT=null;
+$('#tVac').addEventListener('change',async e=>{
+  const c=e.target.closest('.vchk');
+  if(c){ vacManual=true; c.checked?vacSel.add(c.dataset.id):vacSel.delete(c.dataset.id);
+    $('#vCount').textContent=`${vacSel.size} de ${vacProx().length} seleccionadas`; return }
+  const n=e.target.closest('.vnot');
+  if(n){ DB.vacOv=DB.vacOv||{}; (DB.vacOv[n.dataset.id]||(DB.vacOv[n.dataset.id]={})).notif=n.checked;
+    await persist(); renderVac(); avisos(); }
+});
+$('#tVac').addEventListener('input',e=>{
+  const p=e.target.closest('.vplus'); if(!p) return;
+  DB.vacOv=DB.vacOv||{}; (DB.vacOv[p.dataset.id]||(DB.vacOv[p.dataset.id]={})).plus=+p.value||0;
+  clearTimeout(vacT); vacT=setTimeout(()=>{persist(); renderLiq()},600);
+});
+let antT=null;
+$('#tBajas').addEventListener('change',e=>{
+  const c=e.target.closest('.achk'); if(!c) return;
+  antManual=true; c.checked?antSel.add(c.dataset.l):antSel.delete(c.dataset.l);
+  $('#aCount').textContent=`${antSel.size} de ${bajasProx().length} seleccionadas`;
+});
+$('#tBajas').addEventListener('input',e=>{
+  const i=e.target.closest('.afield'); if(!i) return;
+  DB.antOv=DB.antOv||{}; (DB.antOv[i.dataset.l]||(DB.antOv[i.dataset.l]={}))[i.dataset.f]=i.value;
+  clearTimeout(antT); antT=setTimeout(persist,700);
+});
+
+/* --- planillas de vacaciones --- */
+document.addEventListener('click',e=>{
+  const o=e.target.closest('[data-vone]'); if(!o) return;
+  const s=vacRows().find(x=>x.id===o.dataset.vone); if(!s) return;
+  vacPDFDescargar([s],`Vacaciones_${slug(s.nombre)}_${s.desde}.pdf`);
+});
+$('#btnVacDoc').onclick=()=>{ const d=notasSel(); if(!d){toast('No hay salidas seleccionadas');return}
+  vacPDFDescargar(d.rows,`Notificaciones_vacaciones_${d.rows.length}_${todayISO()}.pdf`); };
+$('#btnVacPrint').onclick=()=>{ const d=notasSel(); if(!d){toast('No hay salidas seleccionadas');return} vacPDFImprimir(d.rows) };
+$('#btnVacCsv').onclick=()=>{
+  const rows=[['Desde','Hasta','Dias','Plus','Legajo','Apellido y Nombre','Categoria','U.O.','Salida N','Notificado']];
+  vacProx().forEach(s=>rows.push([dmy(s.desde),dmy(s.hasta),s.dias,vacPlus(s),s.legajo,s.nombre,s.cat,s.uo,s.n,esNotif(s)?'SI':'NO']));
+  download(csv(rows),`vacaciones_proximas_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+
+/* --- reporte para liquidar --- */
+$('#btnLiqCopy').onclick=()=>copiar('#liqMail','Tabla copiada — pegala en el mail');
+$('#btnLiqCsv').onclick=()=>{
+  const rows=[['Legajo','U.O. Cliente','APELLIDO Y NOMBRE','DESDE','HASTA','DIAS','PLUS']];
+  liqRows().forEach(s=>rows.push([s.legajo,s.uo,s.nombre,diaCorto(s.desde),diaCorto(s.hasta),s.dias,vacPlus(s)]));
+  download(csv(rows),`liquidar_vacaciones_${$('#liqFecha').value||todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+$('#btnLiqDoc').onclick=()=>{
+  const f=$('#liqFecha').value, rows=liqRows();
+  if(!rows.length){toast('Elegí una fecha con salidas');return}
+  const inner=repDoc('Vacaciones a liquidar',
+    `Buenas días Seba, te paso las vacaciones con fecha de salida del <b>${dmyDots(f)}</b>.`,
+    [{t:'Legajo',w:'9%'},{t:'U.O. Cliente',l:true,w:'26%'},{t:'Apellido y nombre',l:true,w:'25%'},
+     {t:'Desde',w:'14%'},{t:'Hasta',w:'14%'},{t:'Días',w:'6%'},{t:'Plus',w:'6%'}],
+    rows.map(s=>[s.legajo,s.uo,s.nombre,diaCorto(s.desde),diaCorto(s.hasta),s.dias,vacPlus(s)]));
+  download(wordFile(inner,'Vacaciones a liquidar'),`Vacaciones_a_liquidar_${f}.doc`,'application/msword');
+  toast('Reporte descargado');
+};
+
+/* --- reporte de bajas --- */
+$('#btnBajaCopy').onclick=()=>{
+  const w=document.getElementById('bajaMailWrap');
+  if(w) w.innerHTML=bajasHTML(); copiar('#bajaMail','Tabla copiada — pegala en el mail');
+};
+$('#btnBajaCsv').onclick=()=>{
+  const rows=[['Legajo','Apellido y nombre','F. Ingreso','F. Egreso','TAREA','turno','Motivo','Detalle']];
+  bajasProx().filter(r=>antSel.has(r.legajo))
+    .forEach(r=>rows.push([r.legajo,r.nombre,dmy(r.ingreso),dmy(r.ultimo),r.tarea,r.turno,motivoDe(r),detalleDe(r)]));
+  download(csv(rows),`proximas_bajas_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+$('#btnBajaDoc').onclick=()=>{
+  const rows=bajasProx().filter(r=>antSel.has(r.legajo));
+  if(!rows.length){toast('No hay bajas seleccionadas');return}
+  const inner=repDoc('Informe de bajas','Buenos días, informo las siguientes bajas:',
+    [{t:'Legajo',w:'9%'},{t:'Apellido y nombre',l:true,w:'25%'},{t:'F. Ingreso',w:'11%'},{t:'F. Egreso',w:'11%'},
+     {t:'Tarea',l:true,w:'14%'},{t:'Turno',w:'11%'},{t:'Motivo',w:'7%'},{t:'Detalle',l:true,w:'12%'}],
+    rows.map(r=>[r.legajo,r.nombre,dmy(r.ingreso),dmy(r.ultimo),cap(r.tarea),cap(r.turno),motivoDe(r),detalleDe(r)]),
+    '<p class="dat" style="font-size:9pt;color:#55554F">FPP: fin de período de prueba.</p>');
+  download(wordFile(inner,'Bajas'),`Bajas_${rows.length}_${todayISO()}.doc`,'application/msword');
+  toast('Reporte descargado');
+};
+$('#btnMatCsv').onclick=()=>{
+  const act=antAct(), t={},k={},m={};
+  for(const r of act){ t[r.turno]=(t[r.turno]||0)+1; k[r.tarea]=(k[r.tarea]||0)+1;
+    (m[r.turno]||(m[r.turno]={}))[r.tarea]=((m[r.turno]||{})[r.tarea]||0)+1 }
+  const tur=Object.keys(t).sort(), tar=Object.keys(k).sort();
+  const rows=[['Turno',...tar,'Total']];
+  tur.forEach(u=>rows.push([u,...tar.map(a=>(m[u]||{})[a]||0),t[u]]));
+  rows.push(['Total',...tar.map(a=>k[a]),act.length]);
+  download(csv(rows),`dotacion_turno_tarea_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+$('#btnPlantelCsv').onclick=()=>{
+  const rows=[['Legajo','Apellido y nombre','F. Ingreso','Antiguedad (dias)','Ultimo dia','Tarea','Turno','U.O.']];
+  antAct().forEach(r=>rows.push([r.legajo,r.nombre,dmy(r.ingreso),r.antig,dmy(r.ultimo),r.tarea,r.turno,r.uo]));
+  download(csv(rows),`plantel_activo_${todayISO()}.csv`,'text/csv;charset=utf-8');
+};
+
+/* ============================================================
+   11. ARRANQUE
+   ============================================================ */
+function boot2(){ fillTurnoSel(); loadTpl(); render(); renderVac(); renderAnt(); avisos() }
+(async()=>{
+  const saved=await Store.load();
+  if(saved) DB=Object.assign(DB,saved);
+  if(!DB.templates) DB.templates={};
+  if(DB.version!==2){ // base creada con la version anterior
+    for(const l in DB.people){ const p=DB.people[l];
+      if(p && p.dni && !p.cuil) p.cuil=p.dni;
+      if(p) delete p.dni, delete p.ingreso; }
+    DB.escPedidos=DB.escPedidos??3; DB.escApercib=DB.escApercib??1; DB.renglones=DB.renglones??8;
+    for(const j in DB.shifts){ const sh=DB.shifts[j];
+      if(sh.auto!==false) sh.active = sh.start!=null && sh.start<20*60; }
+    DB.version=2;
+  }
+  DB.tolerancia = DB.tolerancia==null?10:DB.tolerancia;
+  recompute();
+  $('#pFechaDoc').value=todayISO();
+  $('#vFechaNota').value=todayISO();
+  boot2();
+})();
+</script>
+</body>
+</html>

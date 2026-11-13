@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel F3 · Consolidado de Novedades</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+<style>
+:root{
+  --ink:#0e1219; --panel:#151b25; --panel2:#1b2230; --line:#26303f; --line2:#33415a;
+  --tx:#e4e9f2; --mut:#8895ab; --dim:#5f6c83;
+  --amber:#f0a020; --teal:#2dd4a7; --coral:#ff6b5e; --violet:#8b7cf6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--tx);font-family:'Space Grotesk',system-ui,sans-serif;font-size:14px;line-height:1.5}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(900px 500px at 12% -8%, rgba(139,124,246,.10), transparent 65%),
+             radial-gradient(700px 420px at 92% 4%, rgba(240,160,32,.07), transparent 60%)}
+.wrap{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:22px 20px 90px}
+
+/* ---- header ---- */
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px}
+h1{font-size:23px;font-weight:700;margin:0;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--amber)}
+.hola{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--amber);margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.hola::before{content:'';width:16px;height:1px;background:var(--amber)}
+.hola span{color:var(--dim);letter-spacing:.08em}
+.leyenda{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}
+.leyenda i{font-style:normal;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;color:#fff;padding:3px 9px;border-radius:2px}
+.sub{color:var(--mut);font-size:12.5px;margin-top:3px}
+.badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  padding:5px 10px;border-radius:3px;border:1px solid var(--line2);color:var(--mut);background:var(--panel)}
+.badge.on{border-color:var(--teal);color:var(--teal);background:rgba(45,212,167,.08)}
+.badge.warn{border-color:var(--amber);color:var(--amber);background:rgba(240,160,32,.08)}
+
+/* ---- step rail ---- */
+.rail{display:flex;gap:0;margin-bottom:24px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--panel)}
+.rail div{flex:1;padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.05em;
+  color:var(--dim);border-right:1px solid var(--line);display:flex;gap:9px;align-items:center;transition:.2s}
+.rail div:last-child{border-right:0}
+.rail div b{display:inline-flex;width:18px;height:18px;border-radius:2px;background:var(--line);color:var(--mut);
+  align-items:center;justify-content:center;font-size:10px;font-weight:600;flex:none}
+.rail div.done{color:var(--teal)} .rail div.done b{background:rgba(45,212,167,.15);color:var(--teal)}
+.rail div.act{color:var(--tx);background:var(--panel2)} .rail div.act b{background:var(--amber);color:#111}
+
+/* ---- cards ---- */
+section{background:var(--panel);border:1px solid var(--line);border-radius:5px;margin-bottom:16px;overflow:hidden}
+section.off{opacity:.45;pointer-events:none}
+.head{padding:13px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:var(--panel2)}
+.head h2{font-size:14.5px;margin:0;font-weight:600;letter-spacing:-.01em}
+.head .n{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber);letter-spacing:.1em}
+.head .sp{flex:1}
+.body{padding:17px}
+
+/* ---- drop ---- */
+.drop{border:1.5px dashed var(--line2);border-radius:4px;padding:26px 20px;text-align:center;cursor:pointer;transition:.15s;background:rgba(255,255,255,.012)}
+.drop:hover,.drop.over{border-color:var(--amber);background:rgba(240,160,32,.05)}
+.drop strong{display:block;font-size:14px;margin-bottom:5px}
+.drop span{color:var(--mut);font-size:12.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+
+/* ---- controls ---- */
+button{font-family:inherit;font-size:13px;font-weight:500;padding:8px 15px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--panel2);color:var(--tx);transition:.15s}
+button:hover{border-color:var(--mut)}
+button.primary{background:var(--amber);color:#12151c;border-color:var(--amber);font-weight:700}
+button.primary:hover{filter:brightness(1.1)}
+button.ghost{background:transparent;color:var(--mut);border-color:var(--line)}
+button:disabled{opacity:.35;cursor:not-allowed}
+input,select{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:var(--ink);border:1px solid var(--line2);
+  color:var(--tx);padding:7px 9px;border-radius:3px;outline:none}
+input:focus,select:focus{border-color:var(--amber)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--mut);
+  font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;text-transform:uppercase}
+.row{display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap}
+.chk{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:12.5px;cursor:pointer}
+.chk input{width:15px;height:15px;accent-color:var(--amber)}
+
+/* ---- table ---- */
+.tw{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:4px}
+table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:12px}
+th{position:sticky;top:0;background:var(--panel2);text-align:left;padding:8px 10px;font-weight:500;
+  color:var(--mut);border-bottom:1px solid var(--line2);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;z-index:2}
+td{padding:5px 10px;border-bottom:1px solid rgba(38,48,63,.55);white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,.022)}
+td.num{text-align:right}
+.tipos{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+@media(max-width:760px){.tipos{grid-template-columns:1fr}}
+.tipos button{text-align:left;padding:13px 15px;background:var(--panel2);border:1.5px solid var(--line);
+  border-radius:4px;display:block;width:100%;transition:.15s}
+.tipos button:hover{border-color:var(--line2);background:#1f2634}
+.tipos button.sel{border-color:var(--amber);background:rgba(240,160,32,.09)}
+.tipos button strong{display:block;font-size:14px;margin-bottom:4px}
+.tipos button.sel strong{color:var(--amber)}
+.tipos button em{font-style:normal;display:block;color:var(--mut);font-size:11.5px;line-height:1.45}
+section.ok{border-color:rgba(45,212,167,.5)}
+section.ok .head{background:linear-gradient(90deg,rgba(45,212,167,.13),var(--panel2) 60%);
+  border-bottom-color:rgba(45,212,167,.3)}
+section.ok .head .n{color:var(--teal)}
+section.ok .head h2::after{content:'✓ cargado';margin-left:10px;font-family:'IBM Plex Mono',monospace;
+  font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);
+  background:rgba(45,212,167,.13);border:1px solid rgba(45,212,167,.35);padding:2px 8px;border-radius:2px;
+  vertical-align:middle;font-weight:500}
+.drop.cargado{border-style:solid;border-color:rgba(45,212,167,.45);background:rgba(45,212,167,.05)}
+.drop.cargado strong::before{content:'✓ ';color:var(--teal)}
+.opc{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);border:1px solid var(--line2);padding:2px 7px;border-radius:2px;margin-left:8px;
+  vertical-align:middle;font-weight:400}
+.rank{display:flex;flex-direction:column;gap:5px}
+.rk{display:flex;align-items:center;gap:9px;font-size:12px}
+.rk .nm{width:132px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .bar{flex:1;height:13px;background:var(--ink);border-radius:2px;overflow:hidden}
+.rk .bar i{display:block;height:100%;background:linear-gradient(90deg,#f0a020,#e07a1a);border-radius:2px}
+.rk b{font-family:'IBM Plex Mono',monospace;width:42px;text-align:right;font-size:12.5px}
+.rk s{text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:10.5px;width:38px;
+  text-align:right;color:var(--dim)}
+.rk s.up{color:var(--coral)} .rk s.dn{color:var(--teal)}
+.totbox{margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:13px 15px}
+.totbox h4{margin:0 0 10px;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--mut);font-weight:500}
+#totGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px}
+.tot{display:flex;align-items:center;gap:10px;background:var(--ink);border-left:3px solid;border-radius:2px;
+  padding:7px 11px;font-size:11.5px}
+.tot span{color:var(--mut);line-height:1.3}
+.tot b{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;white-space:nowrap}
+.cajas{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-top:16px;
+  align-items:start}
+@media(max-width:800px){.cajas{grid-template-columns:1fr}}
+.caja{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:15px 16px;
+  min-width:0;overflow:hidden}
+.caja.full{grid-column:1/-1}
+.caja h3{font-size:12.5px;font-weight:600;margin:0 0 12px;letter-spacing:.02em;color:var(--tx);
+  padding-bottom:9px;border-bottom:1px solid var(--line)}
+.caja h4{font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--mut);font-weight:500;margin:0 0 9px}
+.caja .tw{max-height:330px}
+.caja p.muted{margin:4px 0}
+.caja p.pie{margin:9px 0 0;font-size:11px;color:var(--dim)}
+.donutrow{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.donutrow .lgs{flex:1;min-width:180px}
+td.w{white-space:normal;max-width:210px}
+th.r{text-align:right}
+.lg{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--mut);padding:5px 0;
+  border-bottom:1px solid rgba(38,48,63,.6)}
+.lg:last-child{border-bottom:0}
+.lg i{width:9px;height:9px;border-radius:2px;flex:none}
+.lg b{margin-left:auto;font-family:'IBM Plex Mono',monospace;color:var(--tx);font-size:14px;font-weight:600}
+.lg s{text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);width:36px;text-align:right}
+tfoot td{position:sticky;bottom:0;background:var(--panel2);border-top:2px solid var(--line2);
+  border-bottom:0;font-weight:600;letter-spacing:.02em;z-index:2}
+td input{width:100%;background:transparent;border:1px solid transparent;padding:3px 5px;font-size:12px}
+td input:hover{border-color:var(--line2)}
+td input:focus{background:var(--ink);border-color:var(--amber)}
+td input.num{text-align:right}
+td input.ed{border-color:var(--amber);background:rgba(240,160,32,.10);color:var(--amber);font-weight:600}
+.tag{font-size:10px;padding:2px 6px;border-radius:2px;letter-spacing:.05em;text-transform:uppercase}
+.tag.new{background:rgba(45,212,167,.14);color:var(--teal)}
+.tag.no{background:rgba(255,107,94,.14);color:var(--coral)}
+.tag.up{background:rgba(240,160,32,.14);color:var(--amber)}
+
+/* ---- alerts ---- */
+.alert{display:flex;gap:11px;padding:11px 13px;border-radius:3px;margin-bottom:9px;font-size:12.5px;
+  border-left:3px solid;background:var(--panel2)}
+.alert b{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;flex:none;padding-top:1px}
+.alert.e{border-color:var(--coral)} .alert.e b{color:var(--coral)}
+.alert.w{border-color:var(--amber)} .alert.w b{color:var(--amber)}
+.alert.i{border-color:var(--teal)} .alert.i b{color:var(--teal)}
+.alert p{margin:0;color:var(--mut)}
+.alert p strong{color:var(--tx);font-weight:500}
+.alert code{font-family:'IBM Plex Mono',monospace;color:var(--tx);font-size:11.5px}
+
+/* ---- stats ---- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:16px;
+  align-items:stretch}
+.stat{min-width:0}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:12px 14px}
+.stat .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:3px;letter-spacing:-.02em}
+.stat.a .v{color:var(--amber)} .stat.t .v{color:var(--teal)} .stat.c .v{color:var(--coral)}
+
+.muted{color:var(--mut);font-size:12.5px}
+.mono{font-family:'IBM Plex Mono',monospace}
+.hr{height:1px;background:var(--line);margin:16px 0}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel2);
+  border:1px solid var(--line2);border-left:3px solid var(--teal);padding:11px 18px;border-radius:3px;
+  font-size:13px;transition:.25s;z-index:99;opacity:0;max-width:88vw}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.err{border-left-color:var(--coral)}
+.file-in{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="hola" id="hola">Bienvenido, Ariel</div>
+    <h1>Panel <em>F3</em> · Consolidado de Novedades</h1>
+    <div class="sub">CD Isidro Casanova · Novedades de reloj → archivo F3 de liquidación</div>
+  </div>
+  <div class="badges">
+    <span class="badge" id="bTipo">sin tipo</span>
+    <span class="badge" id="bBase">base: —</span>
+    <span class="badge" id="bNov">novedades: —</span>
+  </div>
+</header>
+
+<div class="rail" id="rail">
+  <div id="s1"><b>1</b> Base F3</div>
+  <div id="s2"><b>2</b> Novedades</div>
+  <div id="sA"><b>2c</b> Ayuda solidaria</div>
+  <div id="sP"><b>2b</b> Códigos</div>
+  <div id="s3"><b>3</b> Sueldos y categorías</div>
+  <div id="s4"><b>4</b> Control</div>
+  <div id="s5"><b>5</b> Generar F3</div>
+  <div id="s6"><b>6</b> Reporte</div>
+</div>
+
+<!-- 1 · BASE -->
+<section id="secBase">
+  <div class="head"><span class="n">01</span><h2>Base F3 del mes anterior</h2><span class="sp"></span>
+    <span class="muted mono" id="baseInfo"></span>
+    <button class="ghost" id="btnLimpiarBase">Borrar base</button>
+  </div>
+  <div class="body">
+    <div class="tipos" id="tipos"></div>
+    <div class="drop" id="dropBase">
+      <strong>Soltá acá el F3 del mes anterior</strong>
+      <span>Ej: <code class="mono">F3_FC_07_26.xlsx</code> o <code class="mono">F3_BETA_GLD_07_26.xlsx</code> · se guarda en este navegador</span>
+    </div>
+    <input type="file" class="file-in" id="fBase" accept=".xlsx,.xlsm,.xls">
+    <p class="muted" style="margin:12px 0 0">De acá salen las columnas A a AE de cada legajo (nombre, categoría, sueldo, convenio, CUIL, fechas) y los adicionales fijos que no vienen del reloj: Tickets 366, Adicional Empresa 329, Asig. hijo c/discap 555, Adicional Función 371 y Adicional Rama 383.</p>
+  </div>
+</section>
+
+<!-- 2 · NOVEDADES -->
+<section id="secNov" class="off">
+  <div class="head"><span class="n">02</span><h2>Novedades del mes</h2><span class="sp"></span>
+    <span class="muted mono" id="novInfo"></span>
+  </div>
+  <div class="body">
+    <div class="drop" id="dropNov">
+      <strong>Soltá acá el archivo de Novedades</strong>
+      <span>Lee la hoja <code class="mono">Resumen</code> / <code class="mono">RESUMEN</code>, no la Base diaria</span>
+    </div>
+    <input type="file" class="file-in" id="fNov" accept=".xlsx,.xlsm,.xls">
+    <div class="hr"></div>
+    <div class="row">
+      <label class="f">Días normales<input id="inDiasNorm" type="number" value="30" style="width:90px"></label>
+      <label class="f">Período (fila 1)<input id="inFecha" style="width:190px"></label>
+      <label class="chk" style="padding-bottom:8px"><input type="checkbox" id="chkCeros"> Escribir 0 en vez de dejar la celda vacía</label>
+      <label class="chk" style="padding-bottom:8px"><input type="checkbox" id="chkSoloNov"> Solo los legajos que aparecen en las novedades</label>
+      <label class="chk" style="padding-bottom:8px"><input type="checkbox" id="chkAltas"> Incorporar los que están en novedades y no en la base</label>
+      <label class="chk" style="padding-bottom:8px"><input type="checkbox" id="chkPodar" checked> Dejar solo las columnas con novedades</label>
+    </div>
+  </div>
+</section>
+
+<!-- 2c · AYUDA SOLIDARIA -->
+<section id="secAyu" class="off">
+  <div class="head"><span class="n">02c</span><h2>Ayuda solidaria <span class="opc">opcional</span></h2><span class="sp"></span>
+    <span class="muted mono" id="ayuInfo"></span>
+    <button class="ghost" id="btnAyuBorrar">Quitar</button>
+  </div>
+  <div class="body">
+    <div class="drop" id="dropAyu">
+      <strong>Soltá acá la nómina de ayuda solidaria</strong>
+      <span>Ej: <code class="mono">AYUDA_solidaria_*.xlsx</code> · quien tenga monto sale con un 1</span>
+    </div>
+    <input type="file" class="file-in" id="fAyu" accept=".xlsx,.xlsm,.xls,.csv">
+    <p class="muted" style="margin:12px 0 0">Los legajos con monto pagado salen con <strong>1</strong> en la última columna del F3, código 611. Si no cargás nada, la columna no aparece en el archivo.</p>
+    <div id="ayuLista"></div>
+  </div>
+</section>
+
+<!-- 2b · PARES -->
+<section id="secPar" class="off">
+  <div class="head"><span class="n">02b</span><h2>Pares novedad ↔ código</h2><span class="sp"></span>
+    <span class="muted mono" id="parInfo"></span>
+    <button class="ghost" id="btnParReset">Restaurar</button>
+  </div>
+  <div class="body">
+    <p class="muted" style="margin:0 0 12px">El archivo de novedades trae el <strong>nombre</strong> del concepto y el F3 pide el <strong>código</strong>. Acá se emparejan. Podés corregir cualquier código y el cambio queda guardado. Si dejás el código vacío, la columna sale con el nombre y sin código, como venías haciendo a mano.</p>
+    <div class="tw"><table id="tPar"><thead><tr>
+      <th>Nombre en el Resumen</th><th>Estado</th><th>Etiqueta en el F3</th>
+      <th style="width:100px">Código</th><th>Familia en la plantilla</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 3 · SUELDOS -->
+<section id="secSue" class="off">
+  <div class="head"><span class="n">03</span><h2>Sueldos y categorías</h2><span class="sp"></span>
+    <span class="muted mono" id="sueInfo"></span>
+  </div>
+  <div class="body">
+    <div class="row" style="margin-bottom:14px">
+      <label class="f">Aumento general %<input id="inPct" type="number" step="0.01" value="0" style="width:110px"></label>
+      <button id="btnPct">Aplicar a los sueldos</button>
+      <span class="muted">o</span>
+      <button id="btnImpSue">Importar planilla de sueldos</button>
+      <input type="file" class="file-in" id="fSue" accept=".xlsx,.xlsm,.xls,.csv">
+      <span class="sp" style="flex:1"></span>
+      <input id="inBuscar" placeholder="buscar legajo o apellido" style="width:230px">
+    </div>
+    <p class="muted" style="margin:0 0 12px">La planilla a importar necesita una columna de <strong>Legajo</strong> y las que quieras pisar: Sueldo, Sueldo Adicional 1, Sueldo Adicional 2, Categoria, Calificación Profesional. Los legajos que no estén en la planilla quedan como están.</p>
+    <div class="tw"><table id="tSue"><thead><tr>
+      <th>Legajo</th><th>Apellido y Nombres</th><th>Categoría</th><th>Calificación</th>
+      <th style="text-align:right">Sueldo</th><th style="text-align:right">Adic. 1</th><th style="text-align:right">Adic. 2</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 3b · FIJOS -->
+<section id="secFij" class="off">
+  <div class="head"><span class="n">03b</span><h2>Adicionales fijos</h2><span class="sp"></span>
+    <span class="muted mono" id="fijInfo"></span>
+    <button class="ghost" id="btnFijDef">Restaurar parametrizados</button>
+    <button class="ghost" id="btnFij0">Poner en 0 los vacíos</button>
+  </div>
+  <div class="body">
+    <p class="muted" style="margin:0 0 12px">Estos cinco conceptos no vienen del reloj. Vienen parametrizados por legajo con los valores del archivo de conceptos fijos de efectivos (Rama 22% / 20%). Mandan siempre los parametrizados; un legajo nuevo que no esté parametrizado toma lo que traiga el F3 base, buscado por código, y si no trae nada sale en 0. Podés corregir cualquier valor en esta tabla. Función y Rama van en porcentaje (0,18 = 18%).</p>
+    <div class="row" style="margin-bottom:12px">
+      <input id="inBuscarFij" placeholder="buscar legajo o apellido" style="width:230px">
+    </div>
+    <div class="tw"><table id="tFij"><thead><tr>
+      <th>Legajo</th><th>Apellido y Nombres</th>
+      <th style="text-align:right">Tickets<br><span style="color:var(--amber)">366</span></th>
+      <th style="text-align:right">Adic. Empresa<br><span style="color:var(--amber)">329</span></th>
+      <th style="text-align:right">Asig. hijo disc.<br><span style="color:var(--amber)">555</span></th>
+      <th style="text-align:right">Adic. Función<br><span style="color:var(--amber)">371</span></th>
+      <th style="text-align:right">Adic. Rama<br><span style="color:var(--amber)">383</span></th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- 4 · CONTROL -->
+<section id="secCtl" class="off">
+  <div class="head"><span class="n">04</span><h2>Control previo</h2><span class="sp"></span>
+    <button class="ghost" id="btnCsv">Bajar control en CSV</button>
+  </div>
+  <div class="body">
+    <div class="stats" id="stats"></div>
+    <div id="alerts"></div>
+    <div class="hr"></div>
+    <div class="row" style="margin-bottom:12px">
+      <strong style="font-size:13px">Vista previa del F3</strong>
+      <span class="muted" id="prevInfo"></span>
+      <span style="flex:1"></span>
+      <input id="inFiltro" placeholder="filtrar legajo o apellido" style="width:220px">
+      <button class="ghost" id="btnLimpiarOver">Borrar ajustes</button>
+    </div>
+    <p class="muted" style="margin:-4px 0 12px">Editá cualquier celda para pisar lo que trajo el reloj (por ejemplo, reclasificar una ausencia como enfermedad). Los ajustes quedan marcados en ámbar y se guardan hasta que los borres.</p>
+    <div class="leyenda" id="leyenda"></div>
+    <div class="tw"><table id="tPrev"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <div class="totbox"><h4>Totales por columna</h4><div id="totGrid"></div></div>
+  </div>
+</section>
+
+<!-- 5 · GENERAR -->
+<section id="secGen" class="off">
+  <div class="head"><span class="n">05</span><h2>Generar archivo F3</h2></div>
+  <div class="body">
+    <div class="row">
+      <label class="f">Nombre del archivo<input id="inNombre" style="width:280px"></label>
+      <button class="primary" id="btnGen" style="margin-bottom:1px">Descargar F3 .xlsx</button>
+      <button id="btnGuardarBase" style="margin-bottom:1px">Guardar este F3 como base del mes que viene</button>
+    </div>
+    <p class="muted" style="margin:13px 0 0">El archivo sale con el mismo formato que el original: fila 1 con los nombres de concepto, fila 2 con los códigos de liquidación, datos desde la fila 3, y los mismos anchos de columna y formatos de celda de la base.</p>
+  </div>
+</section>
+
+<!-- 6 · REPORTE -->
+<section id="secRep" class="off">
+  <div class="head"><span class="n">06</span><h2>Reporte del mes</h2><span class="sp"></span>
+    <button id="btnRepPpt">Bajar en PowerPoint</button>
+    <button class="ghost" id="btnRepCsv">Bajar en CSV</button>
+  </div>
+  <div class="body" id="repBody"></div>
+</section>
+
+<div style="text-align:center;color:var(--dim);font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;margin-top:26px">
+  Todo se procesa en tu navegador · ningún archivo sale de esta máquina
+</div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   MAPEO F3 ← NOVEDADES
+   Derivado comparando F3 junio/julio 2026 contra sus Resúmenes.
+   src: RES = columna de la hoja Resumen (nombre normalizado)
+        CONST = días normales fijos
+        CALC = suma de licencias (AJ:AU)
+        BASE = viene del F3 anterior (adicional fijo)
+        MAN  = manual / archivo externo
+   ============================================================ */
+const N = s => String(s??'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+                 .replace(/[^A-Z0-9%]+/g,' ').trim();
+
+const MAP_FC = [
+  ['AF','DIAS NORMALES',null,'CONST'],
+  // el Resumen FC cuenta las vacaciones dentro de AUSENTE, hay que restarlas
+  ['AG','DIAS NO TRABAJADOS',110,'RESDIF',['AUSENTE','VACACIONES']],
+  ['AH','DIAS ENFERMEDAD',170,'RES','ENFERMEDAD'],
+  ['AI','FERIADO TRABAJADO',209,'RES','DIA FERIADO'],
+  ['AJ','HS FERIADO',null,'RES','HS FERIADO'],
+  ['AK','ART',234,'RES','ART 10 DIAS 234'],
+  ['AL','ART',310,'RES','ART 310'],
+  ['AM','MUDANZA',null,'RES','MUDANZA'],
+  ['AN','HS GRATIF EXTRAORDINARIA (DOMINGOS)',217,'RES','DIA DOMINGO'],
+  ['AO','HS DOMINGO',null,'RES','HS DOMINGO'],
+  ['AP','DESCUENTO VACACIONES',174,'RES','VACACIONES'],
+  ['AQ','HORAS EXTRAS50%',202,'RES','HORAS EXTRAS'],
+  ['AR','HS NOCTURNAS',null,'RES','HS NOCTURNAS'],
+  ['AS','AYUDA SOLIDARIA',611,'AYUDA'],
+];
+const MAP_GLD = [
+  ['AF','Dias Normales',101,'CONST'],
+  ['AG','Días no trabajados',110,'RES','AUSENCIAS A DESCUENTO'],
+  ['AH','Control',null,'CALC'],
+  ['AI','Descuento Ds. Licencias Vs.',131,'CALC',''],
+  ['AJ','Días Enfermedad',170,'RES','ENFERMEDAD'],
+  ['AK','Licencia Gremial',176,'RES','PERMISO GREMIAL'],
+  ['AL','Licencias Varias',null,'RES','LICENCIAS VARIAS'],
+  ['AM','Donación de sangre',133,'RES','DONACION DE SANGRE'],
+  ['AN','Fallecimiento Familiar',134,'RES','FALLECIMIENTO FAMILIAR'],
+  ['AO','Matrimonio',null,'RES','MATRIMONIO'],
+  ['AP','Nacimiento',132,'RES','NACIMIENTO HIJO'],
+  ['AQ','Día de Estudio',173,'RES','DIA DE ESTUDIO'],
+  ['AR','Días ART (GG)',234,'RES','ART 10 DIAS'],
+  ['AS','Días ART (ART)',310,'RES','ART 310'],
+  ['AT','Licencia sin goce de sueldo',null,'RES','LIC SIN GOCE DE SUELDO'],
+  ['AU','Suspension',105,'RES','SUSPENSION'],
+  ['AV','Ausencia Vacaciones',174,'RES','VACACIONES'],
+  ['AW','Item 4.1.13 (Viaticos)',612,'RES','V Y C'],
+  ['AX','Item 4.1.12 (Comida)',614,'RESSUM',['V Y C','COMIDA ADICIONAL']],
+  ['AY','Horas Extras 50%',null,'RES','TOTAL HS 50%'],
+  ['AZ','Horas Extras 100%',null,'RES','TOTAL HS AL 100%'],
+  ['BA','Horas Nocturnas',null,'RES','HORAS NOCTURNAS'],
+  ['BB','Descuento Hs.',304,'RES','DESCUENTO HS'],
+  ['BC','Adicional Super Congelados ',335,'RES','% ADIC FRIO'],
+  ['BD','Adic. Super Congelados s/ Viat y Com.',61,'RES','% ADIC FRIO'],
+  ['BE','Tickets Ley 26341 art.3',366,'BASE'],
+  ['BF','Adicional Empresa',329,'BASE'],
+  ['BG','Asig hijoc/discap',555,'BASE'],
+  ['BH','Adicional Función',371,'BASE','','0%'],
+  ['BI','Adicional Rama ',383,'BASE','','0%'],
+  ['BJ','TOTAL MIN. DE RETRASO',null,'RES','TOTAL MIN DE RETRASO','[$-F400]h:mm:ss\\ AM/PM'],
+  ['BK','CANT. AUSENCIAS INJUST.',null,'RES','CANT AUSENCIAS INJUST'],
+  ['BL','CANT. AUSENCIAS JUSTIFICADAS',null,'RES','CANT AUSENCIAS JUSTIFICADAS'],
+  ['BM','CUMPLE CONDICIÓN PUNTUALIDAD',null,'RES','CUMPLE CONDICION PUNTUALIDAD'],
+  ['BN','CUMPLE CONDIDICÓN PRESENTISMO',null,'RES','CUMPLE CONDIDICON PRESENTISMO'],
+  ['BO','PORCENTAJE PUNTUALIDAD Y PRESENTISMO',null,'RES','PORCENTAJE PUNTUALIDAD Y PRESENTISMO'],
+  ['BP','AYUDA SOLIDARIA',611,'AYUDA'],
+];
+// columnas del Resumen que no tienen destino en el F3 (se avisan si traen valor)
+const HUERF = {
+  FC : ['MATRIMONIO','FALLEC FAMILIAR','NACIMIENTO DE HIJO'],
+  GLD: ['RESERVA DE PUESTO']
+};
+// el 131 suma estas licencias: enfermedad, gremial, varias, donación, fallecimiento,
+// matrimonio, nacimiento, día de estudio, ART 234 y ART 310.
+const CALC_FROM = ['AJ','AK','AL','AM','AN','AO','AP','AQ','AR','AS'];
+// conceptos que se liquidan en negativo
+const NEG = [110,131,174,304];
+// adicionales fijos: no vienen del reloj, salen del F3 anterior y van todos los meses
+const FIJOS = [['BE',366,'Tickets Ley 26341 art.3'],['BF',329,'Adicional Empresa'],
+               ['BG',555,'Asig hijo c/discap'],['BH',371,'Adicional Función'],
+               ['BI',383,'Adicional Rama']];
+
+/* grupos de color para los encabezados del F3 */
+const GRUPOS = {
+  id  :{bg:'FF2A3444', fg:'FFCBD5E1', web:'#2a3444', tag:'Identificación'},
+  base:{bg:'FF1D4E6B', fg:'FFD8EEFB', web:'#1d4e6b', tag:'Base'},
+  desc:{bg:'FF8C2F2A', fg:'FFFFE0DC', web:'#8c2f2a', tag:'Descuentos'},
+  lic :{bg:'FF8A5A12', fg:'FFFDF0D5', web:'#8a5a12', tag:'Licencias'},
+  hora:{bg:'FF244C9B', fg:'FFDCE6FF', web:'#244c9b', tag:'Horas'},
+  vc  :{bg:'FF1E5D3C', fg:'FFD7F3E3', web:'#1e5d3c', tag:'Viáticos y comida'},
+  adic:{bg:'FF4B2E83', fg:'FFE7DEFB', web:'#4b2e83', tag:'Adicionales'},
+  ctrl:{bg:'FF12615C', fg:'FFD0F5F1', web:'#12615c', tag:'Presentismo'}
+};
+/* Valores por defecto de los adicionales fijos (366, 329, 555, 371, 383).
+   Tomados de F3_EFECTIVOS_CONCEPTOS_FIJOS (export del 22/09/2026), un legajo por entrada: legajo:BE,BF,BG,BH,BI */
+const FIJOS_DEF = (()=>{ const d={};
+  '232738:0,0,0,0,.22|189944:0,0,0,0,.22|229018:0,0,0,0,.22|229791:0,0,0,0,.22|228425:0,0,0,0,.22|181509:1,1,0,.25,.22|181510:1,0,0,0,.2|181511:1,1,0,0,.2|232947:0,0,0,0,.22|196750:0,0,0,0,.22|51920:0,0,0,0,.22|181512:1,0,0,0,.2|229798:0,0,0,0,.22|181513:1,1,0,0,.22|230215:0,0,0,0,.22|210917:0,0,0,0,.22|181514:1,1,0,0,.22|210470:0,0,0,0,.22|230633:0,0,0,.25,.22|228587:0,0,0,0,.22|181515:1,0,0,0,.22|195831:0,0,0,0,.22|181516:1,0,0,.25,.22|197129:0,0,0,.25,.22|197785:0,0,1,0,.2|197789:0,0,0,0,.22|208125:0,0,0,0,.22|181517:1,0,0,0,.2|181519:1,0,0,0,.22|181520:1,1,1,0,.2|230216:0,0,0,0,.22|230379:0,0,0,0,.22|228588:0,0,0,0,.2|211297:0,0,0,.25,.22|181521:1,1,0,0,.2|241177:0,0,0,0,.22|229017:0,0,0,0,.22|283276:0,0,0,0,0|189945:0,0,0,0,.22|235276:0,0,0,0,.22|210475:0,0,0,0,.22|181522:1,1,0,0,.22|196137:0,0,0,0,.22|234742:0,0,0,0,.22|232740:0,0,0,0,.22|181523:1,1,0,0,.2|181525:1,0,0,0,.22|210920:0,0,0,0,.22|232949:0,0,0,0,.22|230634:0,0,0,.25,.22|229516:0,0,0,0,.22|229792:0,0,0,0,.22|181526:1,0,0,0,.22|235275:0,0,1,0,.22|210471:0,0,0,0,.22|197130:0,0,0,0,.2|210922:0,0,0,0,.22|199121:0,0,0,0,.22|229524:0,0,0,0,.22|241174:0,0,0,0,.22|237168:0,0,0,.25,.22|181527:1,0,0,0,.22|236818:0,0,0,0,.22|232131:0,0,0,0,.22|232132:0,0,0,0,.22|181528:1,1,0,0,.2|196139:0,0,0,0,.22|241179:0,0,0,0,.22|211299:0,0,0,0,.2|181530:1,0,0,0,.2|181529:1,0,0,0,.2|232133:0,0,0,0,.22|197790:0,0,0,0,.22|181531:1,0,0,0,.2|199120:0,0,0,0,.22|236819:0,0,0,0,.22|181532:1,0,0,0,.22|196140:0,0,0,0,.22|228213:0,0,0,0,.22|232134:0,0,0,0,.22|230217:0,0,0,0,.22|188127:1,0,0,0,.22|197792:0,0,0,0,.2|237507:0,0,0,0,.22|181534:1,0,0,0,.2|230380:0,0,0,0,.22|232135:0,0,0,0,.22|229519:0,0,0,0,.22|199116:0,0,0,0,.22|237165:0,0,0,0,.22|235277:0,0,0,0,.22|199124:0,0,0,0,.22|181537:1,1,0,0,.22|239658:0,0,0,.25,.22|181538:1,0,0,0,.2|229016:0,0,0,0,.22|228585:0,0,0,0,.22|181539:1,0,0,.25,.22|197793:0,0,0,0,.22|210923:0,0,0,0,.22|181540:1,1,2,0,.2|236820:0,0,0,0,.22|197794:0,0,0,0,.22|189943:0,0,0,0,.22|195832:0,0,0,0,.2|196141:0,0,0,0,.22|210924:0,0,0,0,.22|239657:0,0,0,0,.22|241175:0,0,0,0,.22|234743:0,0,0,0,.22|197795:0,0,0,0,.22|181542:1,0,0,0,.22|237508:0,0,0,0,.22|229795:0,0,0,0,.22|99931:0,0,0,0,.2|210926:0,0,0,0,.22|188091:1,0,0,0,.22|210473:0,0,0,0,.22|181545:1,0,0,0,.22|232951:0,0,0,0,.22|181546:1,1,0,0,.22|219220:0,0,0,0,.22|237509:0,0,0,0,.22|239654:0,0,0,0,.22|230635:0,0,0,0,.22|181547:1,0,0,0,.22|199117:0,0,0,0,.2|229789:0,0,0,0,.22|239655:0,0,0,0,.22|196143:0,0,0,0,.22|232136:0,0,1,0,.2|229796:0,0,0,0,.22|241178:0,0,0,0,.22|229515:0,0,0,0,.22|283277:0,0,0,0,0|211300:0,0,0,0,.22|241180:0,0,0,0,.22|239652:0,0,0,0,.22|181549:1,0,0,0,.22|181548:1,1,0,0,.2|181550:1,1,0,0,.2|241176:0,0,0,0,.22|197796:0,0,0,0,.22|229518:0,0,0,0,.22|232137:0,0,1,0,.22|181551:1,1,0,0,.2|233174:0,0,1,0,.22|181552:1,0,0,0,.22|188124:1,0,0,0,.22|210469:0,0,0,0,.22|229794:0,0,0,0,.22|241173:0,0,0,.25,.22|181554:1,0,0,0,.2|181555:1,0,0,0,.2|181556:1,0,0,0,.2|199118:0,0,0,0,.2|179310:0,0,1,0,.22|230218:0,0,0,0,.22|181557:1,0,0,0,.2|199119:0,0,0,0,.22|181558:1,0,0,0,.2|181559:1,0,0,0,.22|232138:0,0,0,0,.22|239653:0,0,0,0,.22|228586:0,0,0,0,.22|197780:0,0,0,0,.22|155568:0,0,0,0,.22|230219:0,0,0,0,.22|230220:0,0,0,0,.22|181560:1,0,0,0,.22|181561:1,1,0,.25,.22|230221:0,0,0,0,.22|232139:0,0,0,0,.22|210930:0,0,0,0,.22|230638:0,0,0,.25,.22|181562:1,1,0,.25,.22|181563:1,0,0,0,.22|181564:1,1,0,0,.2|234741:0,0,0,0,.22|186227:0,0,1,0,.2|232140:0,0,0,0,.22|181565:1,0,0,0,.2'.split('|').forEach(x=>{ const [L,v]=x.split(':'); const p=v.split(',').map(Number);
+    d[L]={BE:p[0],BF:p[1],BG:p[2],BH:p[3],BI:p[4]}; });
+  return d; })();
+
+// EVENTUALES: solo se les liquidan los días efectivamente trabajados,
+// así que no llevan los descuentos por ausencia (110) ni vacaciones (174).
+const MAP_EVE = [
+  ['AF','Días Normales',101,'RES','DIAS TRABAJADOS'],
+  ['AG','Feriados',null,'RES','FERIADOS'],
+  ['AH','Días Enfermedad (F)',170,'RES','ENFERMEDAD'],
+  ['AI','ART',234,'RES','ART 10 DIAS'],
+  ['AJ','ART',310,'RES','ART 310'],
+  ['AK','Item 4.1.13 (Viaticos)',612,'RES','V Y C'],
+  ['AL','Item 4.1.13 (Comidas)',614,'RESSUM',['V Y C','COMIDA ADICIONAL']],
+  ['AM','Horas Extras 50%',202,'RES','TOTAL HS 50%'],
+  ['AN','Horas Extras 100%',203,'RES','TOTAL HS AL 100%'],
+  ['AO','Descuento Hs.',304,'RES','DESCUENTO HS'],
+  ['AP','Adicional Rama',333,'BASECOD'],
+  ['AQ','Horas Nocturnas',null,'RES','HORAS NOCTURNAS'],
+  ['AR','Adicional Super Congelados',335,'RES','% ADIC FRIO'],
+  ['AS','Adic Conge s/ VyC',610,'RES','% ADIC FRIO'],
+  ['AT','AYUDA SOLIDARIA',611,'AYUDA'],
+];
+
+const GRP_GLD={AF:'base',AG:'desc',AH:'desc',AI:'desc',AJ:'lic',AK:'lic',AL:'lic',AM:'lic',AN:'lic',
+  AO:'lic',AP:'lic',AQ:'lic',AR:'lic',AS:'lic',AT:'lic',AU:'lic',AV:'desc',AW:'vc',AX:'vc',
+  AY:'hora',AZ:'hora',BA:'hora',BB:'desc',BC:'adic',BD:'adic',BE:'adic',BF:'adic',BG:'adic',
+  BH:'adic',BI:'adic',BJ:'ctrl',BK:'ctrl',BL:'ctrl',BM:'ctrl',BN:'ctrl',BO:'ctrl',BP:'ctrl'};
+const GRP_FC={AF:'base',AG:'desc',AH:'lic',AI:'hora',AJ:'hora',AK:'lic',AL:'lic',AM:'lic',
+  AN:'hora',AO:'hora',AP:'desc',AQ:'hora',AR:'hora',AS:'adic'};
+const GRP_EVE={AF:'base',AG:'hora',AH:'lic',AI:'lic',AJ:'lic',AK:'vc',AL:'vc',AM:'hora',
+  AN:'hora',AO:'desc',AP:'adic',AQ:'hora',AR:'adic',AS:'adic',AT:'adic'};
+const TIPOS={
+  GLD:{nom:'Efectivos', det:'Personal de convenio, con presentismo, licencias y plus de frío.', mapa:()=>MAP_GLD, grp:GRP_GLD, podar:true, soloNov:false},
+  FC :{nom:'Fuera de convenio', det:'Feriados, domingos, horas extras y nocturnas.', mapa:()=>MAP_FC,  grp:GRP_FC,  podar:true,  soloNov:false},
+  EVE:{nom:'Eventuales', det:'Jornalizados: cobran los días trabajados. Solo entran los legajos con novedades.', mapa:()=>MAP_EVE, grp:GRP_EVE, podar:true, soloNov:true}
+};
+const grupo = col => (TIPOS[ST.tipo]||TIPOS.GLD).grp[col] || 'base';
+
+const HDR_A_AE = ['Legajo (R)','LNodNro (R)','Cliente (R)','U.O. Cliente (R)','U.O. Propia (R)',
+ 'Apellido y Nombres (R)','Categoria','Calificación Profesional','Sueldo','Sueldo Adicional 1',
+ 'Sueldo Adicional 2','Forma de Cobro (R)','Fecha Ingreso (R)','Fecha Egreso','Motivo de Baja',
+ 'Sector Interno','Lugar de Pago','Centro de Costo','Tipo de Sueldo','Convenio (R)','Convenio Opcional',
+ 'Observaciones','Base de Obra Social','Promedio ART','Rama (R)','Filial (R)','Presupuesto','Recorrido',
+ 'Documento (R)','Antiguedad (R)','Fecha Ultimo Pago (R)'];
+
+const C = s => XLSX.utils.decode_col(s);            // 'AF' -> 31
+const $ = s => document.querySelector(s);
+const LS = 'panelF3_base_v1', LSO = 'panelF3_ajustes_v1';
+
+let ST = { tipo:null, base:null, nov:null, filas:[], mapa:null, over:{} };
+try{ ST.over = JSON.parse(localStorage.getItem(LSO)||'{}'); }catch(e){ ST.over={}; }
+const guardarOver = () => localStorage.setItem(LSO, JSON.stringify(ST.over));
+const nOver = () => Object.values(ST.over).reduce((a,o)=>a+Object.keys(o).length,0);
+
+/* ---------------- utilidades ---------------- */
+// deja la sección en verde cuando el archivo está cargado
+function marcarCarga(sel, ok){
+  const el=$(sel); if(!el) return;
+  el.classList.toggle('ok', !!ok);
+  const d=el.querySelector('.drop');
+  if(d) d.classList.toggle('cargado', !!ok);
+}
+function toast(m,err){const t=$('#toast');t.textContent=m;t.className='show'+(err?' err':'');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3400);}
+function esVacio(v){return v===null||v===undefined||v===''||(typeof v==='string'&&!v.trim());}
+function num(v){ const p=parseNum(v); return p===null?0:p; }
+// devuelve null si el texto no es un número: así '-' o '0:00' pasan tal cual al F3
+function parseNum(v){
+  if(esVacio(v)) return null;
+  if(typeof v==='number') return v;
+  const s=String(v).trim().replace(/\s/g,'');
+  if(!/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) return null;
+  const n=parseFloat(s.includes(',')? s.replace(/\./g,'').replace(',','.') : s);
+  return isNaN(n)?null:n;
+}
+function leg(v){ if(esVacio(v))return ''; const s=String(v).trim();
+  return /^\d+$/.test(s)? String(parseInt(s,10)) : s; }
+function hoyTxt(){const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}
+
+function leerLibro(file){ return new Promise((res,rej)=>{
+  const r=new FileReader();
+  r.onload=e=>{try{res(XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false,cellStyles:true}));}
+              catch(x){rej(x);}};
+  r.onerror=()=>rej(new Error('No se pudo leer el archivo'));
+  r.readAsArrayBuffer(file);
+});}
+const aoa = ws => XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:true});
+
+/* ---------------- 0 · TIPO DE F3 ---------------- */
+function pintarTipos(){
+  $('#tipos').innerHTML=Object.entries(TIPOS).map(([k,t])=>
+    `<button data-t="${k}" class="${ST.tipo===k?'sel':''}"><strong>${t.nom}</strong><em>${t.det}</em></button>`).join('');
+  $('#tipos').onclick=ev=>{
+    const b=ev.target.closest('button[data-t]'); if(!b) return;
+    elegirTipo(b.dataset.t, true);
+  };
+}
+function elegirTipo(t, manual){
+  if(ST.base && ST.base.tipo!==t && manual){
+    if(!confirm(`La base cargada es de ${TIPOS[ST.base.tipo].nom}. Al cambiar a ${TIPOS[t].nom} tenés que volver a subir el F3 base. ¿Seguir?`)) return;
+    localStorage.removeItem(LS); ST.base=null; ST.nov=null;
+    $('#baseInfo').textContent=''; $('#novInfo').textContent='';
+    $('#bBase').textContent='base: —'; $('#bBase').className='badge';
+    $('#bNov').textContent='novedades: —'; $('#bNov').className='badge';
+    marcarCarga('#secBase',false); marcarCarga('#secNov',false);
+  }
+  ST.tipo=t; ST.mapa=TIPOS[t].mapa();
+  $('#chkSoloNov').checked = TIPOS[t].soloNov;
+  $('#chkPodar').checked = true;
+  delete $('#inNombre').dataset.tocado;
+  $('#bTipo').textContent=TIPOS[t].nom; $('#bTipo').className='badge on';
+  if(ST.base) ST.base.tipo=t;
+  pintarTipos(); pintarSueldos(); pintarFijos(); refrescar();
+}
+
+/* ---------------- 1 · BASE F3 ---------------- */
+function detectarTipoF3(A){
+  const h1 = (A[0]||[]).map(N);
+  const tiene = l => l.some(k=>h1.includes(k));
+  // ojo: "DIAS ENFERMEDAD" aparece en los dos formatos, así que GLD se chequea primero
+  if(tiene(['CONTROL','DIAS ART GG','DIAS ART ART','ADICIONAL EMPRESA','ADICIONAL RAMA','AYUDA SOLIDARIA','ITEM 4 1 13 VIATICOS'])) return 'GLD';
+  if(tiene(['HS GRATIF EXTRAORDINARIA DOMINGOS','FERIADO TRABAJADO','HS FERIADO','HS DOMINGO'])) return 'FC';
+  return (A[0]||[]).length > 50 ? 'GLD' : 'FC';
+}
+async function cargarBase(file){
+  try{
+    const wb = await leerLibro(file);
+    const nombreHoja = wb.SheetNames[0];
+    const ws = wb.Sheets[nombreHoja];
+    const A  = aoa(ws);
+    if(A.length<3) throw new Error('El archivo no tiene la estructura del F3');
+    const detectado = detectarTipoF3(A);
+    const tipo = ST.tipo || detectado;
+    const dupes=[];
+    if(ST.tipo && ST.tipo!=='EVE' && detectado!==ST.tipo)
+      toast(`Ojo: elegiste ${TIPOS[ST.tipo].nom} pero el archivo parece de ${TIPOS[detectado].nom}`, true);
+    const emp  = [];
+    // ubicar cada concepto por su código (fila 2) o su nombre (fila 1), no por la letra de columna:
+    // el F3 base puede venir con columnas podadas o en otro orden y la posición fija mezcla legajos.
+    const r1=(A[0]||[]).map(N), r2=(A[1]||[]).map(x=>String(x??'').trim());
+    const colDe=(cod,nombre,letra)=>{
+      if(cod!=null&&cod!==''){ const j=r2.findIndex((x,k)=>k>=31&&x===String(cod)); if(j>=0) return j; }
+      if(nombre){ const nn=N(nombre); const j=r1.findIndex((x,k)=>k>=31&&x===nn); if(j>=0) return j; }
+      return (r2.length>31||r1.length>31)&&letra&&!r2.some((x,k)=>k>=31&&x) ? C(letra) : -1;
+    };
+    const mapaT=TIPOS[tipo].mapa();
+    const colM={}; mapaT.forEach(x=>{ colM[x[0]]=colDe(x[2],x[1],x[0]); });
+    const colFij={}; FIJOS.forEach(([k,cod,nom])=>{ colFij[k]=colDe(cod,nom,k); });
+    const colAyu=colDe(611,'AYUDA SOLIDARIA','BP'), colFrio=colDe(335,null,'BC');
+    let difPar=0;
+    for(let i=2;i<A.length;i++){
+      const f=A[i]||[]; const L=leg(f[0]); if(!L) continue;
+      if(emp.some(x=>x.legajo===L)){ dupes.push(L); continue; }   // el F3 base a veces repite un legajo
+      const e={legajo:L, fijos:{}};
+      for(let c=0;c<31;c++) e['c'+c]=f[c]??'';
+      // foto del mes anterior, para el reporte comparativo
+      e.prev={cat:f[6]??'', calif:f[7]??'', sueldo:f[8]??'', frio:colFrio>=0?(f[colFrio]??''):''};
+      e.crudo=f;
+      // conceptos del mes anterior, para comparar horas extras y demás
+      e.prevC={}; mapaT.forEach(x=>{ const j=colM[x[0]]; if(j<0) return; const v=f[j]; if(v!==null&&v!==undefined&&v!=='') e.prevC[x[0]]=v; });
+      // adicionales fijos: mandan los parametrizados del legajo; si el legajo no está parametrizado,
+      // se toman del F3 subido (buscados por código) y si tampoco están, 0.
+      if(tipo==='GLD'){
+        const def=FIJOS_DEF[L];
+        let dif=false;
+        FIJOS.forEach(([k])=>{
+          const j=colFij[k], v=j>=0?f[j]:undefined, hay=!(v===null||v===undefined||v==='');
+          if(def){ e.fijos[k]=def[k]??0; if(hay&&num(v)!==num(def[k])) dif=true; }
+          else e.fijos[k]= hay? v : 0;
+        });
+        if(dif) difPar++;
+        e.fijos.BP = colAyu>=0?(f[colAyu]??''):'';
+      }
+      emp.push(e);
+    }
+    if(!emp.length) throw new Error('No encontré legajos desde la fila 3');
+    // códigos que trae la plantilla del sistema: familia (fila 1) + código (fila 2)
+    const codigos=[];
+    for(let c=31;c<(A[1]||[]).length;c++){
+      const cod=(A[1]||[])[c];
+      if(cod!==null&&cod!==undefined&&cod!=='') codigos.push({c, fam:(A[0]||[])[c]??'', cod:String(cod).trim()});
+    }
+    const sinPar=tipo==='GLD'?emp.filter(e=>!FIJOS_DEF[e.legajo]).length:0;
+    ST.base = { tipo, hoja:nombreHoja, meta:(A[0]||[]).slice(0,5), emp, codigos, dupes, difPar, sinPar, fijVer:2,
+                cols:(ws['!cols']||[]).map(o=>o?{wch:o.wch,width:o.width,customWidth:o.customWidth}:null),
+                archivo:file.name };
+    ST.tipo = tipo;
+    localStorage.setItem(LS, JSON.stringify(ST.base));
+    aplicarBase();
+    toast(dupes.length
+      ? `Base ${tipo} · ${emp.length} legajos · ${dupes.length} repetido(s) descartado(s)`
+      : `Base ${tipo} cargada · ${emp.length} legajos`+(tipo==='GLD'?` · fijos parametrizados${sinPar?` (${sinPar} legajo(s) nuevo(s) sin parametrizar)`:''}`:''), dupes.length?true:false);
+  }catch(e){ toast('Base: '+e.message, true); }
+}
+function aplicarBase(){
+  const b=ST.base; if(!b) return;
+  ST.tipo=b.tipo; ST.mapa = TIPOS[b.tipo].mapa();
+  $('#chkSoloNov').checked = TIPOS[b.tipo].soloNov;
+  $('#baseInfo').textContent = `${b.archivo} · ${b.emp.length} legajos`;
+  $('#bBase').textContent = 'base: '+b.emp.length+' leg.'; $('#bBase').className='badge on';
+  marcarCarga('#secBase', true);
+  $('#bTipo').textContent = TIPOS[b.tipo].nom; $('#bTipo').className='badge on';
+  pintarTipos();
+  $('#inFecha').value = b.meta[4] || hoyTxt();
+  $('#secNov').classList.remove('off');
+  pintarSueldos(); pintarFijos(); refrescar();
+}
+
+/* ---------------- 2 · NOVEDADES ---------------- */
+function hallarResumen(wb){
+  for(const n of wb.SheetNames){
+    if(N(n)==='RESUMEN') return wb.Sheets[n];
+  }
+  for(const n of wb.SheetNames){
+    const A=aoa(wb.Sheets[n]);
+    for(let i=0;i<Math.min(6,A.length);i++)
+      if((A[i]||[]).some(v=>N(v)==='CODIGO DE EMPLEADO')) return wb.Sheets[n];
+  }
+  return null;
+}
+async function cargarNov(file){
+  try{
+    const wb = await leerLibro(file);
+    const ws = hallarResumen(wb);
+    if(!ws) throw new Error('No encontré la hoja Resumen');
+    const A = aoa(ws);
+    let hr=-1, cLeg=-1;
+    for(let i=0;i<Math.min(6,A.length);i++){
+      const j=(A[i]||[]).findIndex(v=>N(v)==='CODIGO DE EMPLEADO');
+      if(j>=0){ hr=i; cLeg=j; break; }
+    }
+    if(hr<0) throw new Error('No encontré la columna "Código de empleado" en el Resumen');
+    const cols={}; (A[hr]||[]).forEach((v,i)=>{const k=N(v); if(k&&!(k in cols)) cols[k]=i;});
+    const filas={}, orden=[];
+    for(let i=hr+1;i<A.length;i++){
+      // el legajo sale de la columna "Código de empleado": no siempre es la primera,
+      // en agosto la columna A pasó a ser un número de orden
+      const f=A[i]||[]; const L=leg(f[cLeg]);
+      if(!L || !/^\d+$/.test(L)) continue;
+      filas[L]=f; orden.push(L);
+    }
+    if(!orden.length) throw new Error('El Resumen no trae legajos');
+    ST.nov={ archivo:file.name, cols, filas, orden, cLeg, hoja:ws['!ref'] };
+    $('#novInfo').textContent=`${file.name} · ${orden.length} legajos`;
+    $('#bNov').textContent='novedades: '+orden.length+' leg.'; $('#bNov').className='badge on';
+    marcarCarga('#secNov', true);
+    refrescar();
+    toast(`Novedades cargadas · ${orden.length} legajos`);
+  }catch(e){ toast('Novedades: '+e.message, true); }
+}
+
+/* ---------------- 2c · AYUDA SOLIDARIA ---------------- */
+async function cargarAyuda(file){
+  try{
+    const wb=await leerLibro(file);
+    let mejor=null;
+    for(const nm of wb.SheetNames){
+      const A=aoa(wb.Sheets[nm]);
+      for(let i=0;i<Math.min(12,A.length);i++){
+        const j=(A[i]||[]).findIndex(v=>N(v).startsWith('LEGAJO'));
+        if(j>=0){ mejor={A,hr:i,cLeg:j,hoja:nm}; break; }
+      }
+      if(mejor) break;
+    }
+    if(!mejor) throw new Error('No encontré una columna Legajo');
+    const {A,hr,cLeg}=mejor;
+    // la columna de monto es la primera a la derecha del legajo con números en los datos
+    let cM=-1;
+    for(let c=cLeg+1;c<(A[hr]||[]).length+4;c++){
+      let n=0; for(let i=hr+1;i<A.length;i++){ if(typeof (A[i]||[])[c]==='number') n++; }
+      if(n>2){ cM=c; break; }
+    }
+    const set={}, detalle=[];
+    for(let i=hr+1;i<A.length;i++){
+      const f=A[i]||[]; const L=leg(f[cLeg]);
+      if(!L || !/^\d+$/.test(L)) continue;
+      const monto = cM>=0? num(f[cM]) : 1;
+      if(monto>0){ set[L]=1; detalle.push({l:L, n:f[cLeg+2]||f[cLeg+1]||'', monto}); }
+    }
+    if(!detalle.length) throw new Error('No encontré legajos con monto');
+    ST.ayuda={archivo:file.name, set, detalle, conMonto:cM>=0};
+    pintarAyuda(); refrescar();
+    toast(`Ayuda solidaria · ${detalle.length} legajos`);
+  }catch(e){ toast('Ayuda solidaria: '+e.message, true); }
+}
+function pintarAyuda(){
+  const a=ST.ayuda;
+  $('#ayuInfo').textContent = a? `${a.archivo} · ${a.detalle.length} legajos` : '';
+  marcarCarga('#secAyu', !!a);
+  if(!a){ $('#ayuLista').innerHTML=''; return; }
+  const tot=a.detalle.reduce((x,y)=>x+y.monto,0);
+  $('#ayuLista').innerHTML=`<div class="hr"></div>
+    <div class="row" style="margin-bottom:11px">
+      <strong style="font-size:13px">${a.detalle.length} legajos con ayuda solidaria</strong>
+      ${a.conMonto?`<span class="muted mono">total ${tot.toLocaleString('es-AR')}</span>`:''}
+    </div>
+    <div class="tw" style="max-height:230px"><table><thead><tr><th>Legajo</th><th>Apellido y Nombres</th>
+      <th style="text-align:right">Monto</th><th style="text-align:right">En el F3</th></tr></thead><tbody>`+
+    a.detalle.map(x=>`<tr><td>${x.l}</td><td style="white-space:normal;max-width:250px">${x.n}</td>`+
+      `<td class="num" style="color:var(--mut)">${a.conMonto?x.monto.toLocaleString('es-AR'):'—'}</td>`+
+      `<td class="num" style="color:var(--teal);font-weight:600">1</td></tr>`).join('')+'</tbody></table></div>';
+}
+
+/* ---------------- 2b · PARES NOVEDAD <-> CODIGO ---------------- */
+const LSP='panelF3_codigos_v1';
+try{ ST.cod = JSON.parse(localStorage.getItem(LSP)||'{}'); }catch(e){ ST.cod={}; }
+// código efectivo de una entrada del mapa: el corregido a mano gana sobre el deducido
+function codDe(m){
+  const k=ST.tipo+'|'+m[1];
+  return (k in ST.cod) ? ST.cod[k] : (m[2]===null?'':String(m[2]));
+}
+function pintarPares(){
+  const tb=$('#tPar tbody'); tb.innerHTML='';
+  if(!ST.mapa){ $('#parInfo').textContent=''; return; }
+  const cols = ST.nov? ST.nov.cols : null;
+  const fams = {}; (ST.base&&ST.base.codigos||[]).forEach(x=>{ if(!(x.cod in fams)) fams[x.cod]=x.fam; });
+  let sinCol=0, sinCod=0;
+  ST.mapa.forEach((m,i)=>{
+    const orig = m[3]==='CONST'? 'fijo (días del mes)'
+               : m[3]==='TRAB' ? 'calculado: días menos ausencias'
+               : m[3]==='CALC' ? 'calculado: suma de licencias'
+               : m[3]==='BASE' ? 'fijo del F3 anterior'
+               : m[3]==='MAN'  ? 'carga manual'
+               : m[3]==='RESDIF'? m[4][0]+' menos '+m[4][1]
+               : m[3]==='RESSUM'? m[4][0]+' mas '+m[4][1]
+               : m[4];
+    const busca = m[3]==='RESDIF'||m[3]==='RESSUM' ? m[4][0] : (m[3]==='RES'? m[4] : null);
+    const hay = busca===null? null : (cols? cols[busca]!==undefined : null);
+    if(hay===false) sinCol++;
+    const cod = codDe(m);
+    if(!cod) sinCod++;
+    const fam = fams[cod];
+    tb.insertAdjacentHTML('beforeend',
+      `<tr><td style="white-space:normal;max-width:240px;color:${hay===false?'var(--coral)':'var(--tx)'}">${orig}</td>`+
+      `<td>${hay===null?'<span class="tag up">derivado</span>':hay?'<span class="tag new">en el archivo</span>':'<span class="tag no">no vino</span>'}</td>`+
+      `<td style="white-space:normal;max-width:230px;color:var(--mut)">${m[1]}</td>`+
+      `<td><input data-i="${i}" value="${cod}" placeholder="—"></td>`+
+      `<td style="color:${fam?'var(--teal)':'var(--dim)'}">${fam||(cod?'no está en la plantilla':'sin código')}</td></tr>`);
+  });
+  $('#parInfo').textContent=`${ST.mapa.length} conceptos · ${sinCod} sin código`+
+    (cols?` · ${sinCol} no vinieron en el Resumen`:'');
+  tb.oninput=ev=>{
+    const t=ev.target; if(t.dataset.i===undefined) return;
+    const m=ST.mapa[+t.dataset.i];
+    ST.cod[ST.tipo+'|'+m[1]] = t.value.trim();
+    localStorage.setItem(LSP, JSON.stringify(ST.cod));
+    clearTimeout(tb._t); tb._t=setTimeout(()=>{refrescar(); pintarPares();},500);
+  };
+}
+
+/* ---------------- 3 · SUELDOS ---------------- */
+function pintarSueldos(f){
+  const tb=$('#tSue tbody'); tb.innerHTML='';
+  if(!ST.base) return;
+  const q=N(f||$('#inBuscar').value);
+  let n=0;
+  ST.base.emp.forEach((e,i)=>{
+    if(q && !N(e.legajo+' '+e.c5).includes(q)) return;
+    n++;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${e.legajo}</td><td style="white-space:normal;max-width:280px">${e.c5||''}</td>`+
+      `<td><input data-i="${i}" data-c="6" value="${(e.c6??'').toString().replace(/"/g,'&quot;')}"></td>`+
+      `<td><input data-i="${i}" data-c="7" value="${(e.c7??'').toString().replace(/"/g,'&quot;')}"></td>`+
+      `<td class="num"><input class="num" data-i="${i}" data-c="8" value="${e.c8??''}"></td>`+
+      `<td class="num"><input class="num" data-i="${i}" data-c="9" value="${e.c9??''}"></td>`+
+      `<td class="num"><input class="num" data-i="${i}" data-c="10" value="${e.c10??''}"></td>`+
+      `<td>${e._tag?`<span class="tag ${e._tag[0]}">${e._tag[1]}</span>`:''}</td>`;
+    tb.appendChild(tr);
+  });
+  $('#sueInfo').textContent = `${n} de ${ST.base.emp.length} legajos`;
+  tb.oninput = ev=>{
+    const t=ev.target; if(!t.dataset.c) return;
+    const e=ST.base.emp[+t.dataset.i], c='c'+t.dataset.c;
+    e[c] = ['8','9','10'].includes(t.dataset.c) ? (t.value===''?'':num(t.value)) : t.value;
+    e._tag=['up','editado']; localStorage.setItem(LS, JSON.stringify(ST.base));
+  };
+}
+async function importarSueldos(file){
+  try{
+    const wb=await leerLibro(file);
+    const A=aoa(wb.Sheets[wb.SheetNames[0]]);
+    let hr=-1, cols={};
+    for(let i=0;i<Math.min(8,A.length);i++){
+      const c={}; (A[i]||[]).forEach((v,j)=>{const k=N(v); if(k&&!(k in c))c[k]=j;});
+      if(Object.keys(c).some(k=>k.includes('LEGAJO'))){hr=i;cols=c;break;}
+    }
+    if(hr<0) throw new Error('No encontré una columna Legajo');
+    const idx = k => { const f=Object.keys(cols).find(x=>x===k||x.startsWith(k)); return f===undefined?-1:cols[f]; };
+    const cL=idx('LEGAJO'), cS=idx('SUELDO'), cA1=idx('SUELDO ADICIONAL 1'), cA2=idx('SUELDO ADICIONAL 2'),
+          cCat=idx('CATEGORIA'), cCal=idx('CALIFICACION');
+    const porLeg={}; ST.base.emp.forEach((e,i)=>porLeg[e.legajo]=i);
+    let ok=0, sin=[];
+    for(let i=hr+1;i<A.length;i++){
+      const f=A[i]||[]; const L=leg(f[cL]); if(!L) continue;
+      if(!(L in porLeg)){ sin.push(L); continue; }
+      const e=ST.base.emp[porLeg[L]];
+      if(cS>=0 && !esVacio(f[cS])) e.c8=num(f[cS]);
+      if(cA1>=0 && !esVacio(f[cA1])) e.c9=num(f[cA1]);
+      if(cA2>=0 && !esVacio(f[cA2])) e.c10=num(f[cA2]);
+      if(cCat>=0 && !esVacio(f[cCat])) e.c6=f[cCat];
+      if(cCal>=0 && !esVacio(f[cCal])) e.c7=f[cCal];
+      e._tag=['up','actualizado']; ok++;
+    }
+    localStorage.setItem(LS, JSON.stringify(ST.base));
+    pintarSueldos();
+    toast(`${ok} legajos actualizados${sin.length?` · ${sin.length} no estaban en la base`:''}`);
+  }catch(e){ toast('Importar sueldos: '+e.message, true); }
+}
+
+/* ---------------- 4 · ARMADO Y CONTROL ---------------- */
+function armar(){
+  if(!ST.base||!ST.nov) return null;
+  const {cols,filas}=ST.nov, mapa=ST.mapa, ceros=$('#chkCeros').checked, dn=num($('#inDiasNorm').value)||30;
+  const out=[], sinNov=[], sinBase=[], huerfanos={};
+  const usadas=new Set();
+  const soloNov = $('#chkSoloNov').checked;
+  const vac = ceros?0:'';
+  // arma las columnas de concepto de un legajo
+  function conceptos(e, f, r){
+    mapa.forEach(m=>{
+      const [col,,,src,srcName]=m; const ci=C(col);
+      let v=vac;
+      if(src==='CONST') v=dn;
+      else if(src==='BASE'){
+        // fijos: van todos los meses. Si el legajo no está en la base, queda en 0.
+        const x = e.fijos ? e.fijos[col] : undefined;
+        v = esVacio(x) ? 0 : (parseNum(x)===null ? x : parseNum(x));
+      }
+      else if(src==='BASECOD'){
+        // busca en el F3 base la columna que tenga este código de liquidación
+        const cd=String(m[2]??'');
+        const cc=(ST.base.codigos||[]).find(x=>x.cod===cd);
+        const raw = cc && e.crudo? e.crudo[cc.c] : undefined;
+        v = esVacio(raw) ? 0 : (parseNum(raw)===null? raw : parseNum(raw));
+      }
+      else if(src==='AYUDA'){
+        // 1 = tiene asignado el descuento este mes. Sale del archivo de ayuda solidaria.
+        v = (ST.ayuda && ST.ayuda.set[e.legajo]) ? 1 : vac;
+      }
+      else if(src==='MAN')  v = (e.fijos&&e.fijos[col])||'';
+      else if(src==='RES'){
+        if(!f) v=vac;
+        else{
+          const j=cols[srcName];
+          if(j===undefined) v=vac;
+          else{ const raw=f[j];
+                if(esVacio(raw)) v=vac;
+                else { const p=parseNum(raw); v = (p===null)? raw : p; } }
+        }
+      }
+      else if(src==='TRAB'){             // eventuales: días efectivamente trabajados
+        if(!f) v=dn;
+        else{
+          const jd=cols['AUSENCIAS A DESCUENTO'];
+          const aus = jd!==undefined ? num(f[jd])
+                    : (cols['AUSENTE']===undefined?0: num(f[cols['AUSENTE']]) - (cols['VACACIONES']===undefined?0:num(f[cols['VACACIONES']])));
+          v = Math.max(0, dn - Math.abs(aus));
+        }
+      }
+      else if(src==='RESSUM'){          // suma de dos columnas del Resumen
+        if(!f) v=vac;
+        else{
+          const [a,b]=srcName, ja=cols[a], jb=cols[b];
+          if(ja===undefined && jb===undefined) v=vac;
+          else{ const t=(ja===undefined?0:num(f[ja])) + (jb===undefined?0:num(f[jb]));
+                v = (t===0 && !ceros) ? '' : t; }
+        }
+      }
+      else if(src==='RESDIF'){          // resta de dos columnas del Resumen
+        if(!f) v=vac;
+        else{
+          const [a,b]=srcName, ja=cols[a], jb=cols[b];
+          if(ja===undefined) v=vac;
+          else{ const d=num(f[ja]) - (jb===undefined?0:num(f[jb]));
+                v = (d===0 && !ceros) ? '' : d; }
+        }
+      }
+      r[ci]=v;
+    });
+    // ajustes manuales del operador (pisan lo que vino del reloj)
+    const ov = ST.over[e.legajo]||{};
+    Object.entries(ov).forEach(([col,val])=>{ r[C(col)] = esVacio(val)?vac:(isNaN(num(val))?val:num(val)); });
+    // "Descuento Ds. Licencias Vs." (131) = suma de licencias AJ:AS, salvo que esté pisado a mano
+    if(src_calc(mapa)){
+      let s=0; CALC_FROM.forEach(k=>{ const v=r[C(k)]; if(typeof v==='number') s+=Math.abs(v); });
+      if(!('AH' in ov)) r[C('AH')] = (s===0&&!ceros)?'':s;      // control, siempre positivo
+      if(!('AI' in ov)) r[C('AI')] = (s===0&&!ceros)?'':s;      // se pasa a negativo abajo
+    }
+    // conceptos que se liquidan en negativo: 110, 131, 174, 304
+    mapa.forEach(m=>{ if(!NEG.includes(+codDe(m))) return;
+      const x=r[C(m[0])]; if(typeof x==='number' && x!==0) r[C(m[0])] = -Math.abs(x); });
+    return Object.keys(ov);
+  }
+  const ancho = mapa.length? C(mapa[mapa.length-1][0])+1 : 31;
+  ST.base.emp.forEach(e=>{
+    // el F3 base trae toda la dotación; si el mes solo se liquida a quienes
+    // tienen novedades, los demás no entran al archivo
+    if(soloNov && !filas[e.legajo]){ sinNov.push(e.legajo); return; }
+    const f=filas[e.legajo]; if(!f) sinNov.push(e.legajo); else usadas.add(e.legajo);
+    const r=new Array(ancho).fill('');
+    for(let c=0;c<31;c++) r[c]=e['c'+c]??'';
+    const ov=conceptos(e, f, r);
+    out.push({legajo:e.legajo, nombre:e.c5, fila:r, conNov:!!f, ov});
+  });
+  ST.nov.orden.forEach(L=>{ if(!usadas.has(L)) sinBase.push(L); });
+  // altas del mes: están en las novedades pero el F3 base no las trae todavía.
+  // Se incorporan con legajo y nombre del Resumen; el resto de la identificación va a mano.
+  if($('#chkAltas').checked && sinBase.length){
+    let cN=(ST.nov.cLeg+1);
+    Object.keys(cols).forEach(k=>{ if(k.startsWith('APELLIDO')) cN=cols[k]; });
+    sinBase.forEach(L=>{
+      const f=filas[L];
+      const e={legajo:L, fijos:{}, prev:{}, crudo:[], c5:String(f[cN]??'').trim()};
+      for(let c=0;c<31;c++) e['c'+c]='';
+      e.c0=L; e.c5=String(f[cN]??'').trim();
+      const r=new Array(ancho).fill('');
+      r[0]=L; r[5]=e.c5;
+      const ov=conceptos(e, f, r);
+      out.push({legajo:L, nombre:e.c5, fila:r, conNov:true, ov, alta:true});
+    });
+  }
+  // huérfanos: columnas del Resumen sin destino que traen datos
+  (HUERF[ST.base.tipo]||[]).forEach(h=>{
+    const j=cols[h]; if(j===undefined) return;
+    const con=ST.nov.orden.filter(L=>{const v=(filas[L]||[])[j]; return !esVacio(v)&&num(v)!==0;});
+    if(con.length) huerfanos[h]=con;
+  });
+  // columnas del mapa que no aparecieron en el Resumen
+  const faltantes = mapa.filter(m=>m[3]==='RES' && cols[m[4]]===undefined).map(m=>`${m[1]} ← "${m[4]}"`)
+    .concat(mapa.filter(m=>m[3]==='RESDIF' && cols[m[4][0]]===undefined).map(m=>`${m[1]} ← "${m[4][0]}"`))
+    .concat(mapa.filter(m=>m[3]==='RESSUM' && cols[m[4][0]]===undefined && cols[m[4][1]]===undefined)
+                .map(m=>`${m[1]} ← "${m[4][0]}" + "${m[4][1]}"`));
+  // control cruzado: la comida calculada contra la columna "Comida total" del Resumen
+  let comidaDif=[];
+  if(ST.base.tipo==='GLD' && cols['COMIDA TOTAL']!==undefined){
+    out.forEach(r=>{ const f2=filas[r.legajo]; if(!f2) return;
+      const t=num(f2[cols['COMIDA TOTAL']]), c2=num(r.fila[C('AX')]);
+      if(Math.abs(t-c2)>1e-6) comidaDif.push(`${r.legajo} (calc ${c2} vs total ${t})`); });
+  }
+  return {out, sinNov, sinBase, huerfanos, faltantes, comidaDif};
+}
+const src_calc = mapa => mapa.some(m=>m[3]==='CALC');
+// en FC y Eventuales solo salen las columnas que tengan algún dato en todo el mes.
+// Las marcadas (R) las pide el sistema de liquidación aunque vengan vacías, así que quedan.
+function idsActivas(R){
+  const todas=[...Array(31).keys()];
+  if(!idsActivasOn()) return todas;
+  return todas.filter(i=>{
+    if(/\(R\)/.test(HDR_A_AE[i])) return true;
+    return R.out.some(r=>{ const v=r.fila[i]; return v!==''&&v!==null&&v!==undefined; });
+  });
+}
+function columnasActivas(R){
+  const conDato=m=>R.out.some(r=>{ const v=r.fila[C(m[0])]; return v!==''&&v!==null&&v!==undefined&&v!==0; });
+  const podar=$('#chkPodar').checked;
+  return ST.mapa.filter(m=>{
+    if(m[3]==='AYUDA') return conDato(m);      // no es obligatoria: sin archivo, no sale
+    if(!podar) return true;
+    if(m[3]==='CONST'||m[3]==='TRAB') return true;   // los días del mes van siempre
+    return conDato(m);
+  });
+}
+function idsActivasOn(){ return $('#chkPodar').checked; }
+
+function pintarFijos(){
+  const tb=$('#tFij tbody'); tb.innerHTML='';
+  if(!ST.base || ST.base.tipo!=='GLD'){ $('#fijInfo').textContent = ST.base? 'el F3 de FC no lleva adicionales fijos' : ''; return; }
+  const q=N($('#inBuscarFij').value); let n=0, cero=0;
+  ST.base.emp.forEach((e,i)=>{
+    e.fijos = e.fijos||{};
+    FIJOS.forEach(([k])=>{ if(esVacio(e.fijos[k])) cero++; });
+    if(q && !N(e.legajo+' '+e.c5).includes(q)) return;
+    n++;
+    tb.insertAdjacentHTML('beforeend','<tr><td>'+e.legajo+
+      `</td><td style="white-space:normal;max-width:250px">${e.c5||''}</td>`+
+      FIJOS.map(([k])=>`<td class="num"><input class="num" data-i="${i}" data-k="${k}" value="${esVacio(e.fijos[k])?'':e.fijos[k]}"></td>`).join('')+'</tr>');
+  });
+  $('#fijInfo').textContent=`${n} de ${ST.base.emp.length} legajos · ${cero} celda(s) sin valor saldrán en 0`;
+  tb.onchange=ev=>{
+    const t=ev.target; if(!t.dataset.k) return;
+    const e=ST.base.emp[+t.dataset.i];
+    e.fijos[t.dataset.k] = t.value===''?'':(parseNum(t.value)===null?t.value:parseNum(t.value));
+    localStorage.setItem(LS, JSON.stringify(ST.base)); refrescar();
+  };
+}
+
+/* ---------------- 6 · REPORTE DEL MES ---------------- */
+function analizar(R){
+  const gld = ST.mapa.some(m=>+codDe(m)===335);   // ¿este F3 lleva plus de frío?
+  const colFrio = (ST.mapa.find(m=>+codDe(m)===335)||{})[0];
+  const tienePres = ST.mapa.some(m=>m[0]==='BO');
+  const cat=[], sue=[], frioBaja=[], frioAlta=[], frioCambio=[];
+  const pres={full:[],medio:[],cero:[]}, punt={full:0,medio:0,cero:0}, porPct={};
+  R.out.forEach(r=>{
+    const e=ST.base.emp.find(x=>x.legajo===r.legajo); if(!e) return;
+    const p=e.prev||{};
+    if(String(p.cat??'')!==String(e.c6??'')) cat.push({l:r.legajo,n:r.nombre,de:p.cat||'—',a:e.c6||'—'});
+    if(num(p.sueldo)!==num(e.c8)) sue.push({l:r.legajo,n:r.nombre,de:num(p.sueldo),a:num(e.c8)});
+    if(!gld) return;
+    const ant=num(p.frio), act=Math.abs(num(r.fila[C(colFrio)]));
+    if(ant>0&&act===0) frioBaja.push({l:r.legajo,n:r.nombre,de:ant,a:0});
+    else if(ant===0&&act>0) frioAlta.push({l:r.legajo,n:r.nombre,de:0,a:act});
+    else if(ant>0&&act>0&&ant!==act) frioCambio.push({l:r.legajo,n:r.nombre,de:ant,a:act});
+    if(act>0) porPct[act]=(porPct[act]||0)+1;
+    if(!tienePres) return;
+    const b=num(r.fila[C('BO')]), m=num(r.fila[C('BM')]);
+    (b===1?pres.full:b===0.5?pres.medio:pres.cero).push({l:r.legajo,n:r.nombre,v:b});
+    if(m===1)punt.full++; else if(m===0.5)punt.medio++; else punt.cero++;
+  });
+  // --- horas extras y adicionales de jornada ---
+  const codHE = ST.tipo==='GLD' ? {he50:'AY',he100:'AZ',noc:'BA',fer:'AJ',dom:null}
+              : ST.tipo==='FC'  ? {he50:'AQ',he100:null,noc:'AR',fer:'AJ',dom:'AO'}
+                                : {he50:'AK',he100:'AL',noc:'AM',fer:'AH',dom:'AJ'};
+  const hs=[], porCat={}; let tHE=0,tNoc=0,tFer=0,tDom=0,tHE100=0;
+  R.out.forEach(r=>{
+    const e=ST.base.emp.find(x=>x.legajo===r.legajo)||{};
+    const g=k=> k? Math.abs(num(r.fila[C(k)])) : 0;
+    const he=g(codHE.he50), h1=g(codHE.he100), nc=g(codHE.noc), fe=g(codHE.fer), dm=g(codHE.dom);
+    tHE+=he; tHE100+=h1; tNoc+=nc; tFer+=fe; tDom+=dm;
+    const ant=Math.abs(num((e.prevC||{})[codHE.he50]));
+    if(he||h1||nc||fe||dm||ant) hs.push({l:r.legajo,n:r.nombre,cat:e.c6||'—',he,h1,nc,fe,dm,ant,dif:he-ant});
+    const k=e.c6||'—'; porCat[k]=(porCat[k]||0)+he;
+  });
+  hs.sort((a,b)=>b.he-a.he || b.nc-a.nc);
+  const catHE=Object.entries(porCat).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  return {gld,tienePres,cat,sue,frioBaja,frioAlta,frioCambio,pres,punt,porPct,
+          hs,catHE,tHE,tHE100,tNoc,tFer,tDom,codHE,
+          conFrio:Object.values(porPct).reduce((a,b)=>a+b,0), total:R.out.length};
+}
+/* --- gráficos en SVG, sin librerías --- */
+function donut(datos,total){
+  const R0=62,R1=42,cx=76,cy=76; let a=-Math.PI/2, sec='';
+  datos.forEach(d=>{
+    if(!d.v) return;
+    const ang=(d.v/(total||1))*Math.PI*2, b=a+ang, gr=ang>Math.PI?1:0;
+    const P=(r,t)=>[cx+r*Math.cos(t),cy+r*Math.sin(t)].map(x=>x.toFixed(2)).join(' ');
+    sec+=`<path d="M ${P(R0,a)} A ${R0} ${R0} 0 ${gr} 1 ${P(R0,b)} L ${P(R1,b)} A ${R1} ${R1} 0 ${gr} 0 ${P(R1,a)} Z" fill="${d.c}" opacity=".92"><title>${d.k}: ${d.v}</title></path>`;
+    a=b;
+  });
+  const pc=total?Math.round((datos[0].v/total)*100):0;
+  return `<svg viewBox="0 0 152 152" width="152" height="152">${sec}
+    <text x="76" y="72" text-anchor="middle" fill="#e4e9f2" font-family="IBM Plex Mono" font-size="25" font-weight="600">${pc}%</text>
+    <text x="76" y="90" text-anchor="middle" fill="#8895ab" font-family="IBM Plex Mono" font-size="9" letter-spacing="1">COMPLETO</text></svg>`;
+}
+function barras(datos){
+  const max=Math.max(1,...datos.map(d=>d.v)), h=26;
+  return `<svg viewBox="0 0 300 ${datos.length*h+6}" width="100%" height="${datos.length*h+6}" preserveAspectRatio="none">`+
+    datos.map((d,i)=>{
+      const w=Math.max(2,(d.v/max)*168), y=i*h+4;
+      return `<text x="0" y="${y+13}" fill="#8895ab" font-family="IBM Plex Mono" font-size="10">${d.k}</text>`+
+             `<rect x="104" y="${y+3}" width="${w.toFixed(1)}" height="14" rx="2" fill="${d.c}" opacity=".9"/>`+
+             `<text x="${(108+w).toFixed(1)}" y="${y+14}" fill="#e4e9f2" font-family="IBM Plex Mono" font-size="11" font-weight="600">${d.v}</text>`;
+    }).join('')+'</svg>';
+}
+function tablaCambios(items,c1,c2,vacio){
+  if(!items.length) return `<p class="muted" style="margin:6px 0 0">${vacio}</p>`;
+  return `<div class="tw" style="max-height:210px"><table><thead><tr><th>Legajo</th><th>Apellido y Nombres</th><th>${c1}</th><th>${c2}</th></tr></thead><tbody>`+
+    items.map(x=>`<tr><td>${x.l}</td><td style="white-space:normal;max-width:230px">${x.n||''}</td>`+
+      `<td style="color:var(--mut)">${x.de}</td><td style="color:var(--amber)">${x.a}</td></tr>`).join('')+
+    '</tbody></table></div>';
+}
+function kpi(k,v,c){ return `<div class="stat ${c||''}"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
+function caja(titulo, contenido, ancho){
+  return `<div class="caja${ancho?' full':''}"><h3>${titulo}</h3>${contenido}</div>`;
+}
+function tablaHoras(hs){
+  if(!hs.length) return '<p class="muted">Sin horas cargadas este mes.</p>';
+  return `<div class="tw" style="max-height:330px"><table><thead><tr>
+    <th>Legajo</th><th>Apellido y Nombres</th><th>Categoría</th>
+    <th class="r">HE 50%</th><th class="r">Mes pasado</th><th class="r">Dif.</th>
+    <th class="r">Nocturnas</th><th class="r">Feriado</th><th class="r">Domingo</th>
+  </tr></thead><tbody>`+
+  hs.map(x=>`<tr><td>${x.l}</td><td class="w">${x.n||''}</td><td class="w" style="color:var(--mut)">${x.cat}</td>
+    <td class="num" style="color:var(--amber)">${x.he||''}</td>
+    <td class="num" style="color:var(--dim)">${x.ant||''}</td>
+    <td class="num" style="color:${x.dif>0?'var(--coral)':x.dif<0?'var(--teal)':'var(--dim)'}">${x.dif>0?'+':''}${x.dif||''}</td>
+    <td class="num">${x.nc||''}</td><td class="num">${x.fe||''}</td><td class="num">${x.dm||''}</td></tr>`).join('')+
+  '</tbody></table></div>';
+}
+
+function pintarReporte(R){
+  const A=analizar(R); ST.rep=A;
+  const P=[{k:'Presentismo completo',v:A.pres.full.length,c:'#2dd4a7'},
+           {k:'Medio presentismo',v:A.pres.medio.length,c:'#f0a020'},
+           {k:'Sin presentismo',v:A.pres.cero.length,c:'#ff6b5e'}];
+  const pctFrio=Object.entries(A.porPct).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({k:k+'%',v,c:'#4aa3df'}));
+  const conHE=A.hs.filter(x=>x.he>0);
+  const maxHE=Math.max(1,...A.hs.map(x=>x.he));
+
+  /* ---- KPIs ---- */
+  let kpis='';
+  if(A.tienePres){
+    kpis+=kpi('Presentismo completo',A.pres.full.length,'t')
+        + kpi('Medio presentismo',A.pres.medio.length,'a')
+        + kpi('Sin presentismo',A.pres.cero.length,'c');
+  }
+  if(A.gld) kpis+=kpi('Cobran plus de frío',A.conFrio)+kpi('Dejaron de cobrarlo',A.frioBaja.length,A.frioBaja.length?'c':'');
+  kpis+=kpi('Horas extras 50%',A.tHE,'a')+kpi('Personas con extras',conHE.length)
+      + kpi('Hs nocturnas',A.tNoc)+kpi('Cambios de categoría',A.cat.length,A.cat.length?'a':'');
+
+  /* ---- gráficos ---- */
+  const cajaPres = caja(`Presentismo · ${A.total} legajos`,
+    `<div class="donutrow">${donut(P,A.total)}
+       <div class="lgs">${P.map(d=>`<div class="lg"><i style="background:${d.c}"></i>${d.k}<b>${d.v}</b>
+         <s>${A.total?Math.round(d.v/A.total*100):0}%</s></div>`).join('')}</div>
+     </div>
+     <div class="hr"></div>
+     <h4>Puntualidad (código aparte)</h4>
+     ${barras([{k:'Cumple',v:A.punt.full,c:'#2dd4a7'},{k:'Medio',v:A.punt.medio,c:'#f0a020'},
+               {k:'No cumple',v:A.punt.cero,c:'#ff6b5e'}])}`);
+
+  const cajaFrio = caja(`Plus de frío · ${A.conFrio} de ${A.total}`,
+    (pctFrio.length? `<h4>Por porcentaje</h4>${barras(pctFrio)}` : '<p class="muted">Nadie cobra plus de frío este mes.</p>')+
+    `<div class="hr"></div><h4>Movimientos contra el mes pasado</h4>`+
+    barras([{k:'Lo perdieron',v:A.frioBaja.length,c:'#ff6b5e'},
+            {k:'Lo empiezan',v:A.frioAlta.length,c:'#2dd4a7'},
+            {k:'Cambió el %',v:A.frioCambio.length,c:'#f0a020'}]));
+
+  const cajaRank = caja('Horas extras al 50% · ranking',
+    conHE.length? `<div class="rank">`+conHE.slice(0,12).map(x=>`
+      <div class="rk"><span class="nm" title="${x.n||''}">${x.n||x.l}</span>
+        <span class="bar"><i style="width:${(x.he/maxHE*100).toFixed(1)}%"></i></span>
+        <b>${x.he}</b><s class="${x.dif>0?'up':x.dif<0?'dn':''}">${x.dif>0?'+':''}${x.dif||'='}</s></div>`).join('')+
+      `</div><p class="pie">La última columna es la diferencia contra el mes pasado.</p>`
+    : '<p class="muted">Nadie hizo horas extras este mes.</p>');
+
+  const otros=[{k:'Hs feriado',v:A.tFer,c:'#8b7cf6'},{k:'Hs domingo',v:A.tDom,c:'#4aa3df'},
+               {k:'Hs nocturnas',v:A.tNoc,c:'#2dd4a7'},{k:'Hs al 100%',v:A.tHE100,c:'#ff6b5e'}].filter(d=>d.v>0);
+  const cajaCat = caja('Horas extras por categoría',
+    (A.catHE.length? barras(A.catHE.slice(0,8).map(([k,v])=>({k:k.length>18?k.slice(0,17)+'…':k,v,c:'#f0a020'})))
+                   : '<p class="muted">Sin horas extras cargadas.</p>')+
+    (otros.length? `<div class="hr"></div><h4>Otros adicionales de jornada</h4>${barras(otros)}`:''));
+
+  /* ---- armado ---- */
+  const graficos = A.gld ? [cajaPres,cajaFrio,cajaRank,cajaCat] : [cajaRank,cajaCat];
+
+  const bloques=[];
+  bloques.push(caja('Detalle de horas por persona', tablaHoras(A.hs), true));
+  if(A.gld) bloques.push(caja('Dejaron de cobrar el plus de frío',
+    tablaCambios(A.frioBaja,'% mes pasado','% este mes','Nadie perdió el plus de frío respecto del mes pasado.')));
+  bloques.push(caja('Cambios de categoría',
+    tablaCambios(A.cat,'Categoría anterior','Categoría actual','Ninguna categoría cambió respecto del F3 anterior.')));
+  bloques.push(caja('Cambios de sueldo',
+    tablaCambios(A.sue.map(x=>({...x,de:num(x.de).toLocaleString('es-AR'),a:num(x.a).toLocaleString('es-AR')})),
+      'Sueldo anterior','Sueldo actual','Ningún sueldo cambió respecto del F3 anterior.')));
+  if(A.tienePres) bloques.push(caja('Sin presentismo este mes',
+    tablaCambios(A.pres.cero.map(x=>({...x,de:'—',a:'0'})),'','Cobra','Todos cobran al menos medio presentismo.'), true));
+
+  $('#repBody').innerHTML =
+    `<div class="stats">${kpis}</div>`+
+    `<div class="cajas">${graficos.join('')}</div>`+
+    `<div class="cajas">${bloques.join('')}</div>`;
+}
+
+function repCsv(){
+  const A=ST.rep; if(!A){toast('Todavía no hay reporte',true);return;}
+  const l=[['bloque','legajo','apellido y nombres','anterior','actual']];
+  A.cat.forEach(x=>l.push(['cambio de categoría',x.l,x.n,x.de,x.a]));
+  A.sue.forEach(x=>l.push(['cambio de sueldo',x.l,x.n,x.de,x.a]));
+  A.frioBaja.forEach(x=>l.push(['dejó de cobrar frío',x.l,x.n,x.de+'%','0']));
+  A.frioAlta.forEach(x=>l.push(['empieza a cobrar frío',x.l,x.n,'0',x.a+'%']));
+  A.frioCambio.forEach(x=>l.push(['cambió el % de frío',x.l,x.n,x.de+'%',x.a+'%']));
+  A.pres.medio.forEach(x=>l.push(['medio presentismo',x.l,x.n,'','0,5']));
+  A.pres.cero.forEach(x=>l.push(['sin presentismo',x.l,x.n,'','0']));
+  l.push(['resumen','','presentismo completo','',A.pres.full.length]);
+  l.push(['resumen','','medio presentismo','',A.pres.medio.length]);
+  l.push(['resumen','','sin presentismo','',A.pres.cero.length]);
+  l.push(['resumen','','cobran plus de frío','',A.conFrio]);
+  l.push([]); l.push(['horas','legajo','apellido y nombres','categoría','HE 50%','mes pasado','dif','nocturnas','feriado','domingo']);
+  A.hs.forEach(x=>l.push(['horas',x.l,x.n,x.cat,x.he,x.ant,x.dif,x.nc,x.fe,x.dm]));
+  const csv='\uFEFF'+l.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  bajar(new Blob([csv],{type:'text/csv;charset=utf-8'}),'reporte_F3.csv');
+}
+
+function refrescar(){
+  const listo = ST.base && ST.nov;
+  $('#secAyu').classList.toggle('off', !ST.base);
+  $('#secPar').classList.toggle('off', !ST.base);
+  pintarPares();
+  $('#secSue').classList.toggle('off', !ST.base);
+  $('#secFij').classList.toggle('off', !ST.base);
+  pintarFijos();
+  $('#secCtl').classList.toggle('off', !listo);
+  $('#secGen').classList.toggle('off', !listo);
+  $('#secRep').classList.toggle('off', !listo);
+  ['s1','s2','sA','sP','s3','s4','s5','s6'].forEach(id=>$('#'+id).className='');
+  if(ST.base){$('#s1').className='done';$('#s2').className='act';}
+  if(ST.ayuda)$('#sA').className='done';
+  if(listo){$('#s2').className='done';$('#sP').className='done';$('#s3').className='done';$('#s4').className='act';$('#s5').className='act';$('#s6').className='act';}
+  if(!listo){ $('#stats').innerHTML=''; $('#alerts').innerHTML=''; return; }
+
+  const R=armar(); ST.filas=R.out;
+  const conNov=R.out.filter(r=>r.conNov).length;
+  $('#stats').innerHTML=[
+    ['Legajos en el F3', R.out.length,''],
+    ['Con novedades', conNov,'t'],
+    ['Sin novedades', R.sinNov.length, R.sinNov.length?'a':''],
+    ['En novedades sin base', R.sinBase.length, R.sinBase.length?'c':''],
+    ['Ajustes manuales', nOver(), nOver()?'a':''],
+    ['Columnas al F3', columnasActivas(R).length, ''],
+    ['Ayuda solidaria', ST.ayuda? R.out.filter(r=>ST.ayuda.set[r.legajo]).length : '—', ST.ayuda?'t':'']
+  ].map(([k,v,c])=>`<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  const al=[];
+  if(ST.base.dupes && ST.base.dupes.length) al.push(['e','repetidos',
+    `El F3 base trae <strong>${ST.base.dupes.length} legajo(s) más de una vez</strong>: <code>${ST.base.dupes.join(', ')}</code>. Me quedo con la primera fila de cada uno. Si los dejabas repetidos, se liquidaban dos veces.`]);
+  if(R.sinBase.length) al.push([$('#chkAltas').checked?'i':'e','alta',($('#chkAltas').checked
+      ? `<strong>${R.sinBase.length} legajo(s) están en las novedades y no en la base.</strong> Los incorporé con legajo, nombre y sus novedades; <strong>las columnas de identificación (CUIL, convenio, fechas, sueldo) van vacías y hay que completarlas a mano</strong>. → <code>${R.sinBase.join(', ')}</code>`
+      : `<strong>${R.sinBase.length} legajo(s) tienen novedades pero no están en la base F3.</strong> No entran al archivo. Son altas del mes: bajá el F3 base de nuevo o marcá "Incorporar los que están en novedades y no en la base". → <code>${R.sinBase.join(', ')}</code>`)]);
+  if(R.sinNov.length) al.push([$('#chkSoloNov').checked?'i':'w','sin mov',
+    $('#chkSoloNov').checked
+      ? `<strong>${R.sinNov.length} legajo(s) de la base quedaron afuera</strong> porque no tienen novedades este mes. → <code>${R.sinNov.slice(0,25).join(', ')}${R.sinNov.length>25?'…':''}</code>`
+      : `<strong>${R.sinNov.length} legajo(s) de la base no aparecen en las novedades.</strong> Salen con días normales y el resto vacío. Verificá si son bajas o licencias largas. → <code>${R.sinNov.slice(0,25).join(', ')}${R.sinNov.length>25?'…':''}</code>`]);
+  Object.entries(R.huerfanos).forEach(([h,l])=>
+    al.push(['e','sin destino',`El Resumen trae <strong>${h}</strong> con valor en ${l.length} legajo(s), y el F3 ${ST.base.tipo} no tiene columna para ese concepto. Hay que cargarlo aparte. → <code>${l.join(', ')}</code>`]));
+  if(R.comidaDif&&R.comidaDif.length) al.push(['w','comida',`El 614 lo calculo como <strong>V Y C + Comida Adicional</strong>, y en ${R.comidaDif.length} legajo(s) no coincide con la columna "Comida total" del Resumen. → <code>${R.comidaDif.slice(0,15).join(', ')}</code>`]);
+  R.faltantes.forEach(f=>al.push(['w','falta columna',`No encontré <strong>${f}</strong> en el Resumen. Esa columna del F3 sale vacía.`]));
+  al.push(['i','signos',`Los códigos <strong>110, 131, 174 y 304</strong> se escriben en negativo. Ojo que en tus F3 de junio y julio el 110, el 131 y el 174 estaban en positivo: si el sistema los toma como vienen, este cambio invierte el descuento.`]);
+  if(ST.base.tipo==='GLD') al.push(['i','131',`El 131 suma enfermedad, gremial, licencias varias, donación, fallecimiento, matrimonio, nacimiento, día de estudio y ART 234/310. <strong>No incluye licencia sin goce ni suspensión</strong>, aunque en el F3 de junio el legajo 236819 sí las tenía sumadas.`]);
+  if(ST.base.tipo==='GLD'){
+    al.push(['i','fijos',`Tickets 366, Adicional Empresa 329, Asig. hijo c/discap 555, Adicional Función 371 y Adicional Rama 383 salen de los conceptos fijos parametrizados por legajo. Ayuda Solidaria queda vacía: se carga aparte.`]);
+    if(ST.base.sinPar) al.push(['w','fijos',`${ST.base.sinPar} legajo(s) no están parametrizados: sus fijos se tomaron del F3 base (por código). Revisalos en "Adicionales fijos".`]);
+    if(ST.base.difPar) al.push(['i','fijos',`En ${ST.base.difPar} legajo(s) el F3 base traía fijos distintos a los parametrizados; se usaron los parametrizados.`]);
+  }
+  if($('#chkPodar').checked){
+    const ACT2=columnasActivas(R), fuera=ST.mapa.filter(m=>!ACT2.includes(m));
+    const idsF=[...Array(31).keys()].filter(i=>!idsActivas(R).includes(i));
+    if(idsF.length) al.push(['i','poda',`Estas ${idsF.length} columna(s) de identificación no tienen dato en ningún legajo y no salen: <code>${idsF.map(i=>HDR_A_AE[i]).join(', ')}</code>. Las marcadas (R) quedan aunque estén vacías porque el sistema las pide.`]);
+    if(fuera.length) al.push(['i','poda',`Estas ${fuera.length} columna(s) quedaron sin datos en todo el mes y no salen en el archivo: <code>${fuera.map(m=>m[1]+(m[2]?` (${m[2]})`:'')).join(', ')}</code>`]);
+  }
+  if(ST.tipo==='EVE') al.push(['i','eventuales',`Los días normales (101) salen de <strong>DIAS TRABAJADOS</strong> del Resumen, no de 30 menos ausencias. Viáticos (612) toma V Y C y Comidas (614) suma V Y C más Comida Adicional. El frío alimenta el 335 y el 610.`]);
+  if(ST.ayuda){
+    const enF3=new Set(R.out.map(r=>r.legajo));
+    const fuera=ST.ayuda.detalle.filter(x=>!enF3.has(x.l)).map(x=>x.l);
+    if(fuera.length) al.push(['w','ayuda',`${fuera.length} legajo(s) de la nómina de ayuda solidaria no están en este F3: <code>${fuera.slice(0,20).join(', ')}</code>. Revisá si son de otra unidad.`]);
+  }
+  if(!al.length) al.push(['i','ok','Sin diferencias entre la base y las novedades.']);
+  $('#alerts').innerHTML = al.map(([c,b,t])=>`<div class="alert ${c}"><b>${b}</b><p>${t}</p></div>`).join('');
+
+  // vista previa editable: cualquier celda de concepto se puede pisar a mano
+  const ACT=columnasActivas(R), podadas=ST.mapa.length-ACT.length;
+  const q=N($('#inFiltro').value||'');
+  const vis=R.out.filter(r=>!q||N(r.legajo+' '+r.nombre).includes(q));
+  $('#tPrev thead').innerHTML='<tr><th>Legajo</th><th>Apellido y Nombres</th>'+
+    ACT.map(m=>{ const g=GRUPOS[grupo(m[0])];
+      const cd=codDe(m);
+      return `<th title="${m[1]}" style="background:${g.web};color:#fff;border-bottom-color:${g.web}">${m[1]}`+
+             `${cd?`<br><span style="opacity:.75">${cd}</span>`:''}</th>`;}).join('')+'</tr>';
+  $('#tPrev tbody').innerHTML=vis.map(r=>'<tr><td>'+r.legajo+
+    `</td><td style="white-space:normal;max-width:250px">${r.nombre||''}</td>`+
+    ACT.map(m=>{ let v=r.fila[C(m[0])]; if(v===null||v===undefined)v='';
+      const on=r.ov.includes(m[0]);
+      return `<td class="num"><input class="num${on?' ed':''}" data-l="${r.legajo}" data-k="${m[0]}" value="${String(v).replace(/"/g,'&quot;')}"></td>`;
+    }).join('')+'</tr>').join('');
+  $('#prevInfo').textContent=`${vis.length} de ${R.out.length} legajos · ${ACT.length} columna(s) de concepto`+
+    (podadas?` · ${podadas} vacía(s) se descartan`:'')+` · ${nOver()} ajuste(s) manual(es)`;
+  // pie con el total de cada columna
+  $('#tPrev tfoot').innerHTML='<tr><td>TOTALES</td>'+
+    `<td>${R.out.length} legajos</td>`+
+    ACT.map(m=>{ let s=0,hay=false;
+      R.out.forEach(r=>{ const v=r.fila[C(m[0])]; if(typeof v==='number'){s+=v;hay=true;} });
+      s=Math.round(s*1e6)/1e6;
+      return `<td class="num" style="color:${s<0?'var(--coral)':'var(--tx)'}">${hay?s:''}</td>`;
+    }).join('')+'</tr>';
+  pintarReporte(R);
+  $('#totGrid').innerHTML=ACT.map(m=>{
+      let t=0,hay=false;
+      R.out.forEach(r=>{ const v=r.fila[C(m[0])]; if(typeof v==='number'){t+=v;hay=true;} });
+      t=Math.round(t*1e6)/1e6;
+      const g=GRUPOS[grupo(m[0])];
+      const cd=codDe(m);
+      return `<div class="tot" style="border-left-color:${g.web}"><span>${m[1]}${cd?` · ${cd}`:''}</span>`+
+             `<b style="color:${t<0?'var(--coral)':'var(--tx)'}">${hay?t.toLocaleString('es-AR'):'—'}</b></div>`;
+    }).join('');
+  const usados=[...new Set(ACT.map(m=>grupo(m[0])))];
+  $('#leyenda').innerHTML=usados.map(k=>`<i style="background:${GRUPOS[k].web}">${GRUPOS[k].tag}</i>`).join('');
+  $('#tPrev tbody').onchange=ev=>{
+    const t=ev.target; if(!t.dataset.k) return;
+    const l=t.dataset.l, k=t.dataset.k;
+    const orig = (ST.filas.find(x=>x.legajo===l)||{}).fila;
+    ST.over[l]=ST.over[l]||{};
+    ST.over[l][k]=t.value;
+    if(!t.value && !(orig&&orig[C(k)])){ delete ST.over[l][k]; if(!Object.keys(ST.over[l]).length) delete ST.over[l]; }
+    guardarOver(); refrescar();
+  };
+
+  if(!$('#inNombre').dataset.tocado) $('#inNombre').value = nombreSugerido();
+}
+
+/* ---------------- 5 · EXPORTAR ---------------- */
+const MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO',
+             'SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+// saca el período del nombre del archivo de novedades; si no lo encuentra, usa el mes pasado
+function periodoNov(){
+  const f = ST.nov? N(ST.nov.archivo) : '';
+  let mes=-1, anio=null;
+  MESES.forEach((m,i)=>{ if(f.includes(m)) mes=i; });
+  const a4=f.match(/20\d{2}/); if(a4) anio=+a4[0];
+  if(mes<0){
+    const mm=f.match(/\b(0[1-9]|1[0-2])[ _\-\/](\d{2}|20\d{2})\b/);   // 07_26 · 07-2026
+    if(mm){ mes=+mm[1]-1; anio=mm[2].length===2? 2000+ +mm[2] : +mm[2]; }
+  }
+  if(mes<0){ const d=new Date(); d.setMonth(d.getMonth()-1); mes=d.getMonth(); anio=d.getFullYear(); }
+  if(!anio) anio=new Date().getFullYear();
+  return {mes, anio, txt:`${MESES[mes]} ${anio}`};
+}
+function nombreSugerido(){
+  const t = ST.tipo==='EVE'? 'EVENTUALES' : ST.tipo==='FC'? 'FUERA DE CONVENIO' : 'EFECTIVOS';
+  return `F3 ${t} ${periodoNov().txt}.xlsx`;
+}
+async function generar(){
+  const R=armar(); if(!R) return;
+  const mapa=columnasActivas(R), ids=idsActivas(R), nId=ids.length, ancho=nId+mapa.length;
+  const f1=new Array(ancho).fill(null), f2=new Array(ancho).fill(null);
+  const m=ST.base.meta;
+  f1[0]=m[0]??'Unidad Organizativa'; f1[1]=m[1]??''; f1[2]=m[2]??'';
+  f1[3]=m[3]??'Fecha'; f1[4]=$('#inFecha').value||hoyTxt();
+  ids.forEach((i,k)=>f2[k]=HDR_A_AE[i]);
+  mapa.forEach((x,i)=>{ f1[nId+i]=x[1]; const cd=codDe(x); if(cd!=='') f2[nId+i]=isNaN(+cd)?cd:+cd; });
+  const datos=R.out.map(r=>{
+    const f=ids.map(i=>r.fila[i]).concat(mapa.map(x=>r.fila[C(x[0])]));
+    return f.map(v=>(v===''||v===undefined)?null:v);
+  });
+  // el color y el formato ahora se buscan por la posición final, no por la letra original
+  const grpDe=i=> i<nId? GRUPOS.id : GRUPOS[grupo(mapa[i-nId][0])];
+  const colNombre=ids.indexOf(5)+1;
+
+  const wb=new ExcelJS.Workbook();
+  wb.creator='Panel F3 · CD Isidro Casanova';
+  const ws=wb.addWorksheet((ST.base.hoja||'F3').slice(0,31),{
+    views:[{state:'frozen', xSplit:6, ySplit:2}]
+  });
+  ws.addRow(f1); ws.addRow(f2);
+  datos.forEach(d=>ws.addRow(d));
+  const ultDato=datos.length+2;
+  const filaTot=ws.addRow([]);
+  for(let c=nId+1;c<=ancho;c++){
+    const L=ws.getColumn(c).letter;
+    // el resultado va precalculado: si no, Excel muestra la celda vacía hasta recalcular
+    let s=0, hay=false;
+    datos.forEach(d=>{ const v=d[c-1]; if(typeof v==='number'){ s+=v; hay=true; } });
+    filaTot.getCell(c).value={formula:`SUM(${L}3:${L}${ultDato})`, result: hay? Math.round(s*1e6)/1e6 : 0};
+  }
+  filaTot.getCell(1).value='TOTALES';
+  if(colNombre) filaTot.getCell(colNombre).value=`${datos.length} legajos`;
+
+  const borde={style:'thin', color:{argb:'FF9AA6B8'}};
+  const fuente='Calibri';
+
+  // fila 1 · nombres de concepto, con color por grupo
+  const r1=ws.getRow(1); r1.height=46;
+  for(let c=1;c<=ancho;c++){
+    const g = grpDe(c-1);
+    const cell=r1.getCell(c);
+    if(c<=5){ // metadatos de la unidad organizativa
+      cell.font={name:fuente,size:10,bold:c===1||c===4,color:{argb:'FFCBD5E1'}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1B2330'}};
+      cell.alignment={vertical:'middle',horizontal:'left',wrapText:false};
+    }else{
+      cell.font={name:fuente,size:9,bold:true,color:{argb:g.fg}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:g.bg}};
+      cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+    }
+    cell.border={top:borde,left:borde,bottom:borde,right:borde};
+  }
+  // fila 2 · encabezados A:AE y códigos de liquidación
+  const r2=ws.getRow(2); r2.height=26;
+  for(let c=1;c<=ancho;c++){
+    const g = grpDe(c-1);
+    const cell=r2.getCell(c);
+    cell.font={name:fuente,size:c<=nId?9:11,bold:true,color:{argb:'FF1B2330'}};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:c<=nId?'FFE8ECF2':aclarar(g.bg)}};
+    cell.alignment={vertical:'middle',horizontal:c<=nId?'left':'center',wrapText:true};
+    cell.border={top:borde,left:borde,bottom:{style:'medium',color:{argb:'FF6B7789'}},right:borde};
+  }
+  // datos
+  const negCols=[], zPorCol={};
+  mapa.forEach((x,i)=>{ if(NEG.includes(+codDe(x))) negCols.push(nId+1+i); if(x[5]) zPorCol[nId+1+i]=x[5]; });
+  for(let r=3;r<=ultDato;r++){
+    const row=ws.getRow(r); row.height=16;
+    for(let c=1;c<=ancho;c++){
+      const cell=row.getCell(c);
+      cell.font={name:fuente,size:10,
+        color:{argb: negCols.includes(c)&&typeof cell.value==='number'&&cell.value<0 ? 'FF9E2B25':'FF1B2330'}};
+      if(c>nId) cell.alignment={horizontal:'center'};
+      if(zPorCol[c]&&typeof cell.value==='number') cell.numFmt=zPorCol[c];
+      if(r%2===0) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF6F8FB'}};
+      cell.border={bottom:{style:'hair',color:{argb:'FFD5DBE4'}}};
+    }
+  }
+  // totales
+  filaTot.height=20;
+  for(let c=1;c<=ancho;c++){
+    const cell=filaTot.getCell(c);
+    cell.font={name:fuente,size:10,bold:true,color:{argb:'FF1B2330'}};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3E8EF'}};
+    cell.alignment={horizontal:c===1?'left':'center'};
+    cell.border={top:{style:'double',color:{argb:'FF6B7789'}}};
+    if(zPorCol[c]) cell.numFmt=zPorCol[c];
+  }
+  // anchos: los de la base, o 13 por defecto
+  for(let c=1;c<=ancho;c++){
+    const b=c<=nId? (ST.base.cols||[])[ids[c-1]] : null;
+    ws.getColumn(c).width = (b&&(b.wch||b.width)) ? Math.max(6,b.wch||b.width) : 13;
+  }
+
+  let nom=($('#inNombre').value||'F3.xlsx').trim();
+  if(!/\.xlsx$/i.test(nom)) nom+='.xlsx';
+  const buf=await wb.xlsx.writeBuffer();
+  bajar(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), nom);
+  toast(`F3 generado · ${datos.length} legajos`);
+}
+// aclara un ARGB para la fila de códigos
+function aclarar(argb){
+  const c=[2,4,6].map(i=>parseInt(argb.slice(i,i+2),16));
+  return 'FF'+c.map(v=>Math.round(v+(255-v)*0.60).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+function bajar(blob,nombre){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function bajarCsv(){
+  const R=armar(); if(!R) return;
+  const l=[['tipo','legajo','detalle']];
+  R.sinBase.forEach(x=>l.push(['ALTA sin base',x,'tiene novedades y no está en la base F3']));
+  R.sinNov .forEach(x=>l.push(['sin novedades',x,'está en la base y no aparece en el Resumen']));
+  Object.entries(R.huerfanos).forEach(([h,ls])=>ls.forEach(x=>l.push(['concepto sin destino',x,h])));
+  R.faltantes.forEach(f=>l.push(['falta columna','',f]));
+  const csv='\uFEFF'+l.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='control_F3.csv'; a.click();
+}
+function guardarComoBase(){
+  const R=armar(); if(!R) return;
+  const porLeg={}; R.out.forEach(r=>porLeg[r.legajo]=r);
+  ST.base.emp.forEach(e=>{
+    delete e._tag;
+    const r=porLeg[e.legajo];
+    // la foto comparativa pasa a ser este mes: el reporte del mes que viene compara contra esto
+    e.prev={cat:e.c6??'', calif:e.c7??'', sueldo:e.c8??'',
+            frio: r? (r.fila[C('BC')]??'') : (e.prev?e.prev.frio:'')};
+  });
+  localStorage.setItem(LS, JSON.stringify(ST.base));
+  pintarSueldos(); refrescar();
+  toast('Base guardada. El reporte del mes que viene compara contra estos valores.');
+}
+
+
+/* ---------------- reporte en PowerPoint ---------------- */
+const PAL={ink:'1B2330', tx:'2E3849', mut:'6B7789', line:'D5DBE4', bg:'F6F8FB',
+           teal:'1FA88A', amber:'D98518', coral:'D6483C', blue:'2E6FB8', violet:'6B5CD6'};
+function pptBase(){
+  const p=new PptxGenJS(); p.layout='LAYOUT_WIDE';
+  p.defineSlideMaster({title:'F3', background:{color:'FFFFFF'}, objects:[
+    {rect:{x:0,y:0,w:13.33,h:0.06,fill:{color:PAL.amber}}},
+    {text:{text:'Panel F3 · CD Isidro Casanova', options:{x:0.5,y:6.95,w:8,h:0.3,
+      fontSize:9,color:PAL.mut,fontFace:'Calibri'}}}
+  ]});
+  return p;
+}
+function tituloSlide(sl,t,sub){
+  sl.addText(t,{x:0.5,y:0.38,w:12.3,h:0.5,fontSize:26,bold:true,color:PAL.ink,fontFace:'Calibri'});
+  if(sub) sl.addText(sub,{x:0.5,y:0.92,w:12.3,h:0.3,fontSize:12,color:PAL.mut,fontFace:'Calibri'});
+}
+function tarjetas(sl,items,y){
+  const w=(12.33-(items.length-1)*0.25)/items.length;
+  items.forEach((it,i)=>{
+    const x=0.5+i*(w+0.25);
+    sl.addShape('roundRect',{x,y,w,h:1.25,fill:{color:PAL.bg},line:{color:PAL.line,width:1},rectRadius:0.06});
+    sl.addText(it.k,{x:x+0.15,y:y+0.14,w:w-0.3,h:0.35,fontSize:10,color:PAL.mut,fontFace:'Calibri'});
+    sl.addText(String(it.v),{x:x+0.15,y:y+0.5,w:w-0.3,h:0.6,fontSize:30,bold:true,
+      color:it.c||PAL.ink,fontFace:'Calibri'});
+  });
+}
+function tablaPpt(sl,cab,filas,y,h){
+  if(!filas.length){ sl.addText('Sin registros.',{x:0.5,y,w:12.3,h:0.4,fontSize:12,color:PAL.mut,fontFace:'Calibri'}); return; }
+  const MAX=12, corte=(t,n)=>{t=String(t??''); return t.length>n? t.slice(0,n-1)+'…':t;};
+  const rows=[cab.map(c=>({text:c,options:{bold:true,color:'FFFFFF',fill:{color:PAL.ink},fontSize:10}}))]
+    .concat(filas.slice(0,MAX).map(f=>f.map(c=>({text:corte(c,34),options:{fontSize:9.5,color:PAL.tx}}))));
+  sl.addTable(rows,{x:0.5,y,w:12.33,border:{type:'solid',color:PAL.line,pt:0.5},
+    fontFace:'Calibri',valign:'middle',rowH:0.3,autoPage:false});
+  if(filas.length>MAX) sl.addText(`… y ${filas.length-MAX} más. El detalle completo está en el CSV.`,
+    {x:0.5,y:Math.min(y+(MAX+1)*0.32+0.1,6.6),w:12.3,h:0.3,fontSize:9,italic:true,color:PAL.mut,fontFace:'Calibri'});
+}
+async function repPpt(){
+  const A=ST.rep; if(!A){toast('Todavía no hay reporte',true);return;}
+  if(typeof PptxGenJS==='undefined'){toast('No se pudo cargar la librería de PowerPoint. Revisá la conexión.',true);return;}
+  try{
+    const p=pptBase();
+    const per=$('#inFecha').value||hoyTxt();
+    const tipoNom=TIPOS[ST.tipo].nom;
+    const conHE=A.hs.filter(x=>x.he>0);
+
+    // 1 · portada
+    let sl=p.addSlide({masterName:'F3'});
+    sl.addText('Reporte de liquidación',{x:0.5,y:2.1,w:12.3,h:0.8,fontSize:40,bold:true,color:PAL.ink,fontFace:'Calibri'});
+    sl.addText(`F3 de ${tipoNom} · CD Isidro Casanova`,{x:0.5,y:3.0,w:12.3,h:0.5,fontSize:19,color:PAL.amber,fontFace:'Calibri'});
+    sl.addText(`${A.total} legajos · generado el ${per}`,{x:0.5,y:3.55,w:12.3,h:0.4,fontSize:13,color:PAL.mut,fontFace:'Calibri'});
+    sl.addShape('rect',{x:0.5,y:4.15,w:2.2,h:0.04,fill:{color:PAL.amber}});
+
+    // 2 · resumen
+    sl=p.addSlide({masterName:'F3'});
+    tituloSlide(sl,'Resumen del mes',`F3 de ${tipoNom} · ${A.total} legajos`);
+    const k1=[];
+    if(A.tienePres){
+      k1.push({k:'Presentismo completo',v:A.pres.full.length,c:PAL.teal});
+      k1.push({k:'Medio presentismo',v:A.pres.medio.length,c:PAL.amber});
+      k1.push({k:'Sin presentismo',v:A.pres.cero.length,c:PAL.coral});
+    }
+    if(A.gld) k1.push({k:'Cobran plus de frío',v:A.conFrio,c:PAL.blue});
+    k1.push({k:'Horas extras 50%',v:A.tHE,c:PAL.amber});
+    tarjetas(sl,k1.slice(0,5),1.5);
+    tarjetas(sl,[{k:'Personas con extras',v:conHE.length},{k:'Hs nocturnas',v:A.tNoc},
+                 {k:'Hs feriado',v:A.tFer},{k:'Hs domingo',v:A.tDom},
+                 {k:'Cambios de categoría',v:A.cat.length,c:A.cat.length?PAL.amber:PAL.ink}],3.05);
+    sl.addText('Los conceptos 110, 131, 174 y 304 se liquidan en negativo.',
+      {x:0.5,y:4.7,w:12.3,h:0.3,fontSize:11,color:PAL.mut,fontFace:'Calibri'});
+
+    // 3 · presentismo (solo si aplica)
+    if(A.tienePres){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Presentismo y puntualidad');
+      sl.addChart(p.ChartType.doughnut,[{name:'Presentismo',
+        labels:['Completo','Medio','Sin presentismo'],
+        values:[A.pres.full.length,A.pres.medio.length,A.pres.cero.length]}],
+        {x:0.5,y:1.45,w:6.1,h:4.9,holeSize:52,chartColors:[PAL.teal,PAL.amber,PAL.coral],
+         showLegend:true,legendPos:'b',legendFontSize:11,showValue:true,dataLabelPosition:'bestFit',
+         dataLabelColor:'FFFFFF',dataLabelFontSize:12,dataLabelFontBold:true,
+         showTitle:true,title:'Cómo cobran el presentismo',titleFontSize:13,titleColor:PAL.ink});
+      sl.addChart(p.ChartType.bar,[{name:'Legajos',labels:['Cumple','Medio','No cumple'],
+        values:[A.punt.full,A.punt.medio,A.punt.cero]}],
+        {x:6.85,y:1.45,w:5.98,h:4.9,barDir:'bar',chartColors:[PAL.teal],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:11,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:11,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},showLegend:false,
+         showTitle:true,title:'Puntualidad (código aparte)',titleFontSize:13,titleColor:PAL.ink});
+    }
+
+    // 4 · horas extras
+    sl=p.addSlide({masterName:'F3'});
+    tituloSlide(sl,'Horas extras al 50%',`${A.tHE} horas entre ${conHE.length} personas`);
+    if(conHE.length){
+      const top=conHE.slice(0,10).reverse();
+      sl.addChart(p.ChartType.bar,[{name:'Este mes',labels:top.map(x=>(x.n||x.l).split(',')[0]),
+        values:top.map(x=>x.he)},{name:'Mes pasado',labels:top.map(x=>(x.n||x.l).split(',')[0]),
+        values:top.map(x=>x.ant)}],
+        {x:0.5,y:1.45,w:7.4,h:4.9,barDir:'bar',chartColors:[PAL.amber,PAL.line],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:9,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:10,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},
+         showLegend:true,legendPos:'b',legendFontSize:10,
+         showTitle:true,title:'Top 10 · este mes contra el anterior',titleFontSize:13,titleColor:PAL.ink});
+      if(A.catHE.length) sl.addChart(p.ChartType.bar,[{name:'Horas',
+        labels:A.catHE.slice(0,6).map(x=>x[0].length>20?x[0].slice(0,19)+'…':x[0]),
+        values:A.catHE.slice(0,6).map(x=>x[1])}],
+        {x:8.15,y:1.45,w:4.68,h:4.9,barDir:'bar',chartColors:[PAL.violet],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:10,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:9,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},showLegend:false,
+         showTitle:true,title:'Por categoría',titleFontSize:13,titleColor:PAL.ink});
+    } else sl.addText('Nadie hizo horas extras este mes.',{x:0.5,y:2,w:12.3,h:0.5,fontSize:15,color:PAL.mut,fontFace:'Calibri'});
+
+    // 5 · otros adicionales de jornada
+    const otros=[['Hs feriado',A.tFer],['Hs domingo',A.tDom],['Hs nocturnas',A.tNoc],['Hs al 100%',A.tHE100]].filter(x=>x[1]>0);
+    if(otros.length){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Otros adicionales de jornada');
+      sl.addChart(p.ChartType.bar,[{name:'Horas',labels:otros.map(x=>x[0]),values:otros.map(x=>x[1])}],
+        {x:0.5,y:1.5,w:12.33,h:4.8,barDir:'col',chartColors:[PAL.blue],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:12,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:12,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},showLegend:false});
+    }
+
+    // 6 · plus de frío
+    if(A.gld){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Plus de frío',`${A.conFrio} de ${A.total} legajos lo cobran`);
+      const pf=Object.entries(A.porPct).sort((a,b)=>a[0]-b[0]);
+      if(pf.length) sl.addChart(p.ChartType.bar,[{name:'Legajos',labels:pf.map(x=>x[0]+'%'),values:pf.map(x=>x[1])}],
+        {x:0.5,y:1.45,w:6.1,h:4.9,barDir:'col',chartColors:[PAL.blue],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:12,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:12,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},showLegend:false,
+         showTitle:true,title:'Por porcentaje',titleFontSize:13,titleColor:PAL.ink});
+      sl.addChart(p.ChartType.bar,[{name:'Legajos',labels:['Lo perdieron','Lo empiezan','Cambió el %'],
+        values:[A.frioBaja.length,A.frioAlta.length,A.frioCambio.length]}],
+        {x:6.85,y:1.45,w:5.98,h:4.9,barDir:'col',chartColors:[PAL.coral],
+         showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:12,dataLabelColor:PAL.tx,
+         catAxisLabelColor:PAL.mut,valAxisLabelColor:PAL.mut,catAxisLabelFontSize:11,
+         valGridLine:{color:PAL.line,size:1},catGridLine:{style:'none'},showLegend:false,
+         showTitle:true,title:'Movimientos contra el mes pasado',titleFontSize:13,titleColor:PAL.ink});
+      if(A.frioBaja.length){
+        sl=p.addSlide({masterName:'F3'});
+        tituloSlide(sl,'Dejaron de cobrar el plus de frío');
+        tablaPpt(sl,['Legajo','Apellido y Nombres','% mes pasado','% este mes'],
+          A.frioBaja.map(x=>[x.l,x.n,x.de+'%','0']),1.5);
+      }
+    }
+
+    // 7 · detalle de horas
+    if(A.hs.length){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Detalle de horas por persona');
+      tablaPpt(sl,['Legajo','Apellido y Nombres','Categoría','HE 50%','Mes pasado','Dif.','Nocturnas','Feriado','Domingo'],
+        A.hs.map(x=>[x.l,x.n,x.cat,x.he||'',x.ant||'',(x.dif>0?'+':'')+(x.dif||''),x.nc||'',x.fe||'',x.dm||'']),1.5);
+    }
+
+    // 8 · cambios
+    if(A.cat.length||A.sue.length){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Cambios contra el F3 anterior');
+      sl.addText(`Categoría · ${A.cat.length} cambio(s)`,{x:0.5,y:1.35,w:12.3,h:0.3,fontSize:13,bold:true,color:PAL.ink,fontFace:'Calibri'});
+      tablaPpt(sl,['Legajo','Apellido y Nombres','Antes','Ahora'],
+        A.cat.slice(0,5).map(x=>[x.l,x.n,x.de,x.a]),1.7);
+      sl.addText(`Sueldo · ${A.sue.length} cambio(s)`,{x:0.5,y:4.15,w:12.3,h:0.3,fontSize:13,bold:true,color:PAL.ink,fontFace:'Calibri'});
+      tablaPpt(sl,['Legajo','Apellido y Nombres','Antes','Ahora'],
+        A.sue.slice(0,5).map(x=>[x.l,x.n,num(x.de).toLocaleString('es-AR'),num(x.a).toLocaleString('es-AR')]),4.5);
+    }
+
+    // 9 · sin presentismo
+    if(A.tienePres && A.pres.cero.length){
+      sl=p.addSlide({masterName:'F3'});
+      tituloSlide(sl,'Sin presentismo este mes',`${A.pres.cero.length} legajos`);
+      tablaPpt(sl,['Legajo','Apellido y Nombres'],A.pres.cero.map(x=>[x.l,x.n]),1.5);
+    }
+
+    const nom=`Reporte_F3_${ST.tipo}_${String(new Date().getMonth()+1).padStart(2,'0')}_${String(new Date().getFullYear()).slice(2)}.pptx`;
+    // uso write+bajar en vez de writeFile: controlo el nombre y no dependo del descargador interno
+    const blob=await p.write({outputType:'blob'});
+    bajar(blob, nom);
+    toast('Reporte en PowerPoint generado');
+  }catch(e){ toast('PowerPoint: '+e.message, true); }
+}
+
+/* ---------------- eventos ---------------- */
+function dropZone(zona, input, fn){
+  const el=$(zona), inp=$(input);
+  el.onclick=()=>inp.click();
+  inp.onchange=e=>{ if(e.target.files[0]) fn(e.target.files[0]); inp.value=''; };
+  ['dragenter','dragover'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.remove('over');}));
+  el.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) fn(f); });
+}
+dropZone('#dropBase','#fBase',cargarBase);
+dropZone('#dropNov','#fNov',cargarNov);
+dropZone('#dropAyu','#fAyu',cargarAyuda);
+$('#btnAyuBorrar').onclick=()=>{
+  if(!ST.ayuda){toast('No hay archivo de ayuda solidaria cargado');return;}
+  ST.ayuda=null; pintarAyuda(); refrescar(); toast('Ayuda solidaria quitada');
+};
+
+$('#btnImpSue').onclick=()=>$('#fSue').click();
+$('#fSue').onchange=e=>{ if(e.target.files[0]) importarSueldos(e.target.files[0]); e.target.value=''; };
+$('#btnPct').onclick=()=>{
+  const p=parseFloat($('#inPct').value); if(!p){toast('Poné un porcentaje distinto de 0',true);return;}
+  ST.base.emp.forEach(e=>{ if(typeof e.c8==='number'&&e.c8) { e.c8=Math.round(e.c8*(1+p/100)); e._tag=['up','+'+p+'%']; }});
+  localStorage.setItem(LS, JSON.stringify(ST.base)); pintarSueldos();
+  toast(`Aumento del ${p}% aplicado`);
+};
+$('#inBuscar').oninput=()=>pintarSueldos();
+$('#inBuscarFij').oninput=()=>pintarFijos();
+$('#btnRepCsv').onclick=repCsv;
+$('#btnRepPpt').onclick=repPpt;
+$('#btnParReset').onclick=()=>{
+  if(!confirm('¿Volver a los códigos deducidos de tus F3 de junio y julio?')) return;
+  ST.cod={}; localStorage.removeItem(LSP); pintarPares(); refrescar(); toast('Códigos restaurados');
+};
+$('#btnFijDef').onclick=()=>{
+  let n=0; ST.base.emp.forEach(e=>{ const d=FIJOS_DEF[e.legajo]; if(!d) return;
+    e.fijos=e.fijos||{};
+    FIJOS.forEach(([k])=>{ if(num(e.fijos[k])!==num(d[k])){ e.fijos[k]=d[k]; n++; } }); });
+  localStorage.setItem(LS, JSON.stringify(ST.base)); pintarFijos(); refrescar();
+  toast(n? `${n} valor(es) restaurados al parametrizado` : 'Ya estaban todos en el valor parametrizado');
+};
+$('#btnFij0').onclick=()=>{
+  let n=0; ST.base.emp.forEach(e=>{ e.fijos=e.fijos||{};
+    FIJOS.forEach(([k])=>{ if(esVacio(e.fijos[k])){ e.fijos[k]=0; n++; } }); });
+  localStorage.setItem(LS, JSON.stringify(ST.base)); pintarFijos(); refrescar();
+  toast(`${n} celda(s) puestas en 0`);
+};
+let _tf; $('#inFiltro').oninput=()=>{clearTimeout(_tf);_tf=setTimeout(refrescar,220);};
+$('#btnLimpiarOver').onclick=()=>{
+  if(!nOver()){toast('No hay ajustes cargados');return;}
+  if(!confirm(`¿Borrar los ${nOver()} ajustes manuales?`)) return;
+  ST.over={}; guardarOver(); refrescar(); toast('Ajustes borrados');
+};
+$('#inDiasNorm').oninput=refrescar;
+$('#chkCeros').onchange=refrescar;
+$('#chkSoloNov').onchange=refrescar;
+$('#chkAltas').onchange=refrescar;
+$('#chkPodar').onchange=refrescar;
+$('#inNombre').oninput=e=>{ e.target.dataset.tocado='1'; };
+$('#btnGen').onclick=generar;
+$('#btnCsv').onclick=bajarCsv;
+$('#btnGuardarBase').onclick=guardarComoBase;
+$('#btnLimpiarBase').onclick=()=>{
+  if(!confirm('¿Borrar la base guardada en este navegador?')) return;
+  localStorage.removeItem(LS); location.reload();
+};
+
+pintarTipos();
+
+// saludo
+(function(){
+  const h=new Date().getHours();
+  const cómo = h<6?'Buenas noches':h<13?'Buen día':h<20?'Buenas tardes':'Buenas noches';
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const d=new Date();
+  $('#hola').innerHTML=`${cómo}, Ariel <span>· ${d.getDate()} de ${meses[d.getMonth()]}</span>`;
+})();
+
+// base guardada
+try{ const g=localStorage.getItem(LS); if(g){ ST.base=JSON.parse(g);
+  // bases guardadas antes de la corrección: los fijos se habían leído por posición y podían quedar cruzados
+  if(ST.base.tipo==='GLD'&&ST.base.fijVer!==2){
+    ST.base.emp.forEach(e=>{ const d=FIJOS_DEF[e.legajo]; e.fijos=e.fijos||{}; if(d) FIJOS.forEach(([k])=>{ e.fijos[k]=d[k]??0; }); });
+    ST.base.fijVer=2; localStorage.setItem(LS, JSON.stringify(ST.base));
+    setTimeout(()=>toast('Adicionales fijos de la base guardada corregidos con los valores parametrizados'),1500);
+  }
+  aplicarBase(); } }catch(e){}
+</script>
+</body>
+</html>

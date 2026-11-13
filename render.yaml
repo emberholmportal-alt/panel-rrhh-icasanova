@@ -1,0 +1,29 @@
+# Referencia de configuración para Render (el servicio se puede crear a mano con estos mismos valores).
+services:
+  - type: web
+    name: panel-rrhh-icasanova
+    runtime: python
+    region: ohio
+    plan: starter
+    buildCommand: pip install -r backend/requirements.txt && python frontend/build.py
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        fromDatabase:
+          name: panel-rrhh-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: ariel
+      - key: ADMIN_NOMBRE
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+databases:
+  - name: panel-rrhh-db
+    region: ohio
+    plan: basic-256mb

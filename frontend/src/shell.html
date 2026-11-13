@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>/* ventana emergente de inicio de sesión de Microsoft: no cargar el panel */
+if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.hash+location.search)){document.write('<body style="background:#070b14;color:#9aa8bf;font:14px system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0">Conectando con Microsoft 365…</body>');window.stop();}</script>
+<title>Panel de Trabajo RRHH · I.Casanova</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+/*@@CSS@@*/
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="gBar" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0b94cf"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+  <linearGradient id="gBarHot" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#dc2626"/><stop offset="1" stop-color="#f87171"/></linearGradient>
+  <linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee" stop-opacity=".35"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></linearGradient>
+</defs></svg>
+<canvas id="bg3d"></canvas>
+
+<div class="app">
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="side">
+  <div class="brand">
+    <div class="lg-chip"><img alt="Grupo Gestión" src="@@LOGO@@"></div>
+    <div><b>RRHH</b><span>I.CASANOVA</span></div>
+  </div>
+  <nav class="nav" id="modnav">
+    <div class="nav-lab">Centro de control</div>
+    <button class="nav-item mod on" data-v="v-home"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Inicio<span class="nb" id="nb-home"></span></button>
+    <button class="nav-item mod" data-v="v-agenda"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/></svg>Agenda<span class="nb" id="nb-ag"></span></button>
+    <div class="nav-lab">Gestión diaria</div>
+    <button class="nav-item mod" data-v="v-ausentismo"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>Ausentismo<span class="nb" id="nb-aus"></span></button>
+    <button class="nav-item mod" data-v="v-vacaciones"><svg viewBox="0 0 24 24"><circle cx="17" cy="6" r="3"/><path d="M2 20c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M7 17V8M7 8c-3 0-4 2-4 2M7 8c3 0 4 2 4 2M7 8c-1-3 1-4 1-4"/></svg>Vacaciones<span class="nb" id="nb-vac"></span></button>
+    <button class="nav-item mod" data-v="v-bajas"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.5-3.5 3.2-5.5 6.5-5.5s6 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.8.8 2.8 2.6 3 5.2"/></svg>Eventuales<span class="nb" id="nb-ant"></span></button>
+    <button class="nav-item mod" data-v="v-francos"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 13h2v5M14 13h3M14 15.5h2"/></svg>Francos<span class="nb" id="nb-fr"></span></button>
+    <button class="nav-item mod" data-v="v-ropa"><svg viewBox="0 0 24 24"><path d="M8 3 4 5.5 2.5 10l3 1.2V21h13V11.2l3-1.2L20 5.5 16 3c-.6 1.6-2.2 2.6-4 2.6S8.6 4.6 8 3z"/></svg>Indumentaria<span class="nb" id="nb-ro"></span></button>
+    <div class="nav-lab">Liquidación</div>
+    <button class="nav-item mod" data-v="v-f3"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Novedades F3<span class="nb" id="nb-f3"></span></button>
+    <button class="nav-item mod" data-v="v-anticipos"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4M5 14v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"/></svg>Anticipos<span class="nb" id="nb-an"></span></button>
+    <div class="nav-lab">Comunidad</div>
+    <button class="nav-item mod" data-v="v-pizarra"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21l4-4 4 4M7 9l3 3 3-4 4 4"/></svg>Cartelera<span class="nb" id="nb-pz"></span></button>
+    <button class="nav-item mod" data-v="v-buzon"><svg viewBox="0 0 24 24"><path d="M4 7h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 7l8 6 8-6M8 3h8"/></svg>Buzón<span class="nb" id="nb-bz"></span></button>
+    <div class="nav-lab">Sistema</div>
+    <button class="nav-item mod" data-v="v-config"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Configuración</button>
+  </nav>
+  <div class="side-foot">
+    <label class="switch"><input type="checkbox" id="optAnim" checked> Animaciones de entrada</label>
+    <label class="switch"><input type="checkbox" id="opt3d" checked> Fondo 3D</label>
+    <label class="switch"><input type="checkbox" id="optSnd" checked> Sonidos</label>
+    <div class="row3">
+      <button class="btn ghost sm" id="btnExportDB" title="Descarga un respaldo .json con todo">Exportar base</button>
+      <button class="btn ghost sm" id="btnImportDB">Importar base</button>
+    </div>
+    <button class="btn danger sm" id="btnReset">Borrar todo</button>
+    <div class="store-mode" id="storeMode"></div>
+  </div>
+</aside>
+
+<!-- ==================== MAIN ==================== -->
+<div class="main">
+  <header class="topbar">
+    <div class="tb-mid">
+      <h1>Panel de trabajo <em>RRHH</em> · I.Casanova</h1>
+      <div class="sub" id="subhead">Bienvenido Ariel</div>
+    </div>
+    <label class="gris-sw" title="Modo Gris: estilo de oficina, sobrio y corporativo"><span>Modo Gris</span><input type="checkbox" id="optGris"><i></i></label>
+    <div class="me-pill" id="mePill"><button class="me-b" id="meBtn" title="Usuario actual (simulado en esta PC)"><i id="meAv"></i><span id="meNm"></span></button><div class="me-menu" id="meMenu"></div></div>
+    <button class="m365pill none" id="m365pill" title="Conexión con Microsoft 365"><i></i><span>Microsoft 365</span></button>
+    <div class="clock"><b id="clkT">--:--</b><span id="clkD"></span></div>
+    <button class="bell" id="btnLock" title="Modo reposo: bloquear ahora"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button class="bell" data-v="v-home" title="Pendientes del día"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><i id="bellN"></i></button>
+  </header>
+
+<div class="ticker" id="ticker"><div class="tk-lab"><i></i>HOY · <b id="tk-n">0</b></div><div class="tk-view"><div class="tk-track" id="tk-track"></div></div></div>
+<div class="wrap">
+
+<!-- ==================== INICIO ==================== -->
+<section class="view on" id="v-home">
+  <div class="fich" id="h-fich"></div>
+  <div class="hero">
+    <div>
+      <div class="eyebrow" id="h-date"></div>
+      <h2><span id="h-greet">Hola</span>, <span class="grad">Ariel</span></h2>
+      <p id="h-sum">Cargando el estado de cada módulo…</p>
+      <div class="hero-chips" id="h-chips"></div>
+    </div>
+    <div class="orb-wrap" id="h-orbwrap"><canvas id="h-orb"></canvas><div id="h-orb-labels"></div><div class="orb-hint">ARRASTRÁ · CLIC EN UN MÓDULO</div></div>
+  </div>
+
+  <div class="hinfo">
+    <div class="hi-card" id="h-fecha"></div>
+    <div class="hi-card" id="h-clima"></div>
+    <div class="hi-card" id="h-feriado"></div>
+  </div>
+  <div class="hkpis" id="h-kpis"></div>
+
+  <div class="hgrid">
+    <div class="hcol">
+      <div class="card glow">
+        <div class="card-h"><h3><span class="dot"></span>Pendiente hoy</h3><span class="meta" id="h-hoy-n"></span></div>
+        <div class="alist" id="h-hoy"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Agenda · próximos 30 días</h3>
+          <div class="legend"><span><i style="background:var(--c1)"></i>Sale de vacaciones</span><span><i style="background:var(--c3)"></i>Vuelve</span><span><i style="background:var(--c2)"></i>Baja eventual</span><span><i style="background:var(--c4)"></i>Notificar / recordatorio</span></div>
+        </div>
+        <div class="strip14" id="h-strip"></div>
+        <div class="agenda" id="h-agenda"></div>
+      </div>
+    </div>
+    <div class="hcol">
+      <div class="card">
+        <div class="card-h"><h3>Recordatorios</h3><span class="meta" id="h-rec-n"></span></div>
+        <div class="recform">
+          <input type="text" id="h-rec-txt" placeholder="Ej: mandar bajas a Flor">
+          <input type="date" id="h-rec-date">
+          <button class="btn primary sm" id="h-rec-add">Agregar</button>
+        </div>
+        <div id="h-rec"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Fuentes de datos</h3><span class="meta">estado de cada archivo</span></div>
+        <div id="h-src"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cgrid">
+    <div class="card"><div class="card-h"><h3>Tardanzas por día</h3><span class="meta" id="h-c-tarde-m"></span></div><div class="card-b" id="h-c-tarde"></div></div>
+    <div class="card"><div class="card-h"><h3>Personas de vacaciones por semana</h3><span class="meta">próximas 16 semanas</span></div><div class="card-b" id="h-c-vac"></div></div>
+    <div class="card"><div class="card-h"><h3>Bajas de eventuales por semana</h3><span class="meta">próximas 10 semanas</span></div><div class="card-b" id="h-c-baj"></div></div>
+    <div class="card"><div class="card-h"><h3>Anticipos otorgados</h3><span class="meta" id="h-c-ant-m"></span></div><div class="card-b" id="h-c-ant"></div></div>
+  </div>
+</section>
+
+@@AUSENTISMO@@
+
+@@VACACIONES@@
+
+@@BAJAS@@
+
+<!-- ==================== NOVEDADES F3 ==================== -->
+<section class="view" id="v-f3">
+  <div class="vhead"><div><div class="eyebrow">Módulo 04 · Liquidación</div><h2>Novedades F3</h2>
+    <p>Novedades del reloj → archivo F3 de liquidación. Base del mes anterior, códigos, sueldos, control previo y reporte del mes.</p></div>
+    <span class="sp"></span><div class="badges" id="f3badges"></div></div>
+  <div class="updbar" id="upd-f3"></div>
+@@F3@@
+</section>
+
+<!-- ==================== FRANCOS ==================== -->
+<section class="view" id="v-francos">
+  <div class="vhead"><div><div class="eyebrow">Módulo 06 · Gestión diaria</div><h2>Francos</h2>
+    <p>Cargá el plan de francos y los movimientos del reloj: el panel calcula cuántos francos le faltan tomar a cada empleado para cerrar el período sin pasar las jornadas del objetivo.</p></div></div>
+  <div class="updbar" id="upd-fr"></div>
+  <div class="cx-steps">
+    <div class="cx-step" id="fr-drop">
+      <div class="cx-n">1</div>
+      <div class="cx-sb"><h4>Plan de francos</h4><p>Planilla de eventuales · hoja <b>Unificado</b> · 1 = jornada · 0 = franco</p>
+        <div class="cx-st" id="fr-st-plan"></div>
+        <button class="btn primary sm" id="fr-pick">Cargar plan…</button><input type="file" id="fr-file" accept=".xlsx,.xls,.csv" multiple hidden></div>
+    </div>
+    <div class="cx-step" id="fr-mdrop">
+      <div class="cx-n">2</div>
+      <div class="cx-sb"><h4>Movimientos del reloj</h4><p>Export <b>Movimientos</b> (fichadas por día). Se puede actualizar todos los días.</p>
+        <div class="cx-st" id="fr-st-mov"></div>
+        <button class="btn primary sm" id="fr-cx-pick">Cargar movimientos…</button><input type="file" id="fr-mfile" accept=".xlsx,.xls" hidden></div>
+    </div>
+    <div class="cx-step cx-out">
+      <div class="cx-n">3</div>
+      <div class="cx-sb"><h4>Informe</h4><p>Francos que le faltan tomar a cada empleado.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary sm" id="fr-cx-rep">Informe por empleado</button><button class="btn ghost sm" id="fr-cx-xls">Excel</button></div>
+        <div class="cx-cfg"><label>Objetivo <input type="number" id="fr-cx-obj" min="1" max="31" step="1"> jornadas</label><label class="switch"><input type="checkbox" id="fr-cx-art"> ART computa</label></div></div>
+    </div>
+  </div>
+  <div class="kpis" id="fr-cx-kpis"></div>
+  <div class="card">
+    <div class="card-h"><h3>Empleados · fichadas y francos restantes</h3><span class="meta" id="fr-cx-m"></span></div>
+    <div class="card-b">
+      <div class="filters">
+        <div class="field" style="min-width:200px;flex:1"><label>Buscar</label><input type="text" id="fr-q" placeholder="apellido o legajo"></div>
+        <div class="field"><label>Turno</label><div class="msel" id="fr-mt"></div></div>
+        <div class="field"><label>Sector</label><div class="msel" id="fr-ms"></div></div>
+        <div class="field"><label>Mostrar</label><select id="fr-cx-f"><option value="all">Todos</option><option value="pend">Con francos restantes</option><option value="falt">No llegan al objetivo</option><option value="sup">Superaron el objetivo</option><option value="sinmv">Sin fichadas / no cruzados</option></select></div>
+        <div class="cx-coord"><button class="btn primary sm" id="fr-coord" title="Un listado imprimible por cada sector elegido, con los días que quedan para que el coordinador marque los francos">Imprimir listado para coordinador</button><button class="btn ghost sm" id="fr-coord-x" title="Excel para que el coordinador escriba F en los días de franco y lo devuelva por correo">Descargar Excel para completar</button><button class="btn ghost sm" id="fr-asig-pick" title="Cargar el Excel que devolvió el coordinador: actualiza el plan de francos">Cargar Excel completado</button><input type="file" id="fr-afile" accept=".xlsx" multiple hidden></div>
+      </div>
+    </div>
+    <div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="fr-cx"></table></div></div>
+  </div>
+  <div class="card" id="fr-emp-card" hidden>
+    <div class="card-h"><h3 id="fr-emp-h">Empleado</h3><button class="btn ghost sm" id="fr-emp-x">Cerrar</button></div>
+    <div class="card-b" id="fr-emp"></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Calendario día por día</h3><span class="meta" id="fr-n"></span></div>
+    <div class="card-b">
+      <div class="filters">
+        <div class="field" style="min-width:auto"><label>Día</label><div style="display:flex;gap:6px"><button class="btn ghost sm" id="fr-prev">‹</button><input type="date" id="fr-date" style="width:160px"><button class="btn ghost sm" id="fr-next">›</button><button class="btn ghost sm" id="fr-hoy">Hoy</button></div></div>
+        <button class="btn ghost sm" id="fr-csv">CSV del día</button>
+        <button class="btn danger sm" id="fr-del">Borrar datos de francos</button>
+      </div>
+      <div class="cx-ley" id="fr-cx-ley"></div>
+    </div>
+    <div class="card-b flush"><div class="tscroll fr-scroll"><table id="fr-grid" class="fr-grid"></table></div></div>
+  </div>
+  <div class="cgrid" style="grid-template-columns:1.5fr 1fr">
+    <div class="card"><div class="card-h"><h3>Francos por día</h3><span class="meta" id="fr-c-m"></span></div><div class="card-b" id="fr-c-days"></div></div>
+    <div class="card"><div class="card-h"><h3 id="fr-list-h">De franco</h3></div><div class="card-b"><div class="outlist fr-list" id="fr-list"></div></div></div>
+  </div>
+</section>
+
+<!-- ==================== INDUMENTARIA ==================== -->
+<section class="view" id="v-ropa">
+  <div class="vhead"><div><div class="eyebrow">Módulo 07 · Gestión diaria</div><h2>Entrega de indumentaria</h2>
+    <p id="ro-tit">Cargá la planilla de control de entrega</p></div></div>
+  <div class="updbar" id="upd-ropa"></div>
+  <div class="cgrid">
+    <div class="drop" id="ro-drop" style="margin:0">
+      <h2>1 · Control de entrega</h2>
+      <p>Excel con <b>LEGAJO</b>, <b>APELLIDO Y NOMBRE</b>, <b>CUIL</b>, <b>TIPO</b> y <b>ESTADO</b> (ENTREGADO / PENDIENTE).</p>
+      <button class="btn primary" id="ro-pick">Elegir archivo…</button>
+      <input type="file" id="ro-file" accept=".xlsx,.xls" hidden>
+      <div class="hint">Cada versión nueva suma un punto al gráfico de avance.</div>
+    </div>
+    <div class="drop" id="ro-tdrop" style="margin:0">
+      <h2>2 · Declaración de talles</h2>
+      <p>Respuestas del formulario de talles. Se asignan por <b>DNI</b> y, si no coincide, por <b>nombre</b>.</p>
+      <button class="btn primary" id="ro-tpick">Elegir archivo…</button>
+      <input type="file" id="ro-tfile" accept=".xlsx,.xls,.csv" hidden>
+      <div class="hint">Si alguien respondió dos veces queda la última respuesta. Lo cargado a mano después no se pisa.</div>
+    </div>
+  </div>
+  <div class="ro-hero card glow">
+    <div id="ro-ring"></div>
+    <div class="ro-main"><div id="ro-big"></div><div id="ro-funnel"></div></div>
+  </div>
+  <div class="card" id="ro-sinwrap" style="display:none">
+    <div class="card-h"><h3>Respuestas de talles sin coincidencia</h3><span class="meta">asignalas a mano o descartalas</span></div>
+    <div class="card-b" id="ro-sin"></div>
+  </div>
+  <div class="cgrid">
+    <div class="card"><div class="card-h"><h3>Avance por tipo de personal</h3></div><div class="card-b" id="ro-tipos"></div></div>
+    <div class="card"><div class="card-h"><h3>Talles a preparar por prenda</h3><span class="meta">solo quienes faltan entregar</span></div><div class="card-b" id="ro-talles"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Personal</h3><span class="meta" id="ro-n"></span></div>
+    <div class="card-b"><div class="filters">
+      <div class="field" style="min-width:270px"><label>Mostrar</label><select id="ro-est">
+        <option value="">Todos</option><option value="pend">Faltan entregar (todos)</option><option value="S">Faltan entregar · sin talles</option>
+        <option value="T">Faltan entregar · con talles, sin preparar</option><option value="R">Preparados · falta entregar</option>
+        <option value="E">Entregados</option><option value="X">Sin estado en la planilla</option></select></div>
+      <div class="field"><label>Tipo</label><select id="ro-tipo"></select></div>
+      <div class="field" style="min-width:200px;flex:1"><label>Buscar</label><input type="text" id="ro-q" placeholder="apellido o legajo"></div>
+      <button class="btn ghost sm" id="ro-prep-csv">Lista para preparar (CSV)</button>
+      <button class="btn ghost sm" id="ro-csv">CSV de pendientes</button>
+      <button class="btn ghost sm" id="ro-copy">Copiar avance para el mail</button>
+    </div></div>
+    <div class="card-b flush"><div class="tscroll" style="max-height:680px"><table id="ro-table" class="ro-table"></table></div></div>
+  </div>
+  <div class="card"><div class="card-h"><h3>Avance en el tiempo</h3><span class="meta">% entregado en cada actualización</span></div><div class="card-b" id="ro-evo"></div></div>
+  <div id="ro-mailwrap" style="position:fixed;left:-9999px;top:0;width:800px;height:1px;overflow:hidden"></div>
+</section>
+
+<!-- ==================== AGENDA ==================== -->
+<section class="view" id="v-agenda">
+  <div class="vhead"><div><div class="eyebrow">Centro de control</div><h2>Agenda y calendario</h2>
+    <p>Todo junto en un mes: salidas y regresos de vacaciones, bajas, notificaciones, feriados, francos y tus propios eventos.</p></div></div>
+  <div class="ag-bar">
+    <button class="btn ghost sm" id="ag-prev">‹</button><h3 id="ag-title"></h3><button class="btn ghost sm" id="ag-next">›</button>
+    <button class="btn ghost sm" id="ag-today">Hoy</button><span class="sp"></span><div class="ag-filt" id="ag-filt"></div>
+  </div>
+  <div class="agwrap">
+    <div class="card ag-calcard"><div class="ag-cal" id="ag-cal"></div></div>
+    <div class="card glow ag-side">
+      <div class="card-h"><h3><span class="dot"></span><span id="ag-day-h"></span></h3></div>
+      <div class="card-b">
+        <div class="ag-form">
+          <input type="text" id="ag-txt" placeholder="Nuevo evento: ej. reunión con Flor">
+          <div class="ag-form2"><input type="date" id="ag-date"><input type="time" id="ag-hora"><select id="ag-cat"></select></div>
+          <button class="btn primary sm" id="ag-add">Agregar a la agenda</button>
+        </div>
+        <div id="ag-day"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CONFIGURACIÓN ==================== -->
+<section class="view" id="v-pizarra">
+  <div class="vhead"><div><div class="eyebrow">Comunidad · Cartelera general</div><h2>Cartelera</h2>
+    <p>Un tablero para todos: dejá una nota, un dibujo o una imagen y pegala donde quieras. Cada uno mueve, edita o borra lo suyo.</p></div>
+    <div class="pz-new"><button class="btn primary" data-pznew="texto"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg>Escribir</button><button class="btn primary" data-pznew="dibujo"><svg viewBox="0 0 24 24"><path d="M3 21c3-1 4-3 5-5l9-9a2.1 2.1 0 0 0-3-3l-9 9c-2 1-4 2-5 5z"/></svg>Dibujar</button><button class="btn primary" data-pznew="imagen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>Imagen</button></div></div>
+  <div class="local-note" id="pz-note"></div>
+  <div class="filters pz-flt">
+    <div class="field" style="min-width:220px;flex:1"><label>Buscar</label><input type="text" id="pz-q" placeholder="texto o autor"></div>
+    <div class="field"><label>Mostrar</label><select id="pz-f"><option value="all">Todos los aportes</option><option value="mine">Mis aportes</option><option value="pin">Anclados</option><option value="new">Nuevos para mí</option></select></div>
+    <div class="field"><label>Tipo</label><select id="pz-t"><option value="">Todos</option><option value="texto">Texto</option><option value="dibujo">Dibujo</option><option value="imagen">Imagen</option></select></div>
+  </div>
+  <div class="pz-wall" id="pz-wall"></div>
+</section>
+
+<section class="view" id="v-buzon">
+  <div class="vhead"><div><div class="eyebrow">Comunidad · Sugerencias</div><h2>Buzón</h2>
+    <p>Mandá sugerencias, problemas o consultas al administrador. Podés firmar con tu nombre o enviarla anónima.</p></div></div>
+  <div class="local-note" id="bz-note"></div>
+  <div class="bz-grid">
+    <div class="card">
+      <div class="card-h"><h3>Nueva sugerencia</h3></div>
+      <div class="card-b bz-form">
+        <div class="field"><label>Asunto</label><input type="text" id="bz-as" maxlength="120" placeholder="De qué se trata"></div>
+        <div class="field"><label>Categoría</label><select id="bz-cat"><option value="mejora">Mejora</option><option value="problema">Problema</option><option value="consulta">Consulta</option><option value="otro">Otro</option></select></div>
+        <div class="field"><label>Mensaje</label><textarea id="bz-msg" rows="6" maxlength="4000" placeholder="Contá tu idea o lo que pasa con el mayor detalle posible"></textarea></div>
+        <div class="field"><label>Adjunto (opcional)</label><div class="bz-att"><button class="btn ghost sm" id="bz-att-b">Adjuntar archivo…</button><span id="bz-att-n">Imagen o PDF, hasta 3 MB</span><input type="file" id="bz-att" accept="image/*,.pdf" hidden></div></div>
+        <div class="bz-who">
+          <label><input type="radio" name="bz-who" value="nom" checked> <span><b>Con mi nombre</b><em>Podés ver el estado y la respuesta</em></span></label>
+          <label><input type="radio" name="bz-who" value="anon"> <span><b>Anónima</b><em>No se guarda quién la envió: no se puede responder ni seguir</em></span></label>
+        </div>
+        <button class="btn primary" id="bz-send">Enviar sugerencia</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Mis sugerencias</h3><span class="meta" id="bz-mine-m"></span></div>
+      <div class="card-b"><div class="bz-list" id="bz-mine"></div></div>
+    </div>
+  </div>
+  <div class="card" id="bz-admin" hidden>
+    <div class="card-h"><h3>Bandeja del administrador</h3><span class="meta" id="bz-adm-m"></span></div>
+    <div class="card-b">
+      <div class="filters">
+        <div class="field" style="min-width:200px;flex:1"><label>Buscar</label><input type="text" id="bz-q" placeholder="asunto, mensaje o autor"></div>
+        <div class="field"><label>Estado</label><select id="bz-fe"><option value="">Todos</option><option value="abiertas" selected>Abiertas</option><option value="nueva">Nuevas</option><option value="leida">Leídas</option><option value="curso">En curso</option><option value="respondida">Respondidas</option><option value="cerrada">Cerradas</option></select></div>
+        <div class="field"><label>Categoría</label><select id="bz-fc"><option value="">Todas</option><option value="mejora">Mejora</option><option value="problema">Problema</option><option value="consulta">Consulta</option><option value="otro">Otro</option></select></div>
+      </div>
+      <div class="bz-adm"><div class="bz-list" id="bz-inbox"></div><div class="bz-det" id="bz-det"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="v-config">
+  <div class="vhead"><div><div class="eyebrow">Sistema</div><h2>Configuración</h2>
+    <p>Protector de pantalla, contraseña y preferencias de la interfaz.</p></div></div>
+  <div class="cgrid">
+    <div class="card glow">
+      <div class="card-h"><h3><span class="dot"></span>Protector de pantalla</h3><button class="btn primary sm" id="cf-test"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Activar ahora</button></div>
+      <div class="card-b cf">
+        <div class="cf-state" id="cf-state"></div>
+        <label class="switch cf-row"><input type="checkbox" id="cf-on"> Bloquear el panel cuando no lo uso</label>
+        <div class="field"><label>Tiempo sin actividad <b id="cf-min-v" style="color:var(--acc)"></b></label><input type="range" id="cf-min" min="1" max="60" step="1"></div>
+        <label class="switch cf-row"><input type="checkbox" id="cf-open"> Pedir la contraseña cada vez que abro el panel</label>
+        <div class="field"><label>Animación</label><select id="cf-anim"><option value="aurora">Aurora (ondas suaves)</option><option value="red">Red de datos (partículas conectadas)</option><option value="minimal">Mínima (solo el reloj)</option></select></div>
+        <p class="cf-note">El botón de la luna, arriba a la derecha, activa el modo reposo cuando quieras.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Contraseña del protector de pantalla</h3></div>
+      <div class="card-b cf">
+        <div class="field"><label>Contraseña actual</label><input type="password" id="cf-pa" autocomplete="current-password"></div>
+        <div class="field"><label>Nueva contraseña</label><input type="password" id="cf-pb" autocomplete="new-password"></div>
+        <div class="field"><label>Repetir la nueva</label><input type="password" id="cf-pc" autocomplete="new-password"></div>
+        <button class="btn primary sm" id="cf-pass-btn">Guardar contraseña</button>
+        <div class="cf-msg" id="cf-pmsg"></div>
+        <p class="cf-note">El bloqueo protege la pantalla de miradas cuando te levantás del puesto. No cifra los datos: siguen guardados en este navegador.</p>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Interfaz</h3></div>
+    <div class="card-b cf cf-inline">
+      <label class="switch"><input type="checkbox" id="cf-anim2"> Animaciones de entrada</label>
+      <label class="switch"><input type="checkbox" id="cf-bg"> Fondo 3D</label>
+      <label class="switch"><input type="checkbox" id="cf-snd"> Sonidos</label>
+      <label class="switch"><input type="checkbox" id="cf-gris"> Modo Gris (corporativo)</label>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Usuarios de prueba</h3><span class="meta">solo en esta PC · hasta que esté el servidor</span></div>
+    <div class="card-b cf">
+      <p class="cf-note" style="margin-top:0">Mientras no haya servidor, la cartelera y el buzón se guardan en este navegador. Estos usuarios sirven para probar: cambiá de usuario arriba a la derecha y fijate qué puede editar, borrar o ver cada uno.</p>
+      <div class="us-list" id="us-list"></div>
+      <div class="filters" style="margin-top:10px">
+        <div class="field" style="flex:1;min-width:200px"><label>Nombre</label><input type="text" id="us-nm" maxlength="60" placeholder="Apellido, nombre"></div>
+        <div class="field"><label>Rol</label><select id="us-rol"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select></div>
+        <button class="btn primary sm" id="us-add" style="align-self:flex-end">Agregar usuario</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== ANTICIPOS ==================== -->
+<section class="view" id="v-anticipos">
+  <div class="vhead"><div><div class="eyebrow">Módulo 05 · Liquidación</div><h2>Anticipos</h2>
+    <p>Totales otorgados por período y grupo, quién recibió, por U.O. y cruces con las bajas de eventuales.</p></div></div>
+  <div class="updbar" id="upd-an"></div>
+  <div class="drop" id="an-drop">
+    <h2>Cargar archivos de anticipos</h2>
+    <p>Arrastrá uno o varios <b>Anticipos_GRUPO_MM.AAAA.xlsx</b> (ej: Anticipos_GL_09.2026, Anticipos_GLD-FC_09.2026).</p>
+    <button class="btn primary" id="an-pick">Elegir archivos…</button>
+    <input type="file" id="an-file" accept=".xlsx,.xls,.csv" multiple hidden>
+    <div class="hint">El grupo y el período salen del nombre del archivo. Volver a subir el mismo grupo y período lo reemplaza.</div>
+  </div>
+  <div class="card"><div class="card-b">
+    <div class="filters">
+      <div class="field"><label>Período</label><select id="an-per"></select></div>
+      <div class="field"><label>Grupo</label><select id="an-grp"></select></div>
+      <div class="field" style="min-width:220px;flex:1"><label>Buscar</label><input type="text" id="an-q" placeholder="apellido, legajo o U.O."></div>
+      <button class="btn ghost sm" id="an-copy">Copiar para el mail</button>
+      <button class="btn ghost sm" id="an-csv">Descargar CSV</button>
+    </div>
+  </div></div>
+  <div class="srcbar" id="an-last" style="display:none"></div>
+  <div class="kpis" id="an-kpis"></div>
+  <div id="an-alerts"></div>
+  <div class="cgrid">
+    <div class="card"><div class="card-h"><h3>Total por grupo</h3><span class="meta" id="an-c-grp-m"></span></div><div class="card-b" id="an-c-grp"></div></div>
+    <div class="card"><div class="card-h"><h3>Evolución por período</h3><span class="meta">todos los grupos</span></div><div class="card-b" id="an-c-evo"></div></div>
+    <div class="card"><div class="card-h"><h3>Por U.O. cliente</h3></div><div class="card-b" id="an-c-uo"></div></div>
+    <div class="card"><div class="card-h"><h3>Distribución de montos</h3><span class="meta">cantidad de anticipos por importe</span></div><div class="card-b" id="an-c-monto"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Detalle de anticipos</h3><span class="meta" id="an-n"></span></div>
+    <div class="card-b flush"><div class="tscroll"><table id="an-table"></table></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Archivos cargados</h3></div>
+    <div class="card-b flush"><div class="tscroll" style="max-height:300px"><table id="an-lotes"></table></div></div>
+  </div>
+  <div id="an-mailwrap" style="position:fixed;left:-9999px;top:0;width:800px;height:1px;overflow:hidden"></div>
+</section>
+
+  <footer class="foot">PANEL DE TRABAJO RRHH I.CASANOVA · Grupo Gestión · todo se procesa y se guarda solo en este navegador</footer>
+</div>
+</div>
+</div>
+
+<div id="pz-dlg"><div class="pz-box">
+  <div class="card-h"><h3 id="pz-dlg-h">Nuevo aporte</h3><div style="display:flex;gap:8px"><button class="btn ghost sm" id="pz-cancel">Cancelar</button><button class="btn primary sm" id="pz-save">Publicar</button></div></div>
+  <div class="pz-body" id="pz-body"></div>
+</div></div>
+<div id="gris-veil"></div>
+<div id="modal"><div class="modal-box">
+  <div class="card-h"><h3>Vista previa</h3><button class="btn ghost sm" id="btnCloseModal">Cerrar</button></div>
+  <div id="previewBody"></div>
+</div></div>
+<div id="m365dlg"><div class="dlg">
+  <div class="card-h"><h3><span class="dot"></span>Conexión con Microsoft 365 · SharePoint</h3><button class="btn ghost sm" id="m365-close">Cerrar</button></div>
+  <div class="card-b">
+    <div id="m365-status" class="note"></div>
+    <p class="dlg-p"><b>Opcional, para más adelante.</b> Mientras tanto, vacaciones y eventuales se actualizan subiendo el Excel. Con esta conexión se leerían <b>directo del Excel online</b> con tu cuenta de Grupo Gestión (Microsoft Graph, permiso de solo lectura). Para eso hace falta registrar el panel una sola vez en Microsoft Entra ID:</p>
+    <ol class="steps">
+      <li>Publicá el panel en una dirección web (https) o abrilo en <span class="mono">http://localhost</span>. Microsoft no permite iniciar sesión desde un archivo abierto con doble clic.</li>
+      <li>En <b>portal.azure.com → Microsoft Entra ID → Registros de aplicaciones → Nuevo registro</b>: nombre "Panel RRHH I.Casanova", cuentas <b>solo de este directorio</b>.</li>
+      <li>En <b>URI de redirección</b> elegí <b>Aplicación de página única (SPA)</b> y pegá esta dirección: <span class="mono uri" id="m365-uri"></span> <button class="btn ghost sm" id="m365-copy">Copiar</button></li>
+      <li>En <b>Permisos de API</b> agregá Microsoft Graph → Delegados → <b>Files.Read.All</b> (y User.Read, que viene por defecto).</li>
+      <li>Copiá el <b>Id. de aplicación (cliente)</b> y el <b>Id. de directorio (inquilino)</b> acá abajo y tocá Conectar.</li>
+    </ol>
+    <div class="grid2">
+      <div class="field"><label>Id. de aplicación (Client ID)</label><input type="text" id="m365-cid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+      <div class="field"><label>Id. de directorio (Tenant)</label><input type="text" id="m365-ten" placeholder="organizations o el GUID del inquilino"></div>
+    </div>
+    <div class="field"><label>Excel online · Plan de vacaciones</label><input type="text" id="m365-lvac"></div>
+    <div class="field"><label>Excel online · Control de eventuales</label><input type="text" id="m365-lant"></div>
+    <label class="chk" style="margin-bottom:14px"><input type="checkbox" id="m365-auto"> Sincronizar solo al abrir el panel y cada 15 minutos</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="m365-connect">Guardar y conectar</button>
+      <button class="btn ghost" id="m365-save">Solo guardar</button>
+      <button class="btn danger" id="m365-logout">Cerrar sesión</button>
+    </div>
+  </div>
+</div></div>
+<div id="repdlg"><div class="repbox">
+  <div class="card-h"><h3><span class="dot"></span><span id="rep-title">Informe</span></h3>
+    <button class="btn primary sm" id="rep-print"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>Imprimir / Guardar PDF</button>
+    <button class="btn ghost sm" id="rep-html">Descargar HTML</button>
+    <button class="btn ghost sm" id="rep-close">Cerrar</button></div>
+  <iframe id="rep-frame" title="Vista previa del informe"></iframe>
+</div></div>
+<div id="ro-dlg"><div class="dlg" style="max-width:560px">
+  <div class="card-h"><h3><span class="dot"></span><span id="ro-dlg-t"></span></h3><button class="btn ghost sm" id="ro-dlg-close">Cerrar</button></div>
+  <div class="card-b"><p class="dlg-p" id="ro-dlg-s"></p><div class="ro-dlg-f" id="ro-dlg-f"></div>
+    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary" id="ro-dlg-save">Guardar talles</button><button class="btn danger sm" id="ro-dlg-clear">Borrar talles</button></div></div>
+</div></div>
+<datalist id="ro-dl-let"><option>XS<option>S<option>M<option>L<option>XL<option>XXL<option>XXXL<option>4XL</datalist>
+<datalist id="ro-dl-num"><option>38<option>39<option>40<option>41<option>42<option>43<option>44<option>45<option>46<option>48<option>50<option>52<option>54<option>56</datalist>
+<div id="intro"></div>
+<div id="lock"><canvas id="lk-cv"></canvas>
+  <div class="lk-in">
+    <img class="lk-logo" alt="">
+    <div class="lk-time" id="lk-time">--:--</div>
+    <div class="lk-date" id="lk-date"></div>
+    <div class="lk-why" id="lk-why">Modo reposo</div>
+    <form id="lk-form" autocomplete="off">
+      <div class="lk-user"><span>A</span><div><b>Ariel</b><em>Panel de trabajo RRHH · I.Casanova</em></div></div>
+      <div class="lk-row"><input type="password" id="lk-pass" placeholder="Contraseña" autocomplete="current-password"><button class="btn primary" type="submit">Entrar →</button></div>
+      <div class="lk-err" id="lk-err"></div>
+    </form>
+    <div class="lk-hint">Tocá cualquier tecla o hacé clic para desbloquear</div>
+  </div>
+</div>
+<div id="welcome"></div>
+<div id="tip"></div>
+<div id="toast"></div>
+<input type="file" id="fileDB" accept=".json" hidden>
+
+<script>
+/*@@JS_ISIDRO@@*/
+</script>
+<script>
+/*@@JS_F3@@*/
+</script>
+<script>
+/*@@JS_APP@@*/
+</script>
+</body>
+</html>
