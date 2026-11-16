@@ -191,63 +191,73 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
 
 <section class="view" id="v-francos">
   <div class="vhead"><div><div class="eyebrow">Módulo 06 · Gestión diaria</div><h2>Francos</h2>
-    <p>Los eventuales salen de la lista de eventuales. Con los movimientos del reloj, el panel calcula cuántos francos le faltan tomar a cada uno para cerrar el período de liquidación sin pasar las jornadas del objetivo. Los coordinadores asignan los francos acá mismo o con la planilla.</p></div></div>
-  <div class="updbar" id="upd-fr"></div>
-  <div class="fr-liq" id="fr-liq"></div>
-  <div class="cx-steps">
-    <div class="cx-step" id="fr-drop">
-      <div class="cx-n">1</div>
-      <div class="cx-sb"><h4>Eventuales y plan</h4><p>Salen de la <b>lista de eventuales</b>. El plan de francos (hoja <b>Unificado</b>, 1 = jornada · 0 = franco) es opcional.</p>
-        <div class="cx-st" id="fr-st-plan"></div>
-        <button class="btn ghost sm" id="fr-pick">Cargar plan…</button><input type="file" id="fr-file" accept=".xlsx,.xls,.csv" multiple hidden></div>
-    </div>
-    <div class="cx-step" id="fr-mdrop">
-      <div class="cx-n">2</div>
-      <div class="cx-sb"><h4>Movimientos del reloj</h4><p>Export <b>Movimientos</b> (fichadas por día). Se puede actualizar todos los días.</p>
-        <div class="cx-st" id="fr-st-mov"></div>
-        <button class="btn primary sm" id="fr-cx-pick">Cargar movimientos…</button><input type="file" id="fr-mfile" accept=".xlsx,.xls" hidden></div>
-    </div>
-    <div class="cx-step cx-out">
-      <div class="cx-n">3</div>
-      <div class="cx-sb"><h4>Informe</h4><p>Francos que le faltan tomar a cada empleado.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary sm" id="fr-cx-rep">Informe por empleado</button><button class="btn ghost sm" id="fr-cx-xls">Excel</button></div>
-        <div class="cx-cfg"><label>Objetivo <input type="number" id="fr-cx-obj" min="1" max="31" step="1"> jornadas</label><label class="switch"><input type="checkbox" id="fr-cx-art"> ART computa</label></div></div>
-    </div>
-  </div>
-  <div class="kpis" id="fr-cx-kpis"></div>
-  <div class="card">
-    <div class="card-h"><h3>Empleados · fichadas y francos restantes</h3><span class="meta" id="fr-cx-m"></span></div>
-    <div class="card-b">
-      <div class="filters">
-        <div class="field" style="min-width:200px;flex:1"><label>Buscar</label><input type="text" id="fr-q" placeholder="apellido o legajo"></div>
-        <div class="field"><label>Turno</label><div class="msel" id="fr-mt"></div></div>
-        <div class="field"><label>Sector</label><div class="msel" id="fr-ms"></div></div>
-        <div class="field"><label>Mostrar</label><select id="fr-cx-f"><option value="all">Todos</option><option value="pend">Con francos restantes</option><option value="falt">No llegan al objetivo</option><option value="sup">Superaron el objetivo</option><option value="sinmv">Sin fichadas / no cruzados</option></select></div>
-        <div class="cx-coord"><button class="btn primary sm" id="fr-coord" title="Un listado imprimible por cada sector elegido, con los días que quedan para que el coordinador marque los francos">Imprimir listado para coordinador</button><button class="btn ghost sm" id="fr-coord-x" title="Excel para que el coordinador escriba F en los días de franco y lo devuelva por correo">Descargar Excel para completar</button><button class="btn ghost sm" id="fr-asig-pick" title="Cargar el Excel que devolvió el coordinador: actualiza el plan de francos">Cargar Excel completado</button><input type="file" id="fr-afile" accept=".xlsx" multiple hidden><div class="fr-sel-n" id="fr-sel-n"></div></div>
+    <p>Elegí tu sector y turno, tocá los días para marcar francos y descargá el listado. Los eventuales salen solos de la sección Eventuales.</p></div></div>
+  <div class="fr-hero" id="fr-liq"></div>
+  <div class="card fr-plan">
+    <div class="fr-bar">
+      <div class="fr-chips"><span class="fr-chl">Sector</span><div id="fr-ch-s"></div></div>
+      <div class="fr-chips"><span class="fr-chl">Turno</span><div id="fr-ch-t"></div></div>
+      <div class="fr-bar2">
+        <input type="search" id="fr-q" placeholder="Buscar apellido o legajo" class="fr-search">
+        <div class="fr-dl"><button class="btn primary" id="fr-dl-x">⬇ Descargar francos asignados</button><button class="btn ghost" id="fr-dl-p">Imprimir</button></div>
       </div>
     </div>
-    <div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="fr-cx"></table></div></div>
+    <div class="fr-ley" id="fr-cx-ley"></div>
+    <div class="tscroll fr-scroll"><table id="fr-grid" class="fr-grid"></table></div>
+    <div class="fr-foot" id="fr-n"></div>
   </div>
-  <div class="card" id="fr-emp-card" hidden>
-    <div class="card-h"><h3 id="fr-emp-h">Empleado</h3><button class="btn ghost sm" id="fr-emp-x">Cerrar</button></div>
-    <div class="card-b" id="fr-emp"></div>
-  </div>
-  <div class="card">
-    <div class="card-h"><h3>Calendario día por día</h3><span class="meta" id="fr-n"></span></div>
-    <div class="card-b">
-      <div class="filters">
-        <div class="field" style="min-width:auto"><label>Día</label><div style="display:flex;gap:6px"><button class="btn ghost sm" id="fr-prev">‹</button><input type="date" id="fr-date" style="width:160px"><button class="btn ghost sm" id="fr-next">›</button><button class="btn ghost sm" id="fr-hoy">Hoy</button></div></div>
-        <button class="btn ghost sm" id="fr-csv">CSV del día</button>
-        <button class="btn danger sm" id="fr-del">Borrar datos de francos</button>
+
+  <details class="card fr-rrhh" id="fr-rrhh">
+    <summary><b>Control de RRHH</b><span>Fichadas del reloj, francos que faltan tomar, informes y planillas</span></summary>
+    <div class="fr-rrhh-b">
+      <div class="updbar" id="upd-fr"></div>
+      <div class="cx-steps">
+        <div class="cx-step" id="fr-mdrop">
+          <div class="cx-n">1</div>
+          <div class="cx-sb"><h4>Movimientos del reloj</h4><p>Export <b>Movimientos</b> (fichadas por día). Con esto el panel calcula los francos que faltan tomar.</p>
+            <div class="cx-st" id="fr-st-mov"></div>
+            <button class="btn primary sm" id="fr-cx-pick">Cargar movimientos…</button><input type="file" id="fr-mfile" accept=".xlsx,.xls" hidden></div>
+        </div>
+        <div class="cx-step cx-out">
+          <div class="cx-n">2</div>
+          <div class="cx-sb"><h4>Informe</h4><p>Francos que le faltan tomar a cada empleado.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary sm" id="fr-cx-rep">Informe por empleado</button><button class="btn ghost sm" id="fr-cx-xls">Excel</button></div>
+            <div class="cx-cfg"><label>Objetivo <input type="number" id="fr-cx-obj" min="1" max="31" step="1"> jornadas</label><label class="switch"><input type="checkbox" id="fr-cx-art"> ART computa</label></div></div>
+        </div>
+        <div class="cx-step" id="fr-drop">
+          <div class="cx-n">3</div>
+          <div class="cx-sb"><h4>Planilla externa (opcional)</h4><p>Solo si se planificó afuera: plan de francos (hoja <b>Unificado</b>) o el Excel que completó un coordinador.</p>
+            <div class="cx-st" id="fr-st-plan"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" id="fr-pick">Cargar plan…</button><input type="file" id="fr-file" accept=".xlsx,.xls,.csv" multiple hidden>
+            <button class="btn ghost sm" id="fr-coord-x">Excel para completar</button><button class="btn ghost sm" id="fr-asig-pick">Cargar Excel completado</button><input type="file" id="fr-afile" accept=".xlsx" multiple hidden></div></div>
+        </div>
       </div>
-      <div class="cx-ley" id="fr-cx-ley"></div>
+      <div class="kpis" id="fr-cx-kpis"></div>
+      <div class="card">
+        <div class="card-h"><h3>Empleados · fichadas y francos restantes</h3><span class="meta" id="fr-cx-m"></span></div>
+        <div class="card-b">
+          <div class="filters">
+            <div class="field"><label>Turno</label><div class="msel" id="fr-mt"></div></div>
+            <div class="field"><label>Sector</label><div class="msel" id="fr-ms"></div></div>
+            <div class="field"><label>Mostrar</label><select id="fr-cx-f"><option value="all">Todos</option><option value="pend">Con francos restantes</option><option value="falt">No llegan al objetivo</option><option value="sup">Superaron el objetivo</option><option value="sinmv">Sin fichadas / no cruzados</option></select></div>
+            <div class="cx-coord"><button class="btn ghost sm" id="fr-coord">Imprimir listado para coordinador</button><div class="fr-sel-n" id="fr-sel-n"></div></div>
+          </div>
+        </div>
+        <div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="fr-cx"></table></div></div>
+      </div>
+      <div class="card" id="fr-emp-card" hidden>
+        <div class="card-h"><h3 id="fr-emp-h">Empleado</h3><button class="btn ghost sm" id="fr-emp-x">Cerrar</button></div>
+        <div class="card-b" id="fr-emp"></div>
+      </div>
+      <div class="cgrid" style="grid-template-columns:1.5fr 1fr">
+        <div class="card"><div class="card-h"><h3>Francos por día</h3><span class="meta" id="fr-c-m"></span></div><div class="card-b" id="fr-c-days"></div></div>
+        <div class="card"><div class="card-h"><h3 id="fr-list-h">De franco</h3></div><div class="card-b">
+          <div style="display:flex;gap:6px;margin-bottom:10px"><button class="btn ghost sm" id="fr-prev">‹</button><input type="date" id="fr-date" style="width:160px"><button class="btn ghost sm" id="fr-next">›</button><button class="btn ghost sm" id="fr-hoy">Hoy</button><button class="btn ghost sm" id="fr-csv">CSV</button></div>
+          <div class="outlist fr-list" id="fr-list"></div></div></div>
+      </div>
+      <div style="text-align:right;margin-top:12px"><button class="btn danger sm" id="fr-del">Borrar datos de francos</button></div>
     </div>
-    <div class="card-b flush"><div class="tscroll fr-scroll"><table id="fr-grid" class="fr-grid"></table></div></div>
-  </div>
-  <div class="cgrid" style="grid-template-columns:1.5fr 1fr">
-    <div class="card"><div class="card-h"><h3>Francos por día</h3><span class="meta" id="fr-c-m"></span></div><div class="card-b" id="fr-c-days"></div></div>
-    <div class="card"><div class="card-h"><h3 id="fr-list-h">De franco</h3></div><div class="card-b"><div class="outlist fr-list" id="fr-list"></div></div></div>
-  </div>
+  </details>
 </section>
 
 <!-- ==================== INDUMENTARIA ==================== -->

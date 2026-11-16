@@ -416,7 +416,7 @@ function computeAvisos(){
   if(bd.length){ const last=bd[bd.length-1].f, gap=diffD(last,H), lim=dObj(H).getDay()===1?3:1;
     if(gap>lim) A.push({p:'media',m:'aus',t:'Ausentismo · desactualizado',v:`El último día cargado es ${lblDay(last)}`,d:`${gap} días sin reporte del reloj`,go:'v-ausentismo'}); }
   try{
-    for(const k of ['vac','ant','fr']){ const u=updInfo(k), go=k==='vac'?'v-vacaciones':k==='ant'?'v-bajas':'v-francos', nom=k==='vac'?'Plan de vacaciones':k==='ant'?'Control de eventuales':'Francos';
+    for(const k of ['vac','ant']){ const u=updInfo(k), go=k==='vac'?'v-vacaciones':k==='ant'?'v-bajas':'v-francos', nom=k==='vac'?'Plan de vacaciones':k==='ant'?'Control de eventuales':'Francos';
       if(u.st==='none') A.push({p:'media',m:k==='fr'?'rec':k,t:'Actualización · '+nom,v:u.t,d:k==='fr'?'Subí la planilla de francos asignados':'Bajalo de SharePoint y subilo al panel',go});
       else if(u.st==='stale'||u.st==='crit') A.push({p:u.st==='crit'?'alta':'media',m:k==='fr'?'rec':k,t:'Actualización · '+nom,v:u.warn||'Datos desactualizados',d:'Última actualización: '+fmtAt(u.at)+' ('+minsAgo(u.at)+')',go}); }
     for(const k of ['vac','ant']){ const st=M365.state[k]||{}; if(st.st==='err') A.push({p:'alta',m:k,t:'SharePoint · '+SRC[k].nom,v:'No se pudo sincronizar',d:st.msg,go:SRC[k].mod}); }
@@ -1143,7 +1143,7 @@ const FRE = () => {
   const lim=addD(hoy(),-75), by={}; L.forEach(e=>{ if(e.legajo) by[e.legajo]=e; });
   const out=L.slice();
   for(const a of A){
-    if(!a.activo&&!(a.egreso&&a.egreso>=lim)) continue;
+    if(!a.activo) continue;   // solo eventuales ACTIVOS
     ANTOF.set(a.legajo,a);
     const e=by[a.legajo];
     if(e){ if(antOK(a.tarea)) e.sector=normTxt(a.tarea); if(antOK(a.turno)) e.turno=normTxt(a.turno);
@@ -1165,6 +1165,8 @@ const liqNom=ym=>{ const [y,m]=ym.split('-').map(Number); return MESL[m-1][0].to
 const liqMas=(ym,n)=>{ let [y,m]=ym.split('-').map(Number); m+=n; while(m>12){ m-=12; y++; } while(m<1){ m+=12; y--; } return `${y}-${pad(m)}`; };
 // quién cargó cada franco: {legajo: {fecha: {v, by, at}}}
 const frMeta=(e,d)=>{ const fa=DB.francos&&DB.francos.fa, m=fa&&fa[frKey(e)]; return m&&m[d]||null; };
+function frFlt(e){ const q=frState.q.trim().toLowerCase(); return (!frState.turnos.length||frState.turnos.includes(turKey(e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(e.sector)))&&(!q||e.nombre.toLowerCase().includes(q)||String(e.legajo).includes(q)); }
+const frAsig=(e,ds)=>ds.reduce((a,d)=>a+(e.d[d]==='F'&&!(e.ingreso&&d<e.ingreso)&&!(e.egreso&&d>e.egreso)&&dObj(d).getDay()!==0?1:0),0);
 function frCanEdit(){ return !(window.SRV&&SRV.mode==='online')||SRV.user.rol==='admin'||(SRV.user.perms&&SRV.user.perms.francos)==='editar'; }
 const frUser=()=>(window.SRV&&SRV.mode==='online'&&SRV.user&&SRV.user.nombre)||'Este equipo';
 function frDates(){ const s=new Set(); FRE().forEach(e=>Object.keys(e.d).forEach(d=>s.add(d))); return [...s].sort(); }
@@ -1253,8 +1255,8 @@ function frCruce(){
   const cfg=cxCfg(), corte=M?M.d1:'', out=[], dias=[];
   for(let d=P.d0; d<=P.d1; d=addD(d,1)) dias.push(d);
   for(const e of E){
-    const enLista=ANTOF.has(e.legajo)&&(!e.ingreso||e.ingreso<=P.d1)&&(!e.egreso||e.egreso>=P.d0);
-    if(!enLista&&!dias.some(d=>e.d[d]!=null)) continue;
+    // con la lista de eventuales cargada, solo aparecen los ACTIVOS; sin lista, los del plan
+    if(ANTOF.size){ if(!ANTOF.has(e.legajo)) continue; } else if(!dias.some(d=>e.d[d]!=null)) continue;
     const mv=M?M.emps[e.legajo]||null:null, g={T:0,DT:0,FT:0,ENF:0,ART:0,AUS:0,VAC:0,LIC:0,OTRO:0,F:0,DOM:0,FER:0,P:0,PF:0,'-':0}, cal={};
     for(const d of dias){
       const dom=dObj(d).getDay()===0, fer=cxFer(d); let c;
@@ -1277,7 +1279,7 @@ function frCruce(){
   const sinPl=M?Object.entries(M.emps).filter(([k,v])=>!enPl.has(k)&&/jornaliz/i.test(v.c)&&dias.some(d=>v.d[d]==='T')).map(([k,v])=>({legajo:k,nombre:v.n})):[];
   return {P,corte,M,dias,cfg,rows:out,sinPl,by:Object.fromEntries(out.map(r=>[r.e.legajo||r.e.nombre,r]))};
 }
-const CX_LAB={T:'Trabajó',DT:'Domingo trabajado',FT:'Feriado trabajado',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Jornada planificada',PF:'Franco planificado','-':'Fuera de contrato'};
+const CX_LAB={T:'Trabajó',DT:'Domingo trabajado',FT:'Feriado trabajado',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
 const CX_TXT={T:'✓',DT:'D',FT:'Fe',ENF:'E',ART:'A',AUS:'X',VAC:'V',LIC:'L',OTRO:'N',F:'F',DOM:'·',FER:'Fe',P:'·',PF:'F','-':'–'};
 const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',AUS:'#fee2e2',VAC:'#e0f2fe',LIC:'#ede9fe',OTRO:'#f1f5f9',F:'#cffafe',DOM:'#f1f5f9',FER:'#fef3c7',P:'#fff',PF:'#ecfeff','-':'#fff'};
 const cxKey=e=>e.legajo||e.nombre;
@@ -1289,22 +1291,29 @@ function renderFrancos(){
   const F=DB.francos, E=FRE(), C=frCruce(), cfg=cxCfg();
   // pasos de carga
   const P=cxPeriodo(), M=F&&F.mov;
-  { const cur=liqDe(hoy()), opts=[]; for(let i=-4;i<=2;i++) opts.push(liqMas(cur,i)); if(!opts.includes(P.ym)) opts.push(P.ym); opts.sort();
-    $('#fr-liq').innerHTML=`<div class="fr-liq-l"><span class="eyebrow">Período de liquidación</span><select id="fr-liq-s">${opts.map(o=>`<option value="${o}"${o===P.ym?' selected':''}>${liqNom(o)}${o===cur?' · en curso':''}</option>`).join('')}</select></div>
-      <div class="fr-liq-r"><b>${dmy(P.d0)} al ${dmy(P.d1)}</b><span>Corte del 23 al 22 · ${C?C.rows.length+' eventuales en el período':'sin empleados'}${hoy()>=P.d0&&hoy()<=P.d1?` · faltan ${Math.round((dObj(P.d1)-dObj(hoy()))/864e5)} día(s) para el cierre`:hoy()>P.d1?' · cerrado':' · todavía no empezó'}</span></div>`; }
+  { const cur=liqDe(hoy()), rows=C?C.rows:[], asig=rows.reduce((a,r)=>a+frAsig(r.e,C.dias),0), sin=rows.filter(r=>!frAsig(r.e,C.dias)).length,
+      falta=hoy()>=P.d0&&hoy()<=P.d1?Math.round((dObj(P.d1)-dObj(hoy()))/864e5):null;
+    const nA=rows.length;
+    $('#fr-liq').innerHTML=`<div class="fr-hp"><button class="fr-arr" data-liq="-1" title="Período anterior">‹</button>
+      <div class="fr-hn"><span>Liquidación</span><b>${liqNom(P.ym)}</b><em>${dmy(P.d0)} al ${dmy(P.d1)}${P.ym===cur?' · en curso':''}</em></div>
+      <button class="fr-arr" data-liq="1" title="Período siguiente">›</button>${P.ym!==cur?'<button class="btn ghost sm" data-liq="0">Volver al actual</button>':''}</div>
+      <div class="fr-hs"><div><b>${nA}</b><span>eventuales activos</span></div><div><b>${asig}</b><span>francos asignados</span></div><div class="${sin?'w':''}"><b>${sin}</b><span>sin francos</span></div><div><b>${falta==null?(hoy()>P.d1?'—':'·'):falta}</b><span>${falta==null?(hoy()>P.d1?'período cerrado':'no empezó'):'días al cierre'}</span></div></div>`; }
   const nAnt=[...ANTOF.values()].filter(a=>a.activo).length, nBaja=ANTOF.size-nAnt, nPl=F?Object.keys(F.emps||{}).length:0;
   $('#fr-drop').classList.toggle('ok',!!E.length); $('#fr-mdrop').classList.toggle('ok',!!(C&&C.M));
   const LA=F&&F.asig&&F.asig[F.asig.length-1];
-  $('#fr-st-plan').innerHTML=(nAnt?`<b>${nAnt} eventuales activos</b> de la lista de eventuales${nBaja?` · ${nBaja} con baja reciente`:''}${nPl?` · ${nPl} en el plan`:''}`:nPl?`<b>${nPl} empleados</b> en el plan`:'Sin empleados: cargá la lista de eventuales (sección Eventuales) o un plan')+
+  $('#fr-st-plan').innerHTML=(nAnt?`<b>${nAnt} eventuales activos</b> de la lista de eventuales`:nPl?`<b>${nPl} empleados</b> en el plan`:'Sin empleados: cargá la lista de eventuales (sección Eventuales) o un plan')+
     (F&&(F.files||[]).length?`<br>${esc((F.files||[]).slice(-1)[0]||'')} · ${fmtAt(F.at)}`:'')+(LA?`<br>Última asignación cargada: <b>${esc(LA.file)}</b> · ${fmtAt(LA.at)} · ${LA.fr} franco(s)${LA.falt?` · <span class="w">${LA.falt} sin completar</span>`:''}`:'');
   $('#fr-st-mov').innerHTML=M?`<b>Fichadas del ${dmy(M.d0)} al ${dmy(M.d1)}</b><br>${esc(M.file||'')} · ${fmtAt(M.at)}${C&&!C.M?'<br><span class="w">⚠ No corresponde al período del plan</span>':''}${C&&C.M&&M.d1<addD(hoy(),-2)?'<br><span class="w">⚠ Hay días sin cruzar: subí un export más nuevo</span>':''}`:'Sin cargar · sin movimientos se usa solo el plan';
   $('#fr-cx-obj').value=cfg.obj; $('#fr-cx-art').checked=!!cfg.art;
   renderMsel('#fr-mt','turnos','Turno',E.map(e=>turKey(e.turno)));
+  { const base=C?C.rows.map(r=>r.e):E, chip=(key,vals,el)=>{ const cnt={}; vals.forEach(k=>cnt[k]=(cnt[k]||0)+1); const ks=Object.keys(cnt).sort((x,y)=>x.localeCompare(y,'es')), on=frState[key];
+      $(el).innerHTML=`<button type="button" class="fr-ch${on.length?'':' on'}" data-chall="${key}">Todos</button>`+ks.map(k=>`<button type="button" class="fr-ch${on.includes(k)?' on':''}" data-ch="${key}" data-chv="${esc(k)}">${esc(k)} <i>${cnt[k]}</i></button>`).join(''); };
+    chip('sectors',base.map(e=>secKey(e.sector)),'#fr-ch-s'); chip('turnos',base.map(e=>turKey(e.turno)),'#fr-ch-t'); }
   renderMsel('#fr-ms','sectors','Sector',E.map(e=>secKey(e.sector)));
   $('#fr-cx-f').value=cxState.f;
   { const el=$('#fr-sel-n'); if(el) el.innerHTML=frState.sel.length?`<b>${frState.sel.length}</b> elegido(s) · las planillas salen solo con ellos <button type="button" class="btn ghost sm" id="fr-sel-x">Limpiar</button>`:'Elegí eventuales con las casillas, o filtrá por sector: la planilla sale con ellos'; }
   const q=frState.q.trim().toLowerCase();
-  const flt=e=>(!frState.turnos.length||frState.turnos.includes(turKey(e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(e.sector)))&&(!q||e.nombre.toLowerCase().includes(q)||String(e.legajo).includes(q));
+  const flt=frFlt;
   // KPIs
   if(C){ const act=C.rows.filter(r=>!(r.e.egreso&&r.e.egreso<hoy())), pend=act.filter(r=>r.pend>0), sup=act.filter(r=>r.sup), falt=act.filter(r=>r.falt>0), sinmv=C.rows.filter(r=>!r.mv);
     $('#fr-cx-kpis').innerHTML=[
@@ -1341,15 +1350,15 @@ function renderFrancos(){
   const EF=(C?C.rows.map(r=>r.e):E.filter(e=>ds.some(d=>e.d[d]!=null))).filter(flt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const ED=frCanEdit();
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
-      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}<th title="Francos que faltan tomar">Faltan</th></tr></thead><tbody>`+
+      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}<th class="frt" title="Francos asignados en el período">Francos</th>${C&&C.M?'<th class="frt" title="Francos que le faltan tomar según las fichadas">Faltan</th>':''}</tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
       return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\n'+(c==='PF'?'Clic para quitar el franco':'Clic para asignar franco'):''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td style="text-align:center">${r?cxTag(r,cfg):''}</td></tr>`; }).join('')+'</tbody>'
-    :'<tbody><tr><td><div class="empty">Cargá el plan de francos.</div></td></tr></tbody>';
-  $('#fr-n').textContent=EF.length?`${EF.length} empleado(s)${C&&C.M?' · hasta el '+dm(C.corte)+' según fichadas, después según el plan':''}${ED?' · clic en un día para asignar o quitar un franco':''}`:'';
-  $('#fr-cx-ley').innerHTML=['T','F','PF','P','DOM','FER','ENF','ART','AUS','DT'].map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
+        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\n'+(c==='PF'?'Clic para quitar el franco':'Clic para asignar franco'):''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td class="frt"><span class="fr-cnt${frAsig(e,ds)?'':' z'}">${frAsig(e,ds)}</span></td>${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
+    :`<tbody><tr><td><div class="empty">${E.length?'Nadie con ese filtro.':'No hay eventuales: cargá la lista en la sección Eventuales.'}</div></td></tr></tbody>`;
+  $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día para marcar franco</b>; tocalo de nuevo para quitarlo. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
+  $('#fr-cx-ley').innerHTML=(C&&C.M?['PF','P','T','F','DOM','FER','ENF','ART','AUS']:['PF','P','DOM','FER']).map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
   // francos por día + lista del día
   const cnt=ds.map(d=>EF.filter(e=>cxFr(code(e,d))).length);
   $('#fr-c-m').textContent=ds.length?`${dm(ds[0])} al ${dm(ds[ds.length-1])} · clic en una barra para ver el día`:'';
@@ -1613,6 +1622,63 @@ function cxExcel(){
   XLSX.writeFile(wb,`francos_por_empleado_${C.P.d0}_al_${C.P.d1}.xlsx`); App.toast('Excel descargado');
 }
 App.renderFrancos=renderFrancos;
+/* ---------- Listado de francos asignados (por sector y turno) ---------- */
+function frListado(){
+  const C=frCruce(); if(!C) return null;
+  const R=C.rows.filter(r=>frFlt(r.e)), grupos={};
+  R.forEach(r=>{ const k=secKey(r.e.sector)+'\u0001'+turKey(r.e.turno); (grupos[k]||(grupos[k]=[])).push(r); });
+  const G=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,'es')).map(k=>{ const [sec,tur]=k.split('\u0001');
+    const L=grupos[k].sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es')).map(r=>({e:r.e,f:C.dias.filter(d=>r.e.d[d]==='F'&&dObj(d).getDay()!==0&&!(r.e.ingreso&&d<r.e.ingreso)&&!(r.e.egreso&&d>r.e.egreso))}));
+    return {sec,tur,L}; });
+  const filtro=[frState.sectors.length?'Sector: '+frState.sectors.join(', '):'Todos los sectores',frState.turnos.length?'Turno: '+frState.turnos.join(', '):'todos los turnos'].join(' · ');
+  return {C,G,filtro,n:R.length,tot:G.reduce((a,g)=>a+g.L.reduce((b,x)=>b+x.f.length,0),0)};
+}
+const frDiaTxt=d=>DOW[dObj(d).getDay()].slice(0,2)+' '+dm(d);
+async function frListadoXlsx(){
+  const X=frListado(); if(!X||!X.n){ App.toast('No hay eventuales con ese filtro.',true); return; }
+  if(typeof ExcelJS==='undefined'){ App.toast('No cargó la librería de Excel.',true); return; }
+  const {C,G}=X, wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
+  const thin={style:'thin',color:{argb:'FFCBD5E1'}}, B={top:thin,left:thin,bottom:thin,right:thin}, fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
+  const ws=wb.addWorksheet('Francos asignados',{views:[{state:'frozen',ySplit:4}],pageSetup:{orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  ws.columns=[{width:11},{width:36},{width:10},{width:70}];
+  ws.mergeCells('A1:D1'); ws.getCell('A1').value=`FRANCOS ASIGNADOS · ${liqNom(C.P.ym).toUpperCase()}`; ws.getCell('A1').font={bold:true,size:15};
+  ws.mergeCells('A2:D2'); ws.getCell('A2').value=`Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · ${X.filtro} · ${X.n} eventuales · ${X.tot} francos · emitido ${dmy(hoy())}`; ws.getCell('A2').font={color:{argb:'FF475569'}};
+  const h=ws.getRow(4); ['Legajo','Empleado','Francos','Días de franco'].forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill=fill('FF1E293B'); c.border=B; c.alignment={horizontal:j===2?'center':'left'}; });
+  let r=5;
+  for(const g of G){
+    ws.mergeCells(r,1,r,4); const c=ws.getCell(r,1); c.value=`${g.sec} · ${g.tur} · ${g.L.length} eventual(es) · ${g.L.reduce((a,x)=>a+x.f.length,0)} francos`; c.font={bold:true}; c.fill=fill('FFE0F2FE'); r++;
+    for(const x of g.L){ const row=ws.getRow(r++); [x.e.legajo,x.e.nombre,x.f.length,x.f.length?x.f.map(frDiaTxt).join(' · '):'Sin francos asignados'].forEach((v,j)=>{ const cc=row.getCell(j+1); cc.value=v; cc.border=B; cc.alignment={horizontal:j===2?'center':'left',vertical:'top',wrapText:j===3};
+      if(j===3&&!x.f.length) cc.font={color:{argb:'FFB91C1C'},italic:true}; }); }
+    r++; }
+  // calendario: una fila por eventual, una columna por día
+  const wc=wb.addWorksheet('Calendario',{views:[{state:'frozen',xSplit:4,ySplit:2}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  wc.columns=[{width:10},{width:30},{width:14},{width:12}].concat(C.dias.map(()=>({width:4.2})));
+  wc.getCell(1,1).value=`Francos asignados · ${liqNom(C.P.ym)} · ${dmy(C.P.d0)} al ${dmy(C.P.d1)}`; wc.getCell(1,1).font={bold:true,size:13};
+  const hc=wc.getRow(2); ['Legajo','Empleado','Sector','Turno'].concat(C.dias.map(d=>DOW[dObj(d).getDay()].slice(0,2)+'\n'+dObj(d).getDate())).forEach((t,j)=>{ const c=hc.getCell(j+1); c.value=t; c.font={bold:true,size:9}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.border=B; c.fill=fill(j>3&&dObj(C.dias[j-4]).getDay()===0?'FFE2E8F0':'FFF1F5F9'); });
+  hc.height=28; let rr=3;
+  for(const g of G) for(const x of g.L){ const row=wc.getRow(rr++), fs=new Set(x.f);
+    [x.e.legajo,x.e.nombre,g.sec,g.tur].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=v; c.border=B; c.font={size:9.5}; });
+    C.dias.forEach((d,j)=>{ const c=row.getCell(5+j); c.border=B; c.alignment={horizontal:'center'}; if(fs.has(d)){ c.value='F'; c.font={bold:true,color:{argb:'FF0E7490'}}; c.fill=fill('FFCFFAFE'); } else if(dObj(d).getDay()===0) c.fill=fill('FFF1F5F9'); }); }
+  const buf=await wb.xlsx.writeBuffer(), tag=frState.sectors.length===1?frState.sectors[0].replace(/[^A-Z0-9Ñ]+/g,'_'):'todos';
+  download(buf,`francos_asignados_${C.P.ym}_${tag}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  App.toast(`Listado descargado: ${X.n} eventuales · ${X.tot} francos asignados`);
+}
+function frListadoPrint(){
+  const X=frListado(); if(!X||!X.n){ App.toast('No hay eventuales con ese filtro.',true); return; }
+  const {C,G}=X;
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Francos asignados ${esc(liqNom(C.P.ym))}</title><style>
+body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px}h1{font-size:20px;margin:0}p.m{color:#475569;font-size:12px;margin:4px 0 16px}
+.g{break-inside:avoid;margin-bottom:18px}.g h2{font-size:14px;background:#e0f2fe;padding:6px 10px;margin:0;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px solid #e2e8f0;padding:5px 8px;text-align:left;vertical-align:top}th{color:#475569;font-size:11px}
+td.n{text-align:center;width:60px;font-weight:bold}.z{color:#b91c1c;font-style:italic}.firma{margin-top:30px;font-size:12px;color:#334155}
+@media print{body{margin:10mm}button{display:none}}</style></head><body>
+<button onclick="print()" style="float:right;padding:8px 14px">Imprimir / PDF</button>
+<h1>Francos asignados · ${esc(liqNom(C.P.ym))}</h1><p class="m">Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · ${esc(X.filtro)} · ${X.n} eventuales · ${X.tot} francos · emitido ${dmy(hoy())}</p>
+${G.map(g=>`<div class="g"><h2>${esc(g.sec)} · ${esc(g.tur)} · ${g.L.length} eventual(es)</h2><table><tr><th>Legajo</th><th>Empleado</th><th>Francos</th><th>Días de franco</th></tr>
+${g.L.map(x=>`<tr><td>${esc(x.e.legajo)}</td><td>${esc(x.e.nombre)}</td><td class="n">${x.f.length}</td><td${x.f.length?'':' class="z"'}>${x.f.length?x.f.map(frDiaTxt).join(' · '):'Sin francos asignados'}</td></tr>`).join('')}</table></div>`).join('')}
+<div class="firma">Coordinador/a: ______________________________ &nbsp;&nbsp; Firma: ____________________ &nbsp;&nbsp; Fecha: ____/____/______</div></body></html>`;
+  const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else download(html,`francos_asignados_${C.P.ym}.html`,'text/html;charset=utf-8');
+}
 // asignar o quitar un franco desde el calendario
 let frBusy=false;
 async function frToggle(id){
@@ -1630,6 +1696,8 @@ async function frToggle(id){
   finally{ frBusy=false; renderFrancos(); App.refresh(); }
 }
 function hookFrancos(){
+  $('#fr-dl-x').onclick=frListadoXlsx; $('#fr-dl-p').onclick=frListadoPrint;
+  if(window.SRV&&SRV.mode==='online'&&SRV.user.rol!=='admin') $('#fr-rrhh').hidden=true;
   $('#fr-pick').onclick=()=>$('#fr-file').click();
   $('#fr-file').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
   $('#fr-cx-pick').onclick=()=>$('#fr-mfile').click();
@@ -1661,6 +1729,9 @@ function hookFrancos(){
   $('#fr-next').onclick=()=>{ frState.date=addD(frState.date,1); renderFrancos(); };
   document.addEventListener('click',e=>{ if(!e.target.closest('#v-francos')) return;
     const fe=e.target.closest('[data-fe]'); if(fe){ frToggle(fe.dataset.fe); return; }
+    const lq=e.target.closest('[data-liq]'); if(lq){ const n=+lq.dataset.liq; frState.liq=n?liqMas(cxPeriodo().ym,n):liqDe(hoy()); frState.date=''; renderFrancos(); return; }
+    const ca=e.target.closest('[data-chall]'); if(ca){ frState[ca.dataset.chall]=[]; renderFrancos(); return; }
+    const ch=e.target.closest('[data-ch]'); if(ch){ const k=ch.dataset.ch, v=ch.dataset.chv; frState[k]=frState[k].includes(v)?frState[k].filter(x=>x!==v):frState[k].concat(v); renderFrancos(); return; }
     if(e.target.closest('.fr-ck')) return;
     if(e.target.closest('#fr-sel-x')){ frState.sel=[]; renderFrancos(); return; }
     const c=e.target.closest('[data-frd]'); if(c){ frState.date=c.dataset.frd; renderFrancos(); return; }
