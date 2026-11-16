@@ -17,7 +17,7 @@ def perfil(tipo: str) -> dict:
     elif tipo == "coordinador":    # nómina, lista de eventuales, asigna francos, pide vacaciones; vacaciones y cumpleaños solo en pantalla
         p = {"nomina": "ver", "eventuales": "ver", "francos": "editar", "vacsol": "editar", "vacaciones": "consulta", "cumpleanos": "consulta"}
     elif tipo == "lectura":        # ve todas las secciones y descarga informes, sin modificar nada
-        p = {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}
+        p = {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda", "hextras"]}
         return p
     elif tipo == "aylen":          # vacaciones (próximas y en curso) y nómina
         p = {"vacaciones": "ver", "nomina": "ver"}
@@ -55,6 +55,11 @@ MIGRACIONES = [
         *[(u, {"vacaciones": "consulta", "cumpleanos": "consulta"}) for u in COORDINADORES],
         # Joaquín carga vacaciones directo y aprueba pedidos
         ("joliva", {"vacaciones": "editar"}),
+    ]),
+    ("2026-11-16-hextras", [
+        # Horas extras: la ven RRHH (Cynthia, Joaquín), Rubén y Luis
+        ("cbertetti", {"hextras": "ver"}), ("joliva", {"hextras": "ver"}),
+        ("rcampos", {"hextras": "ver"}), ("lmunoz", {"hextras": "ver"}),
     ]),
     ("2026-11-16-rcampos", [
         # Rubén Campos: todas las secciones, solo ver y descargar informes

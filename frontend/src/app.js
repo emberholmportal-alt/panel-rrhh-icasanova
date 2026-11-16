@@ -424,7 +424,7 @@ function computeAvisos(){
     const fm=ferEn(addD(H,1)); if(fm) A.push({p:'media',m:'rec',t:'Feriado · mañana',v:fm.n,d:'Revisá dotación, francos y liquidación de horas',go:'v-agenda'});
   }catch(e){}
   // --- fichada propia
-  try{ const fs=fichState();
+  if(fichOn()) try{ const fs=fichState();
     if(fs.prev) A.push({p:'alta',m:'rec',t:'Mi fichada · salida pendiente',v:`El ${lblDay(fs.prev)} no marcaste la salida`,d:'Confirmá si la fichaste o informalo',go:'h-fich'});
     if(fs.needIn) A.push({p:'alta',m:'rec',t:'Mi fichada · entrada',v:'¿Fichaste la entrada de hoy?',d:'Tildalo en Inicio apenas pases por el reloj',go:'h-fich'});
     else if(fs.needOut) A.push({p:fs.tarde?'alta':'media',m:'rec',t:'Mi fichada · salida',v:fs.tarde?'¡Acordate de fichar la salida!':'Falta fichar la salida de hoy',d:`Entrada marcada a las ${fs.f.in}`,go:'h-fich'});
@@ -1884,6 +1884,8 @@ function renderTicker(){
    MI FICHADA — recordatorio de entrada y salida
    ================================================================ */
 const FICH = () => (DB.fich||(DB.fich={}));
+// el recordatorio de fichada es solo para Ariel (el resto del panel no ficha); en "ver como" tampoco aparece
+const fichOn = () => !(window.SRV&&SRV.mode==='online') || (!!SRV.user&&SRV.user.username==='ariel'&&!SRV.imp);
 const hhmmNow = () => { const d=new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 function fichPendSalida(){ // último día anterior con entrada y sin salida (últimos 7 días)
   const H=hoy();
@@ -1896,6 +1898,7 @@ function fichState(){
 }
 function renderFich(){
   const el=$('#h-fich'); if(!el) return;
+  if(!fichOn()){ el.style.display='none'; el.innerHTML=''; return; } el.style.display='';
   const s=fichState(), f=s.f, H=s.H;
   let cls='ok';
   if(s.prev||s.needIn) cls='crit'; else if(s.needOut) cls=s.tarde?'warn':'info';
@@ -1931,6 +1934,7 @@ document.addEventListener('click',async e=>{
 // recordatorio sonoro una vez por bloque: al abrir si falta la entrada, y a partir de las 15 si falta la salida
 let fichBeep={};
 function fichNudge(){
+  if(!fichOn()) return;
   const s=fichState(), k=s.H+(s.needIn?'in':s.needOut&&s.tarde?'out':s.prev?'prev':'');
   if(k===s.H||fichBeep[k]) return; fichBeep[k]=1;
   SND.play('notify');
@@ -2297,7 +2301,7 @@ function welcome(){
   try{ if(DB.cumple&&typeof cuRows==='function'){ const R=cuRows(+H.slice(5,7)).filter(r=>r.fecha>=H&&r.fecha<=addD(H,7)), hoyC=R.filter(r=>r.fecha===H);
     if(R.length) cards.push(`<div class="wl-c"><i>🎂</i><b>${hoyC.length?'Cumple hoy':'Cumpleaños'}</b><span>${hoyC.length?hoyC.slice(0,3).map(r=>esc(shortName(r.nombre))).join(', '):`${R.length} esta semana`}</span></div>`); } }catch(e){}
   // lo de cada uno
-  try{ if(adm){ const fs=fichState(); if(fs.needIn) items.push('⏱ Todavía no marcaste la entrada'); else if(fs.needOut&&fs.tarde) items.push('🚪 Acordate de fichar la salida');
+  try{ if(adm&&fichOn()){ const fs=fichState(); if(fs.needIn) items.push('⏱ Todavía no marcaste la entrada'); else if(fs.needOut&&fs.tarde) items.push('🚪 Acordate de fichar la salida');
       const alta=computeAvisos().filter(a=>a.p==='alta').length; items.push(alta?`<b>${alta}</b> tema(s) urgente(s) para hoy`:'Nada urgente pendiente');
       const ev=Object.values(computeRange(H,H,{francos:true})[H]||{}).filter(x=>x.f!=='fr').reduce((a,x)=>a+x.names.length,0); if(ev) items.push(`<b>${ev}</b> evento(s) en la agenda de hoy`); } }catch(e){}
   try{ if(typeof VS!=='undefined'&&VS.ok){ const pend=VS.items.filter(x=>x.estado==='pendiente');

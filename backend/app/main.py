@@ -271,6 +271,8 @@ def doc_out(d: Doc) -> dict:
 def readable(u: User, key: str) -> bool:
     if key == "eventuales" and can_read(u, "francos"):
         return True        # Francos arma su lista con los eventuales activos
+    if key in ("ausentismo", "nomina") and can_read(u, "hextras"):
+        return True        # Horas extras se calcula con las fichadas y la nómina
     return key == "otros" or can_read(u, key)
 
 

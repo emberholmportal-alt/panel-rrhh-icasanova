@@ -31,6 +31,7 @@ MODULES = {
     "menu": "Menú semanal",
     "vacsol": "Solicitudes de vacaciones",
     "agenda": "Agenda y recordatorios",
+    "hextras": "Horas extras",
 }
 # módulos que todos ven aunque no tengan permiso asignado
 DEFAULT_LEVEL = {"menu": "ver"}

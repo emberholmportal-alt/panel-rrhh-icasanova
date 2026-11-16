@@ -40,6 +40,7 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <button class="nav-item mod on" data-v="v-home"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Inicio<span class="nb" id="nb-home"></span></button>
     <button class="nav-item mod" data-v="v-agenda"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/></svg>Agenda<span class="nb" id="nb-ag"></span></button>
     <div class="nav-lab">Gestión diaria</div>
+    <button class="nav-item mod" data-v="v-hextras"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M17 3l3 3M7 3L4 6"/></svg>Horas extras</button>
     <button class="nav-item mod" data-v="v-ausentismo"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>Ausentismo<span class="nb" id="nb-aus"></span></button>
     <button class="nav-item mod" data-v="v-vacaciones"><svg viewBox="0 0 24 24"><circle cx="17" cy="6" r="3"/><path d="M2 20c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M7 17V8M7 8c-3 0-4 2-4 2M7 8c3 0 4 2 4 2M7 8c-1-3 1-4 1-4"/></svg>Vacaciones<span class="nb" id="nb-vac"></span><span class="nb nb-sol" id="nb-vacsol" title="Pedidos de vacaciones pendientes" style="display:none"></span></button>
     <button class="nav-item mod" data-v="v-bajas"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.5-3.5 3.2-5.5 6.5-5.5s6 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.8.8 2.8 2.6 3 5.2"/></svg>Eventuales<span class="nb" id="nb-ant"></span></button>
@@ -189,6 +190,42 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
   </div>
   <div class="card"><div class="card-h"><h3>Sector × turno</h3></div><div class="card-b flush"><div class="tscroll"><table id="nm-mx" class="nm-t"></table></div></div></div>
   <div class="card"><div class="card-h"><h3>Detalle</h3><span class="meta" id="nm-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:520px"><table id="nm-det"></table></div></div></div>
+</section>
+
+<section class="view" id="v-hextras">
+  <div class="vhead"><div><div class="eyebrow">Módulo · Liquidación</div><h2>Horas extras</h2>
+    <p>Calculadas con las fichadas del reloj (Ausentismo): de la primera a la última fichada, lo que supera la jornada. Mínimo 1 h y bloques de media hora.
+      Al 50%: hábiles y sábado hasta las 13 h · al 100%: sábado desde las 13 h, domingos, feriados y francos en esos días.</p></div>
+    <div style="display:flex;gap:8px;align-self:flex-end;flex-wrap:wrap"><button class="btn primary" id="hx-xls">Descargar Excel</button></div></div>
+  <div class="card"><div class="card-b"><div class="filters">
+    <div class="field"><label>Liquidación</label><select id="hx-mes"></select></div>
+    <div class="field" style="min-width:160px;flex:1"><label>Buscar</label><input type="text" id="hx-q" placeholder="apellido o legajo"></div>
+    <div class="field"><label>Sector</label><select id="hx-sec"></select></div>
+    <div class="field"><label>Turno</label><select id="hx-tur"></select></div>
+    <div class="field"><label>Tipo</label><select id="hx-tip"></select></div>
+  </div><div class="hx-cortes" id="hx-cortes"></div></div></div>
+  <div class="hx-falt" id="hx-falt"></div>
+  <div class="kpis" id="hx-kpis"></div>
+  <div class="tabs"><button class="tab on" data-hxt="corte">Resumen del corte</button><button class="tab" data-hxt="dia">Por día</button><button class="tab" data-hxt="jor">Jornadas</button></div>
+  <div id="hx-p-corte">
+    <div class="cgrid" style="grid-template-columns:1fr 1fr">
+      <div class="card"><div class="card-h"><h3>Por sector</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:420px"><table id="hx-sec-t" class="nm-t"></table></div></div></div>
+      <div class="card"><div class="card-h"><h3>Por turno</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:420px"><table id="hx-tur-t" class="nm-t"></table></div></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Por persona</h3><span class="meta" id="hx-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:620px"><table id="hx-per" class="hx-per"></table></div></div></div>
+  </div>
+  <div id="hx-p-dia" style="display:none">
+    <div class="card"><div class="card-b"><div class="filters"><div class="field"><label>Día</label><select id="hx-dia"></select></div></div></div></div>
+    <div class="cgrid" style="grid-template-columns:1fr 1fr">
+      <div class="card"><div class="card-h"><h3>Por sector</h3></div><div class="card-b flush"><div class="tscroll"><table id="hx-dsec" class="nm-t"></table></div></div></div>
+      <div class="card"><div class="card-h"><h3>Por turno</h3></div><div class="card-b flush"><div class="tscroll"><table id="hx-dtur" class="nm-t"></table></div></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Detalle del día</h3><span class="meta" id="hx-dn"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:620px"><table id="hx-dlist"></table></div></div></div>
+  </div>
+  <div id="hx-p-jor" style="display:none">
+    <div class="card"><div class="card-h"><h3>Duración de cada jornada</h3><span class="meta">las horas extras empiezan a contar después de esta duración</span></div>
+      <div class="card-b flush"><div class="tscroll" style="max-height:620px"><table id="hx-jor"></table></div></div></div>
+  </div>
 </section>
 
 <section class="view" id="v-francos">

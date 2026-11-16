@@ -60,3 +60,13 @@ body.srv-imp{padding-top:40px}
 .vc-l button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:9px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:rgba(255,255,255,.03);color:inherit;cursor:pointer;font:inherit}
 .vc-l button:hover{border-color:var(--acc);background:rgba(34,211,238,.08)}
 .vc-l span{color:#94a3b8;font-size:12px}
+/* horas extras */
+.hx-cortes{margin-top:10px;font-size:13px;color:var(--text2)}
+.hx-falt{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);font-size:13px}
+.hx-per tbody tr[data-hxp]{cursor:pointer}
+.hx-per tbody tr[data-hxp]:hover td{background:rgba(34,211,238,.06)}
+.hx-det>td{background:rgba(255,255,255,.02);padding:8px 14px 14px!important}
+.hx-mini{width:100%;font-size:12.5px}
+.hx-mini th,.hx-mini td{padding:4px 8px}
+.hx-dur{width:80px;padding:4px 8px}
+#v-hextras .tabs{margin:4px 0 14px}

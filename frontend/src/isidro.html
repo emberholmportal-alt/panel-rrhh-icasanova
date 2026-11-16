@@ -279,6 +279,7 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <button class="tab on" data-p="p-tarde">Llegadas tarde <span class="badge" id="bTarde">0</span></button>
     <button class="tab" data-p="p-rank">Reincidencias <span class="badge" id="bRank">0</span></button>
     <button class="tab" data-p="p-pedidos">Pedidos de explicación <span class="badge" id="bPed">0</span></button>
+    <button class="tab" data-p="p-pres">Presentes</button>
     <button class="tab" data-p="p-sinf">Sin fichada <span class="badge" id="bSinf">0</span></button>
     <button class="tab" data-p="p-turnos">Turnos <span class="badge" id="bTurnos">0</span></button>
     <button class="tab" data-p="p-plantilla">Plantilla</button>
@@ -377,6 +378,22 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
         <div class="tscroll" style="max-height:300px"><table id="tPeople"></table></div>
       </div>
     </div>
+  </div>
+
+  <!-- ============ PRESENTES DEL DÍA ============ -->
+  <div class="panel" id="p-pres">
+    <div class="card"><div class="card-b"><div class="filters">
+      <div class="field"><label>Día</label><select id="pr-dia"></select></div>
+      <div class="field"><label>Ver</label><select id="pr-modo"><option value="pres">Presentes</option><option value="todo">Presentes, ausentes y novedades</option></select></div>
+      <div class="field" style="align-self:flex-end"><button class="btn ghost sm" id="pr-xls">Descargar Excel</button></div>
+    </div></div></div>
+    <div class="kpis" id="pr-kpis"></div>
+    <div class="cgrid" style="grid-template-columns:1fr 1fr">
+      <div class="card"><div class="card-h"><h3>Por sector</h3></div><div class="card-b flush"><div class="tscroll"><table id="pr-sec" class="nm-t"></table></div></div></div>
+      <div class="card"><div class="card-h"><h3>Por turno</h3></div><div class="card-b flush"><div class="tscroll"><table id="pr-tur" class="nm-t"></table></div></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Sector × turno (presentes)</h3></div><div class="card-b flush"><div class="tscroll"><table id="pr-mx" class="nm-t"></table></div></div></div>
+    <div class="card"><div class="card-h"><h3>Detalle</h3><span class="meta" id="pr-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:520px"><table id="pr-det"></table></div></div></div>
   </div>
 
   <!-- ============ SIN FICHADA ============ -->

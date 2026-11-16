@@ -102,7 +102,7 @@ const SRVX=(()=>{
   S.api=api;
   // nota para el registro de cambios: se manda junto con el próximo guardado de ese módulo
   S.notas={}; S.nota=(m,t)=>{ (S.notas[m]||(S.notas[m]=[])).push(t); };
-  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
+  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos','v-hextras':'hextras'};
   const lvl0=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
   // solicitudes de vacaciones: las ven quienes las cargan y quienes ven o aprueban Vacaciones
   const lvl=m=>m==='vacsol'?(lvl0('vacsol')||(lvl0('vacaciones')?'ver':'')):lvl0(m);
