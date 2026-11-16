@@ -86,7 +86,7 @@ def set_session(resp: Response, u: User, imp: User | None = None):
 
 
 # con "ver como" solo se puede leer; estas son las únicas acciones permitidas
-IMP_PERMITIDO = {"/api/ver-como/salir", "/api/auth/logout"}
+IMP_PERMITIDO = {"/api/ver-como/salir", "/api/auth/logout", "/api/auth/verify"}
 
 
 def clear_session(resp: Response):

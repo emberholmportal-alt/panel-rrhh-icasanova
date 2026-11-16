@@ -2249,13 +2249,14 @@ LK_EV.forEach(ev=>addEventListener(ev,()=>{ if(!locked) lastAct=Date.now(); },{p
 setInterval(()=>{ if(!locked&&LK.on&&Date.now()-lastAct>LK.min*60e3) lockNow('inactividad'); },5000);
 
 function lockNow(why){
-  if(locked) return; locked=true;
+  if(locked) return;
+  if(window.SRV&&SRV.mode&&SRV.mode!=='online') return;   // sin sesión iniciada no hay nada que bloquear: manda el login locked=true;
   try{ sessionStorage.setItem(LKK,'1'); }catch(e){}
   closeIntro(); $('#m365dlg').classList.remove('on'); $('#modal').classList.remove('on');
   const L=$('#lock');
   L.querySelector('.lk-logo').src=($('.brand img')||{}).src||'';
   $('#lk-why').textContent= why==='inactividad'?`Bloqueado por ${LK.min} min sin actividad`:why==='inicio'?'Panel protegido':'Modo reposo';
-  if(lkOnline()){ const n=SRV.user.nombre||SRV.user.username||''; const pila=(n.split(',')[1]||n).trim().split(' ')[0]||n;
+  if(lkOnline()){ const n=(SRV.imp&&SRV.imp.nombre)||SRV.user.nombre||SRV.user.username||''; const pila=(n.split(',')[1]||n).trim().split(' ')[0]||n;
     L.querySelector('.lk-user span').textContent=(pila[0]||'?').toUpperCase(); L.querySelector('.lk-user b').textContent=pila;
     $('#lk-pass').placeholder='Tu contraseña del panel'; }
   $('#lk-pass').value=''; $('#lk-err').textContent=''; L.classList.remove('ask');

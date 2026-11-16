@@ -194,8 +194,10 @@ class VerifyIn(BaseModel):
 
 
 @app.post("/api/auth/verify")
-def verify_password(body: VerifyIn, u: User = Depends(current_user)):
-    """Desbloqueo de la pantalla en reposo: confirma la contraseña del usuario que ya tiene la sesión abierta."""
+def verify_password(body: VerifyIn, request: Request, u: User = Depends(current_user)):
+    """Desbloqueo de la pantalla en reposo: confirma la contraseña del usuario que ya tiene la sesión abierta.
+    En "ver como" la persona frente a la pantalla es el administrador: se pide SU contraseña."""
+    u = getattr(request.state, "imp", None) or u
     key = f"lock|{u.username}"
     if auth.login_blocked(key):
         raise HTTPException(429, "Demasiados intentos. Esperá 15 minutos o cerrá sesión y volvé a entrar.")
