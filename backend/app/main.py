@@ -535,7 +535,7 @@ def create_user(body: UserIn, a: User = Depends(require_admin), db: Session = De
         raise HTTPException(400, "Ese usuario ya existe")
     if not (body.nombre or "").strip():
         raise HTTPException(400, "Falta el nombre")
-    pw = auth.temp_password()
+    pw = auth.temp_password(body.nombre)
     u = User(username=username, nombre=body.nombre.strip(), rol="admin" if body.rol == "admin" else "usuario",
              perms=clean_perms(body.perms) if body.perms is not None else dict(DEFAULT_PERMS),
              pass_hash=auth.hash_pw(pw), must_change=True)
@@ -573,7 +573,7 @@ def reset_user(uid: int, a: User = Depends(require_admin), db: Session = Depends
     u = db.get(User, uid)
     if not u:
         raise HTTPException(404, "No existe el usuario")
-    pw = auth.temp_password()
+    pw = auth.temp_password(u.nombre)
     u.pass_hash = auth.hash_pw(pw)
     u.must_change = True
     u.token_ver += 1

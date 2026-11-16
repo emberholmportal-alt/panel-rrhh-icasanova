@@ -49,10 +49,16 @@ def check_pw(pw: str, h: str) -> bool:
         return False
 
 
-def temp_password() -> str:
-    # 10 caracteres fáciles de dictar (sin 0/O, 1/l)
-    abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
-    return "".join(secrets.choice(abc) for _ in range(10))
+def temp_password(nombre: str = "") -> str:
+    """Clave temporal fácil de dictar: apellido en minúsculas + año (ej. chaparro26).
+    Es de un solo uso: al ingresar, el panel obliga a elegir una propia."""
+    import unicodedata
+    from datetime import datetime, timedelta, timezone
+    ap = (nombre or "").split(",")[0]          # apellido completo (antes de la coma), sin espacios
+    ap = "".join(c for c in unicodedata.normalize("NFD", ap.lower()) if c.isalpha() and c.isascii())
+    if len(ap) < 3:
+        ap = "gestion"
+    return f"{ap}{datetime.now(timezone(timedelta(hours=-3))).year % 100:02d}"
 
 
 def pw_ok(pw: str) -> str | None:

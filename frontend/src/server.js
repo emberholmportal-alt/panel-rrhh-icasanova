@@ -198,7 +198,7 @@ const SRVX=(()=>{
   setInterval(poll,30000); setTimeout(poll,4000);
 
   /* ---------------- administración de usuarios (Configuración) ---------------- */
-  let USR=[], MODS=S.modules||{};
+  let USR=[], MODS=S.modules||{}, usSel=null;   // usSel: fila marcada en la tabla de usuarios
   const LV={'':'—','consulta':'Consultar','ver':'Ver','editar':'Editar'};
   async function loadUsers(){ const r=await api('GET','/api/users'); USR=r.users; MODS=r.modules; }
   function renderAdmin(){
@@ -209,7 +209,7 @@ const SRVX=(()=>{
     const form=card&&card.querySelector('.filters'); if(form) form.style.display=isAdm?'':'none';
     if(!isAdm){ box.innerHTML=`<div class="us-row"><b>${esc(U.nombre)}</b><span class="tag">${esc(U.username)}</span><button class="btn ghost sm" data-srv-pass>Cambiar contraseña</button></div>`; return; }
     box.innerHTML=`<div class="tscroll"><table class="us-tab"><thead><tr><th>Usuario</th><th>Rol</th>${Object.entries(MODS).map(([k,v])=>`<th title="${esc(v)}">${esc(v.split(' ')[0])}</th>`).join('')}<th>Estado</th><th></th></tr></thead><tbody>`+
-      USR.map(u=>`<tr data-uid="${u.id}" class="${u.activo?'':'off'}"><td><b>${esc(u.nombre)}</b><div class="us-un">${esc(u.username)}${u.last_login?' · último ingreso '+fmtAt(u.last_login):' · nunca ingresó'}</div></td>
+      USR.map(u=>`<tr data-uid="${u.id}" class="${u.activo?'':'off'}${usSel===u.id?' sel':''}" title="Clic en la fila para marcarla"><td><b>${esc(u.nombre)}</b><div class="us-un">${esc(u.username)}${u.last_login?' · último ingreso '+fmtAt(u.last_login):' · nunca ingresó'}</div></td>
         <td><select data-uf="rol"><option value="usuario"${u.rol==='usuario'?' selected':''}>Usuario</option><option value="admin"${u.rol==='admin'?' selected':''}>Admin</option></select></td>
         ${Object.keys(MODS).map(m=>`<td>${u.rol==='admin'?'<span class="us-all">total</span>':`<select data-up="${m}">${Object.entries(LV).map(([k,v])=>`<option value="${k}"${(u.perms[m]||'')===k?' selected':''}>${v}</option>`).join('')}</select>`}</td>`).join('')}
         <td><label class="switch"><input type="checkbox" data-uf="activo"${u.activo?' checked':''}> ${u.activo?'Activo':'Inactivo'}</label></td>
@@ -237,6 +237,9 @@ const SRVX=(()=>{
     refreshAdmin();
   });
   document.addEventListener('click',async e=>{
+    // marcar una fila de la tabla de usuarios (el nombre queda fijo a la izquierda al moverse por los permisos)
+    const ur=e.target.closest('.us-tab tbody tr'); if(ur&&!e.target.closest('select,button,input,label')){
+      const id=+ur.dataset.uid; usSel=usSel===id?null:id; ur.parentNode.querySelectorAll('tr').forEach(t=>t.classList.toggle('sel',+t.dataset.uid===usSel)); }
     if(e.target.closest('[data-srv-pass]')){ $('#mePill').classList.remove('open'); passScreen(false); return; }
     if(e.target.closest('[data-srv-out]')){ logout(); return; }
     const rs=e.target.closest('[data-ureset]'); if(rs&&isAdm){ const u=USR.find(x=>x.id===+rs.closest('tr').dataset.uid);

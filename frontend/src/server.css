@@ -35,3 +35,13 @@ html.gris .sl-box{background:#fff;border-color:#d6dae1;box-shadow:0 10px 30px rg
 /* solo lectura: no se marca "Notificado" ni se cambia el plus; tampoco se abre ni se sube el Excel de origen */
 .view.ro .vnot,.view.ro .vplus{pointer-events:none;opacity:.55}
 .view.ro .srcbar .acts{display:none!important}
+/* usuarios y permisos: el nombre queda fijo a la izquierda y la fila se puede marcar */
+.us-tab th:first-child,.us-tab td:first-child{position:sticky;left:0;z-index:2;background:var(--solid);box-shadow:inset -1px 0 var(--stroke2),6px 0 10px -6px rgba(0,0,0,.45)}
+.us-tab th:first-child{z-index:3}
+.us-tab tbody tr{cursor:pointer}
+.us-tab tbody tr:hover td{background-color:rgba(34,211,238,.04)}
+.us-tab tbody tr:hover td:first-child{background:var(--solid2)}
+.us-tab tbody tr.sel td{background-color:rgba(34,211,238,.12)}
+.us-tab tbody tr.sel td:first-child{background:var(--solid2);box-shadow:inset 3px 0 var(--acc),inset -1px 0 var(--stroke2),6px 0 10px -6px rgba(0,0,0,.45)}
+.us-tab tbody tr.sel td:first-child b{color:var(--acc)}
+.us-tab tr.off td:first-child{opacity:1}.us-tab tr.off td:first-child>*{opacity:.5}
