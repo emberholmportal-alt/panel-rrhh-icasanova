@@ -74,20 +74,22 @@ function mnPegar(txt){
   App.toast('Tabla pegada: revisala y tocá Guardar');
 }
 /* ---------------- cumpleaños ---------------- */
-const CU_TIPO=sn=>{ const t=normTxt(sn); return /FC|FUERA/.test(t)?'Fuera de convenio':/^GL$|EVENT|JORNAL/.test(t)?'Eventual':/GLD|EFECT/.test(t)?'Efectivo':''; };
+const CU_TIPO=sn=>{ const t=normTxt(sn); return /FC|FUERA/.test(t)?'Fuera de convenio':/^GL$|EVENT|JORNAL/.test(t)?'Eventual':/GLD|EFECT/.test(t)?'Efectivo':/CARREF/.test(t)?'Carrefour':''; };
 let cuState={mes:''};
 async function loadCumple(files){
   const f=files[0]; if(!f) return;
   try{ const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}); const emps={};
     const hojas=wb.SheetNames.filter(sn=>!/consolid|^hoja/i.test(sn)); const usar=hojas.length?hojas:wb.SheetNames;
     for(const sn of usar){ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:false});
-      let hi=-1,H=[]; for(let i=0;i<Math.min(rows.length,10);i++){ H=(rows[i]||[]).map(c=>normTxt(c)); if(H.some(x=>/LEG/.test(x))&&H.some(x=>/NACIM|^FECHA/.test(x))){ hi=i; break; } }
+      let hi=-1,H=[]; for(let i=0;i<Math.min(rows.length,10);i++){ H=(rows[i]||[]).map(c=>normTxt(c)); if(H.some(x=>/LEG|APELLIDO|NOMBRE/.test(x))&&H.some(x=>/NACIM|^FECHA|CUMPLE/.test(x))){ hi=i; break; } }
       if(hi<0) continue;
-      const ix=re=>H.findIndex(x=>re.test(x)), cL=ix(/LEG/), cA=ix(/^APELLIDO$/), cN=ix(/^NOMBRE$/), cAN=ix(/APELLIDO Y NOMBRE|APELLIDO, NOMBRE|NOMBRE Y APELLIDO/), cF=ix(/NACIM/)>=0?ix(/NACIM/):ix(/^FECHA/);
-      for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r||r[cL]==null) continue; const leg=nmLeg(r[cL]), nac=excelDateToISO(r[cF]); if(!leg||!nac) continue;
-        const nombre=cAN>=0&&r[cAN]?String(r[cAN]).trim():[r[cA],r[cN]].filter(Boolean).map(x=>String(x).trim()).join(', ');
-        if(!emps[leg]) emps[leg]={leg,nombre,nac,tipo:CU_TIPO(sn)}; } }
-    const n=Object.keys(emps).length; if(!n) throw new Error('No encontré columnas de legajo y fecha de nacimiento.');
+      const ix=re=>H.findIndex(x=>re.test(x)), cL=ix(/LEG/), cA=ix(/^APELLIDO$/), cN=ix(/^NOMBRE$/), cAN=ix(/APELLIDO Y NOMBRE|APELLIDO, NOMBRE|NOMBRE Y APELLIDO/), cF=ix(/NACIM/)>=0?ix(/NACIM/):ix(/^FECHA|CUMPLE/);
+      // hojas sin legajo (ej. personal de Carrefour): se identifican por apellido y nombre
+      for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const leg=cL>=0&&r[cL]!=null?nmLeg(r[cL]):'', nac=excelDateToISO(r[cF]); if(!nac) continue;
+        const nombre=cAN>=0&&r[cAN]?String(r[cAN]).replace(/\s+/g,' ').trim():[r[cA],r[cN]].filter(Boolean).map(x=>String(x).replace(/\s+/g,' ').trim()).join(', ');
+        if(!leg&&!nombre) continue; const k=leg||('n:'+sinTilde(nombre));
+        if(!emps[k]) emps[k]={leg,nombre,nac,tipo:CU_TIPO(sn)||sn}; } }
+    const n=Object.keys(emps).length; if(!n) throw new Error('No encontré columnas de nombre (o legajo) y fecha de nacimiento.');
     DB.cumple={file:f.name,at:new Date().toISOString(),emps:Object.values(emps)}; await persist(); renderCumple(); App.refresh();
     App.toast(`Cumpleaños cargados: ${n} persona(s)`);
   }catch(e){ App.toast(e.message,true); }
@@ -97,7 +99,7 @@ function cuRows(mes){
   const C=DB.cumple; if(!C) return [];
   const y=+hoy().slice(0,4), nmMap={}; try{ nmRows().forEach(r=>nmMap[sinTilde(r.nombre)]=r); }catch(e){}
   return C.emps.filter(e=>+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
-    return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:y-+e.nac.slice(0,4),sector:x.sector||'',turno:x.turno||''}); })
+    return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:(y-+e.nac.slice(0,4))>=15?y-+e.nac.slice(0,4):null,sector:x.sector||'',turno:x.turno||''}); })
     .sort((a,b)=>a.dia-b.dia||a.nombre.localeCompare(b.nombre,'es'));
 }
 const MESES_N=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -112,14 +114,14 @@ function renderCumple(){
   $('#cu-kpis').innerHTML=[{l:`Cumplen en ${MESES_N[cuState.mes-1].toLowerCase()}`,v:R.length,s:C?'en todo el plantel':'cargá el archivo'},{l:'Hoy',v:hoyN.length,s:hoyN.map(r=>r.nombre.split(',')[0]).join(', ')||'nadie',c:hoyN.length?'acc-ochre':''},{l:'Próximos 7 días',v:sem.length,s:'incluye hoy'}]
     .map(k=>`<div class="kpi ${k.c||''}"><div class="lab">${esc(k.l)}</div><div class="val">${k.v}</div><div class="sub">${esc(k.s)}</div></div>`).join('');
   $('#cu-list').innerHTML=R.length?`<thead><tr><th>Día</th><th>Apellido y nombre</th><th>Legajo</th><th>Tipo</th><th>Sector</th><th>Turno</th><th class="num">Cumple</th></tr></thead><tbody>`+
-    R.map(r=>`<tr class="${r.fecha===h?'cu-hoy':r.fecha<h?'cu-pas':''}"><td class="mono"><b>${String(r.dia).padStart(2,'0')}</b> ${DOW[dObj(r.fecha).getDay()].slice(0,2)}</td><td><b>${esc(r.nombre)}</b>${r.fecha===h?' 🎂':''}</td><td class="mono">${esc(r.leg)}</td><td>${esc(r.tipo)}</td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="num">${r.edad} años</td></tr>`).join('')+'</tbody>'
+    R.map(r=>`<tr class="${r.fecha===h?'cu-hoy':r.fecha<h?'cu-pas':''}"><td class="mono"><b>${String(r.dia).padStart(2,'0')}</b> ${DOW[dObj(r.fecha).getDay()].slice(0,2)}</td><td><b>${esc(r.nombre)}</b>${r.fecha===h?' 🎂':''}</td><td class="mono">${esc(r.leg)}</td><td>${esc(r.tipo)}</td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="num">${r.edad!=null?r.edad+' años':'—'}</td></tr>`).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${C?'Nadie cumple años en este mes.':'Todavía no se cargó el archivo de cumpleaños.'}</div></td></tr></tbody>`;
 }
 function cuExcel(){
   const R=cuRows(cuState.mes); if(!R.length){ App.toast('No hay cumpleaños en ese mes.',true); return; }
   const mes=MESES_N[cuState.mes-1], y=hoy().slice(0,4);
   const a=[[`CUMPLEAÑOS · ${mes.toUpperCase()} ${y} · CD ISIDRO CASANOVA`],[],['Día','Fecha','Apellido y nombre','Legajo','Tipo','Sector','Turno','Cumple (años)']]
-    .concat(R.map(r=>[r.dia,`${DOWL[dObj(r.fecha).getDay()]} ${dmy(r.fecha)}`,r.nombre,r.leg,r.tipo,r.sector,r.turno,r.edad])).concat([[],['Total',R.length]]);
+    .concat(R.map(r=>[r.dia,`${DOWL[dObj(r.fecha).getDay()]} ${dmy(r.fecha)}`,r.nombre,r.leg,r.tipo,r.sector,r.turno,r.edad!=null?r.edad:''])).concat([[],['Total',R.length]]);
   const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(a);
   ws['!cols']=[{wch:6},{wch:22},{wch:36},{wch:10},{wch:18},{wch:20},{wch:14},{wch:13}]; ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:2,c:0},e:{r:2+R.length,c:7}})};
@@ -134,7 +136,7 @@ function renderHomeCom(){
       :`<div class="empty" style="padding:14px">${dw===0?'Hoy es domingo: no hay menú.':'Todavía no se cargó el menú de hoy.'}</div>`)+'</div></div>');
   if(DB.cumple){ const R=cuRows(+h.slice(5,7)).filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
     parts.push(`<div class="card hc-cu"><div class="card-h"><h3>🎂 Cumpleaños</h3><button class="btn ghost sm" data-go="v-cumple">Ver el mes</button></div><div class="card-b">`+
-      (R.length?R.slice(0,8).map(r=>`<div class="hc-cur${r.fecha===h?' hoy':''}"><b>${r.fecha===h?'HOY':`${DOW[dObj(r.fecha).getDay()].slice(0,2)} ${r.dia}`}</b><span>${esc(r.nombre)}</span><em>${r.edad} años</em></div>`).join(''):'<div class="empty" style="padding:14px">Nadie cumple años en los próximos 7 días.</div>')+'</div></div>'); }
+      (R.length?R.slice(0,8).map(r=>`<div class="hc-cur${r.fecha===h?' hoy':''}"><b>${r.fecha===h?'HOY':`${DOW[dObj(r.fecha).getDay()].slice(0,2)} ${r.dia}`}</b><span>${esc(r.nombre)}</span><em>${r.edad!=null?r.edad+' años':''}</em></div>`).join(''):'<div class="empty" style="padding:14px">Nadie cumple años en los próximos 7 días.</div>')+'</div></div>'); }
   box.innerHTML=parts.join('');
 }
 function hookComedor(){
