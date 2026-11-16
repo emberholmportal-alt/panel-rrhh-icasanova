@@ -78,6 +78,20 @@ const SRVX=(()=>{
         if(forzada) location.reload(); else { el.remove(); document.body.classList.remove('srv-locked'); App.toast('Contraseña cambiada'); } }
       catch(err){ $('#sp-e').textContent=err.message; } };
   }
+  // "ver como": el admin elige un usuario y el panel se recarga mostrando exactamente lo que ve esa persona
+  async function verComo(){
+    let L=[]; try{ L=(await api('GET','/api/users')).users.filter(u=>u.activo&&u.id!==S.user.id); }catch(e){ App.toast(e.message,true); return; }
+    const m=document.createElement('div'); m.className='vs-modal';
+    m.innerHTML=`<div class="vs-mbox vc-box"><h3>👁 Ver como otro usuario</h3><p>Elegí a quién: el panel se recarga mostrando lo mismo que ve esa persona, con sus permisos. Es solo lectura y volvés a tu usuario con un clic.</p>
+      <input type="text" class="vc-q" placeholder="Buscar por nombre o usuario">
+      <div class="vc-l">${L.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(u=>`<button type="button" data-vcu="${u.id}" data-q="${esc((u.nombre+' '+u.username).toLowerCase())}"><b>${esc(u.nombre)}</b><span>${esc(u.username)}${u.rol==='admin'?' · admin':''}</span></button>`).join('')}</div>
+      <div class="vs-mb"><button type="button" class="btn ghost" data-vcx>Cancelar</button></div></div>`;
+    document.body.appendChild(m); const q=m.querySelector('.vc-q'); setTimeout(()=>q.focus(),50);
+    q.oninput=()=>{ const t=q.value.trim().toLowerCase(); m.querySelectorAll('[data-vcu]').forEach(b=>b.style.display=!t||b.dataset.q.includes(t)?'':'none'); };
+    m.onclick=async e=>{ if(e.target===m||e.target.closest('[data-vcx]')){ m.remove(); return; }
+      const b=e.target.closest('[data-vcu]'); if(!b) return;
+      try{ await api('POST',`/api/users/${b.dataset.vcu}/ver-como`); location.reload(); }catch(x){ App.toast(x.message,true); } };
+  }
   async function logout(){ try{ await api('POST','/api/auth/logout'); }catch(e){}
     S.F3K.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} }); location.reload(); }
 
@@ -157,7 +171,8 @@ const SRVX=(()=>{
     }catch(err){ setSt('Sin guardar','err'); if(err.status!==401) App.toast('No se pudo guardar en el servidor: '+err.message+'. Reintento en unos segundos.',true); setTimeout(()=>{ if(lastDB) S.save(lastDB); },8000); }
     finally{ saving=false; }
   }
-  S.save=db=>{ lastDB=db; clearTimeout(pending); pending=setTimeout(flush,500); return Promise.resolve(); };
+  let impAvisado=false;
+  S.save=db=>{ lastDB=db; if(S.imp){ if(!impAvisado&&Date.now()-lastAct<5000){ impAvisado=true; App.toast('Modo "ver como": los cambios no se guardan.',true); } return Promise.resolve(); } clearTimeout(pending); pending=setTimeout(flush,500); return Promise.resolve(); };
   // francos día por día: el servidor aplica el cambio sobre la última versión y anota quién y cuándo
   S.francosCeldas=async cambios=>{
     if(!canW('francos')) throw new Error('No tenés permiso para asignar francos.');
@@ -246,7 +261,9 @@ const SRVX=(()=>{
     const ur=e.target.closest('.us-tab tbody tr'); if(ur&&!e.target.closest('select,button,input,label')){
       const id=+ur.dataset.uid; usSel=usSel===id?null:id; ur.parentNode.querySelectorAll('tr').forEach(t=>t.classList.toggle('sel',+t.dataset.uid===usSel)); }
     if(e.target.closest('[data-srv-pass]')){ $('#mePill').classList.remove('open'); passScreen(false); return; }
-    if(e.target.closest('[data-srv-out]')){ logout(); return; }
+    if(e.target.closest('[data-srv-out]')){ if(S.imp){ try{ await api('POST','/api/ver-como/salir'); }catch(x){} location.reload(); return; } logout(); return; }
+    if(e.target.closest('[data-imp-out]')){ try{ await api('POST','/api/ver-como/salir'); }catch(x){} location.reload(); return; }
+    if(e.target.closest('[data-vercomo]')){ $('#mePill').classList.remove('open'); verComo(); return; }
     const rs=e.target.closest('[data-ureset]'); if(rs&&isAdm){ const u=USR.find(x=>x.id===+rs.closest('tr').dataset.uid);
       if(u&&confirm(`¿Generar una contraseña nueva para ${u.nombre}? Se cierran sus sesiones abiertas.`)){ try{ const r=await api('POST',`/api/users/${u.id}/reset`); showPass(u.nombre,u.username,r.password); }catch(err){ App.toast(err.message,true); } } return; }
     if(e.target.id==='us-aud-b'){ try{ const r=await api('GET','/api/audit'); $('#us-aud').innerHTML=`<div class="tscroll" style="max-height:320px"><table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>${r.items.map(i=>`<tr><td class="mono">${fmtAt(i.at)}</td><td>${esc(i.usuario)}</td><td>${esc(i.accion.replace(/_/g,' '))}</td><td>${esc(i.detalle)}</td></tr>`).join('')}</tbody></table></div>`; }catch(err){ App.toast(err.message,true); } return; }
@@ -270,6 +287,14 @@ const SRVX=(()=>{
   const ft=$('footer.foot'); if(ft) ft.textContent='PANEL DE TRABAJO RRHH I.CASANOVA · Grupo Gestión · datos guardados en el servidor, con acceso por usuario';
   // sin avisos de "subí tal archivo" para quien no administra la carga
   if(!isAdm){ const _caS=computeAvisos; computeAvisos=function(){ return _caS().filter(x=>!/^Actualización/.test(x.t||'')); }; App.refresh(); }
-  if(U.must_change) passScreen(true);
+  // Ausentismo parcial: solo Llegadas tarde y Reincidencias
+  if(U.aus_parcial){ const keep=new Set(['p-tarde','p-rank']);
+    document.querySelectorAll('#v-ausentismo #tabs .tab').forEach(t=>{ if(!keep.has(t.dataset.p)){ t.style.display='none'; const p=document.getElementById(t.dataset.p); if(p){ p.classList.remove('on'); p.style.display='none'; } } });
+    const t0=document.querySelector('#v-ausentismo #tabs .tab[data-p="p-tarde"]'); if(t0&&!t0.classList.contains('on')) t0.click(); }
+  if(U.must_change&&!S.imp) passScreen(true);
+  // "ver como": aviso fijo arriba y botón para volver al usuario propio
+  if(S.imp){ document.body.classList.add('srv-imp'); const b=document.createElement('div'); b.id='srv-imp';
+    b.innerHTML=`<span>👁 Estás viendo el panel como <b>${esc(U.nombre)}</b> · solo lectura, no se guarda ningún cambio</span><button type="button" class="btn primary sm" data-imp-out>Volver a ${esc(S.imp.nombre.split(',')[1]?S.imp.nombre.split(',')[1].trim():S.imp.nombre)}</button>`;
+    document.body.prepend(b); }
   return {online:true,user:U,logout,passScreen,api,isAdm};
 })();

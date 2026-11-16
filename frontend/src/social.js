@@ -41,7 +41,7 @@ const avCol=id=>{ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))%3
 function renderMe(){
   $('#meAv').textContent=ini(ME.nombre); $('#meAv').style.background=avCol(ME.id);
   $('#meNm').innerHTML=`${esc(ME.nombre)}<small>${ME.rol==='admin'?'Administrador':'Usuario'}</small>`;
-  if(ONLINE){ $('#meMenu').innerHTML=`<div class="me-h">${esc(ME.username||'')}</div><button data-srv-pass><span>Cambiar contraseña</span></button><button data-srv-out><span>Cerrar sesión</span></button>`+(ME.rol==='admin'?`<button data-go="v-config" class="me-cfg">Usuarios y permisos…</button>`:''); }
+  if(ONLINE){ $('#meMenu').innerHTML=`<div class="me-h">${esc(ME.username||'')}</div><button data-srv-pass><span>Cambiar contraseña</span></button><button data-srv-out><span>Cerrar sesión</span></button>`+(ME.rol==='admin'?`<button data-vercomo class="me-cfg"><span>👁 Ver como otro usuario…</span></button><button data-go="v-config" class="me-cfg">Usuarios y permisos…</button>`:''); }
   else $('#meMenu').innerHTML=`<div class="me-h">Cambiar de usuario <em>(prueba local)</em></div>`+USERS.map(u=>`<button data-meu="${esc(u.id)}" class="${u.id===ME.id?'on':''}"><i style="background:${avCol(u.id)}">${esc(ini(u.nombre))}</i><span>${esc(u.nombre)}<small>${u.rol==='admin'?'Administrador':'Usuario'}</small></span></button>`).join('')+
     `<button data-go="v-config" class="me-cfg">Administrar usuarios de prueba…</button>`;
   const sh=$('#subhead'); if(sh) sh.textContent='Bienvenido '+ME.nombre.split(',').pop().trim().split(' ')[0];

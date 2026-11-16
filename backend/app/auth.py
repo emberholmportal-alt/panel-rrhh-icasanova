@@ -69,14 +69,23 @@ def pw_ok(pw: str) -> str | None:
     return None
 
 
-def make_token(u: User) -> str:
-    exp = datetime.now(timezone.utc) + timedelta(hours=SESSION_HOURS)
-    return jwt.encode({"sub": str(u.id), "tv": u.token_ver, "exp": exp}, JWT_SECRET, algorithm="HS256")
+def make_token(u: User, imp: User | None = None) -> str:
+    horas = 2 if imp else SESSION_HOURS
+    exp = datetime.now(timezone.utc) + timedelta(hours=horas)
+    p = {"sub": str(u.id), "tv": u.token_ver, "exp": exp}
+    if imp:   # "ver como": el admin mira el panel con la cuenta de otro, en solo lectura
+        p["imp"] = imp.id
+        p["itv"] = imp.token_ver
+    return jwt.encode(p, JWT_SECRET, algorithm="HS256")
 
 
-def set_session(resp: Response, u: User):
-    resp.set_cookie(COOKIE, make_token(u), httponly=True, secure=COOKIE_SECURE, samesite="lax",
-                    max_age=SESSION_HOURS * 3600, path="/")
+def set_session(resp: Response, u: User, imp: User | None = None):
+    resp.set_cookie(COOKIE, make_token(u, imp), httponly=True, secure=COOKIE_SECURE, samesite="lax",
+                    max_age=(2 if imp else SESSION_HOURS) * 3600, path="/")
+
+
+# con "ver como" solo se puede leer; estas son las únicas acciones permitidas
+IMP_PERMITIDO = {"/api/ver-como/salir", "/api/auth/logout"}
 
 
 def clear_session(resp: Response):
@@ -94,6 +103,14 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     u = db.get(User, int(p["sub"]))
     if not u or not u.activo or u.token_ver != p.get("tv"):
         raise HTTPException(401, "La sesión ya no es válida: iniciá sesión de nuevo")
+    request.state.imp = None
+    if p.get("imp"):
+        a = db.get(User, int(p["imp"]))
+        if not a or not a.activo or a.rol != "admin" or a.token_ver != p.get("itv"):
+            raise HTTPException(401, "La sesión ya no es válida: iniciá sesión de nuevo")
+        request.state.imp = a
+        if request.method not in ("GET", "HEAD") and request.url.path not in IMP_PERMITIDO:
+            raise HTTPException(403, f"Estás viendo el panel como {u.nombre}: es solo lectura, no se guarda ningún cambio.")
     return u
 
 
@@ -105,6 +122,9 @@ def require_admin(u: User = Depends(current_user)) -> User:
 
 # El menú semanal lo edita solo el comedor (Milagros Marchioro) y el administrador.
 MENU_EDITORES = {"mmarchioro"}
+
+# En Ausentismo estos usuarios ven solo "Llegadas tarde" y "Reincidencias" (no pedidos, sin fichada, turnos ni plantilla).
+AUS_PARCIAL = {"cbertetti", "joliva", "rcampos", "lmunoz"}
 
 
 def level(u: User, modulo: str) -> str:

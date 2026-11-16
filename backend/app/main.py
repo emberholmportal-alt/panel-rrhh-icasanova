@@ -153,6 +153,7 @@ def startup():
 def user_out(u: User) -> dict:
     return {"id": u.id, "username": u.username, "nombre": u.nombre, "rol": u.rol,
             "perms": {m: auth.level(u, m) for m in MODULES}, "must_change": u.must_change, "activo": u.activo,
+            "aus_parcial": u.rol != "admin" and u.username in auth.AUS_PARCIAL,
             "last_login": u.last_login.isoformat() if u.last_login else None}
 
 
@@ -205,6 +206,29 @@ def verify_password(body: VerifyIn, u: User = Depends(current_user)):
     return {"ok": True}
 
 
+@app.post("/api/users/{uid}/ver-como")
+def ver_como(uid: int, response: Response, a: User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    """El administrador entra al panel como otro usuario, en solo lectura, para ver lo mismo que ve esa persona."""
+    t = db.get(User, uid)
+    if not t or not t.activo:
+        raise HTTPException(404, "Ese usuario no existe o está desactivado")
+    if t.id == a.id:
+        raise HTTPException(400, "Ya estás con tu usuario")
+    auth.audit(db, a, "ver_como", t.username)
+    db.commit()
+    auth.set_session(response, t, imp=a)
+    return {"ok": True, "nombre": t.nombre}
+
+
+@app.post("/api/ver-como/salir")
+def ver_como_salir(request: Request, response: Response, u: User = Depends(current_user)):
+    a = getattr(request.state, "imp", None)
+    if not a:
+        return {"ok": True}
+    auth.set_session(response, a)
+    return {"ok": True}
+
+
 @app.post("/api/auth/logout")
 def logout(response: Response):
     auth.clear_session(response)
@@ -254,12 +278,17 @@ def writable(u: User, key: str) -> bool:
     return (u.rol == "admin") if key == "otros" else can_write(u, key)
 
 
+def imp_out(request: Request) -> dict | None:
+    a = getattr(request.state, "imp", None)
+    return {"id": a.id, "nombre": a.nombre, "username": a.username} if a else None
+
+
 @app.get("/api/bootstrap")
-def bootstrap(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def bootstrap(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
     docs = {d.key: doc_out(d) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
     mine = {d.key: d.data for d in db.scalars(select(UserDoc).where(UserDoc.user_id == u.id))}
     return {"user": user_out(u), "modules": MODULES, "docs": docs, "user_docs": mine,
-            "server_time": iso(now()), "build": BUILD}
+            "server_time": iso(now()), "build": BUILD, "imp": imp_out(request)}
 
 
 @app.get("/api/sync")
