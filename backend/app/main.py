@@ -74,11 +74,20 @@ def startup():
         db.commit()
         # recuperación del administrador: si ADMIN_RESET_PASSWORD está definida, la clave del admin
         # pasa a ser esa (temporal, hay que cambiarla al entrar). Borrar la variable después de usarla.
+        # Se aplica UNA sola vez por valor: si la variable queda puesta, los reinicios de Render
+        # (deploys o el servicio que se duerme) no vuelven a pisar la clave que eligió el admin.
         reset = os.environ.get("ADMIN_RESET_PASSWORD")
         if reset:
+            import hashlib
             username = (os.environ.get("ADMIN_USERNAME") or "admin").strip().lower()
             u = db.scalar(select(User).where(User.username == username))
-            if u:
+            marca = db.get(Doc, "_reset_admin")
+            huella = hashlib.sha256((username + "|" + reset).encode()).hexdigest()
+            if u and not (marca and (marca.data or {}).get("h") == huella):
+                if marca is None:
+                    marca = Doc(key="_reset_admin", data={}, version=0)
+                    db.add(marca)
+                marca.data = {"h": huella, "at": iso(now())}
                 u.pass_hash = auth.hash_pw(reset)
                 u.must_change = True
                 u.activo = True
