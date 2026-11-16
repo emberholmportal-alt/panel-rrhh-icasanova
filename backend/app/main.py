@@ -156,6 +156,23 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     return user_out(u)
 
 
+class VerifyIn(BaseModel):
+    password: str = Field(max_length=200)
+
+
+@app.post("/api/auth/verify")
+def verify_password(body: VerifyIn, u: User = Depends(current_user)):
+    """Desbloqueo de la pantalla en reposo: confirma la contraseña del usuario que ya tiene la sesión abierta."""
+    key = f"lock|{u.username}"
+    if auth.login_blocked(key):
+        raise HTTPException(429, "Demasiados intentos. Esperá 15 minutos o cerrá sesión y volvé a entrar.")
+    if not auth.check_pw(body.password, u.pass_hash):
+        auth.login_failed(key)
+        return {"ok": False}
+    auth.login_ok(key)
+    return {"ok": True}
+
+
 @app.post("/api/auth/logout")
 def logout(response: Response):
     auth.clear_session(response)

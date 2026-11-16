@@ -2230,7 +2230,14 @@ async function hashPass(p){
   try{ if(window.crypto&&crypto.subtle){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); } }catch(e){}
   let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return 'f'+(h>>>0).toString(16);
 }
-async function passOk(p){ if(!LK.hash) LK.hash=await hashPass('Gestion2026'), saveLK(); return (await hashPass(p))===LK.hash; }
+const lkOnline=()=>!!(window.SRV&&SRV.mode==='online'&&SRV.user&&SRV.api);
+// con servidor, el bloqueo se destraba con la MISMA contraseña con la que el usuario entra al panel
+async function passOk(p){
+  if(lkOnline()){
+    try{ const r=await SRV.api('POST','/api/auth/verify',{password:p}); return !!r.ok; }
+    catch(e){ if(e.status===401){ try{ sessionStorage.removeItem(LKK); }catch(x){} location.reload(); return false; } $('#lk-err').textContent=e.message; throw e; }
+  }
+  if(!LK.hash) LK.hash=await hashPass('Gestion2026'), saveLK(); return (await hashPass(p))===LK.hash; }
 
 let locked=false, lastAct=Date.now(), lkRaf=0;
 const LK_EV=['pointermove','pointerdown','keydown','wheel','touchstart','scroll'];
@@ -2244,6 +2251,9 @@ function lockNow(why){
   const L=$('#lock');
   L.querySelector('.lk-logo').src=($('.brand img')||{}).src||'';
   $('#lk-why').textContent= why==='inactividad'?`Bloqueado por ${LK.min} min sin actividad`:why==='inicio'?'Panel protegido':'Modo reposo';
+  if(lkOnline()){ const n=SRV.user.nombre||SRV.user.username||''; const pila=(n.split(',')[1]||n).trim().split(' ')[0]||n;
+    L.querySelector('.lk-user span').textContent=(pila[0]||'?').toUpperCase(); L.querySelector('.lk-user b').textContent=pila;
+    $('#lk-pass').placeholder='Tu contraseña del panel'; }
   $('#lk-pass').value=''; $('#lk-err').textContent=''; L.classList.remove('ask');
   L.classList.add('on'); document.body.classList.add('is-locked');
   BG.stop(); Orb.active(false);
@@ -2253,7 +2263,8 @@ function lockNow(why){
 async function unlockTry(){
   const p=$('#lk-pass').value;
   if(!p){ $('#lk-pass').focus(); return; }
-  if(await passOk(p)){
+  let ok=false; try{ ok=await passOk(p); }catch(e){ return; }
+  if(ok){
     locked=false; lastAct=Date.now();
     try{ sessionStorage.removeItem(LKK); }catch(e){}
     const L=$('#lock'); L.classList.add('out');

@@ -114,6 +114,8 @@ const SRVX=(()=>{
   }
   // en el servidor no se borra la base completa; importar una base solo lo hace un administrador
   const rst=$('#btnReset'); if(rst) rst.style.display='none';
+  // con servidor, el protector de pantalla usa la contraseña del panel: no hay una clave aparte
+  { const pc=$('#cf-pass-btn'); if(pc&&pc.closest('.card')) pc.closest('.card').style.display='none'; }
   if(!isAdm){ ['#btnImportDB','#btnExportDB'].forEach(q=>{ const im=$(q); if(im) im.style.display='none'; }); }   // el respaldo completo es solo del administrador
 
   /* ---------------- guardado ---------------- */
