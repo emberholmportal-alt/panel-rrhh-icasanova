@@ -7,10 +7,11 @@
      por ejemplo: planilla de vacaciones, control de eventuales, padrón propio
    Lo que falte de sector y turno se completa con el plan de francos.
    ================================================================ */
-const NM_TIPO={EF:'Efectivos',FC:'Fuera de convenio',EV:'Eventuales','':'Sin clasificar'};
-const NM_COL={EF:'#22d3ee',FC:'#a78bfa',EV:'#f59e0b','':'#64748b'};
+const NM_TIPO={EF:'Efectivos',FC:'Fuera de convenio',EV:'Eventuales',EXT:'Personal externo','':'Sin clasificar'};
+const NM_COL={EF:'#22d3ee',FC:'#a78bfa',EV:'#f59e0b',EXT:'#34d399','':'#64748b'};
 function nmTipo(t){ t=normTxt(t);
   if(!t) return '';
+  if(/^EXT\b|EXTERN/.test(t)) return 'EXT';
   if(/FUERA DE CONVENIO|\bF\.?C\b|GLD[\s-]*FC/.test(t)) return 'FC';
   if(/EVENTUAL|JORNALIZ|\bM\.?M\b|180 DIAS|TEMPORA|\bGL\b(?! ?D)/.test(t)) return 'EV';
   if(/EFECTIV|CONVENIO|CAMIONERO|\bGLD\b|ENDOSOS/.test(t)) return 'EF';
@@ -34,7 +35,7 @@ function nmParse(rows,name){
     if(r[cN]) e.nombre=String(r[cN]).trim();
     if(cS>=0&&r[cS]!=null&&String(r[cS]).trim()&&!/^(SI|NO)$/i.test(String(r[cS]).trim())) e.sector=normTxt(r[cS]);
     if(cT>=0&&r[cT]!=null&&String(r[cT]).trim()) e.turno=normTxt(r[cT]);
-    const tp=nmTipo(cTp>=0?r[cTp]:'')||nmTipo(cU>=0?r[cU]:''); if(tp) e.tipo=tp;
+    const tp=nmTipo(cTp>=0?r[cTp]:'')||nmTipo(cU>=0?r[cU]:''); if(tp){ e.tipo=tp; e.tipoF=tp; }
     if(cI>=0&&r[cI]) e.ingreso=excelDateToISO(r[cI])||e.ingreso;
     if(cE>=0&&r[cE]) { const x=excelDateToISO(r[cE]); if(x) e.egreso=x; } }
   return Object.keys(out).length?{emps:out,roster:false,desc:`${Object.keys(out).length} legajo(s)`}:null;
@@ -48,7 +49,7 @@ async function loadNomina(files){
       if(!got){ err.push(f.name); continue; }
       if(got.roster){   // el reloj define quién está: se conservan sector y turno ya cargados
         const prev=N.emps; N.emps={};
-        for(const [leg,e] of Object.entries(got.emps)){ const p=prev[leg]||{}; N.emps[leg]=Object.assign({},p,e,{sector:p.sector,turno:p.turno,ingreso:p.ingreso}); }
+        for(const [leg,e] of Object.entries(got.emps)){ const p=prev[leg]||{}; N.emps[leg]=Object.assign({},p,e,{sector:p.sector,turno:p.turno,ingreso:p.ingreso,tipoF:p.tipoF}); }
         N.roster={file:f.name,at:new Date().toISOString(),desc:got.desc}; }
       else for(const [leg,e] of Object.entries(got.emps)){ const p=N.emps[leg]; if(!p&&N.roster) continue;   // con reloj cargado, solo completa a los que están
         N.emps[leg]=Object.assign(p||{leg},Object.fromEntries(Object.entries(e).filter(([k,v])=>v!=null&&v!==''))); }
@@ -67,7 +68,7 @@ function nmRows(){
   // agregados a mano (ej. delegados, que no fichan): se suman y pisan sector/tipo aunque se recargue el reloj
   const base=Object.assign({},N.emps); Object.values(N.extra||{}).forEach(x=>{ if(x&&x.leg) base[x.leg]=Object.assign({},base[x.leg]||{},Object.fromEntries(Object.entries(x).filter(([k,v])=>v!=null&&v!==''&&k!=='at'&&k!=='por'))); });
   return Object.values(base).filter(e=>!(e.egreso&&e.egreso<hoyI)).map(e=>{ const f=fr[e.leg]||{};
-    return {leg:e.leg,nombre:e.nombre||f.nombre||'',tipo:e.tipo||(f.legajo?'EV':''),sector:e.sector||normTxt(f.sector)||'SIN SECTOR',turno:e.turno||normTxt(f.turno)||'SIN TURNO',ingreso:e.ingreso||f.ingreso||''}; })
+    return {leg:e.leg,nombre:e.nombre||f.nombre||'',tipo:e.tipoF||e.tipo||(f.legajo?'EV':''),sector:e.sector||normTxt(f.sector)||'SIN SECTOR',turno:e.turno||normTxt(f.turno)||'SIN TURNO',ingreso:e.ingreso||f.ingreso||''}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
 }
 let nmState={tipos:[],sectores:[],turnos:[],q:''};
@@ -82,7 +83,7 @@ function nmMsel(sel,key,lab,vals,labf){
 }
 function nmFiltered(R){ const q=nmState.q.trim().toLowerCase();
   return R.filter(r=>(!nmState.tipos.length||nmState.tipos.includes(r.tipo))&&(!nmState.sectores.length||nmState.sectores.includes(r.sector))&&(!nmState.turnos.length||nmState.turnos.includes(r.turno))&&(!q||r.nombre.toLowerCase().includes(q)||r.leg.includes(q))); }
-function nmGroup(R,k){ const g={}; R.forEach(r=>{ const x=g[r[k]]||(g[r[k]]={EF:0,FC:0,EV:0,'':0,t:0}); x[r.tipo]++; x.t++; }); return g; }
+function nmGroup(R,k){ const g={}; R.forEach(r=>{ const x=g[r[k]]||(g[r[k]]={EF:0,FC:0,EV:0,EXT:0,'':0,t:0}); x[r.tipo]++; x.t++; }); return g; }
 function renderNomina(){
   if(!$('#v-nomina')) return;
   const N=DB.nomina, ALL=nmRows();
@@ -92,14 +93,14 @@ function renderNomina(){
   nmMsel('#nm-ms','sectores','Sector',ALL.map(r=>r.sector));
   nmMsel('#nm-mu','turnos','Turno',ALL.map(r=>r.turno));
   const R=nmFiltered(ALL), c=k=>R.filter(r=>r.tipo===k).length, sc=ALL.filter(r=>!r.tipo).length;
-  $('#nm-kpis').innerHTML=[{l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} con el filtro`:'personas en nómina',c:''},{l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'}]
+  $('#nm-kpis').innerHTML=[{l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} con el filtro`:'personas en nómina',c:''},{l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'}].concat(ALL.some(r=>r.tipo==='EXT')?[{l:'Personal externo',v:c('EXT'),s:'EXT',c:''}]:[])
     .concat(sc?[{l:'Sin clasificar',v:R.filter(r=>!r.tipo).length,s:'cargá el Movimientos del reloj',c:'acc-alert'}]:[])
     .map(k=>`<div class="kpi ${k.c}"><div class="lab">${esc(k.l)}</div><div class="val">${esc(k.v)}</div><div class="sub">${esc(k.s)}</div></div>`).join('');
   const tbl=(id,key,lab)=>{ const g=nmGroup(R,key), ks=Object.keys(g).sort((a,b)=>g[b].t-g[a].t||a.localeCompare(b,'es'));
-    $(id).innerHTML=ks.length?`<thead><tr><th>${lab}</th><th class="num">Efectivos</th><th class="num">Fuera conv.</th><th class="num">Eventuales</th><th class="num">Total</th><th style="width:34%"></th></tr></thead><tbody>`+
-      ks.map(k=>{ const x=g[k], m=Math.max(...ks.map(z=>g[z].t)); return `<tr><td><b>${esc(k)}</b></td><td class="num">${x.EF||''}</td><td class="num">${x.FC||''}</td><td class="num">${x.EV||''}</td><td class="num"><b>${x.t}</b></td>
-        <td><div class="nm-bar">${['EF','FC','EV',''].map(t=>x[t]?`<i style="width:${x[t]/m*100}%;background:${NM_COL[t]}" title="${NM_TIPO[t]}: ${x[t]}"></i>`:'').join('')}</div></td></tr>`; }).join('')+
-      `<tr class="tot"><td>Total</td><td class="num">${c('EF')}</td><td class="num">${c('FC')}</td><td class="num">${c('EV')}</td><td class="num">${R.length}</td><td></td></tr></tbody>`
+    $(id).innerHTML=ks.length?`<thead><tr><th>${lab}</th><th class="num">Efectivos</th><th class="num">Fuera conv.</th><th class="num">Eventuales</th><th class="num">Externos</th><th class="num">Total</th><th style="width:34%"></th></tr></thead><tbody>`+
+      ks.map(k=>{ const x=g[k], m=Math.max(...ks.map(z=>g[z].t)); return `<tr><td><b>${esc(k)}</b></td><td class="num">${x.EF||''}</td><td class="num">${x.FC||''}</td><td class="num">${x.EV||''}</td><td class="num">${x.EXT||''}</td><td class="num"><b>${x.t}</b></td>
+        <td><div class="nm-bar">${['EF','FC','EV','EXT',''].map(t=>x[t]?`<i style="width:${x[t]/m*100}%;background:${NM_COL[t]}" title="${NM_TIPO[t]}: ${x[t]}"></i>`:'').join('')}</div></td></tr>`; }).join('')+
+      `<tr class="tot"><td>Total</td><td class="num">${c('EF')}</td><td class="num">${c('FC')}</td><td class="num">${c('EV')}</td><td class="num">${c('EXT')}</td><td class="num">${R.length}</td><td></td></tr></tbody>`
       :'<tbody><tr><td><div class="empty">Sin datos con este filtro.</div></td></tr></tbody>'; };
   tbl('#nm-sec','sector','Sector'); tbl('#nm-tur','turno','Turno');
   // matriz sector × turno
@@ -118,11 +119,11 @@ const nmFiltroTxt=()=>[nmState.tipos.length?'Tipo: '+nmState.tipos.map(k=>NM_TIP
 function nmExcel(){
   const R=nmFiltered(nmRows()); if(!R.length){ App.toast('No hay datos para exportar.',true); return; }
   const wb=XLSX.utils.book_new(), sum=k=>R.filter(r=>r.tipo===k).length;
-  const res=[['NÓMINA · CD ISIDRO CASANOVA'],['Generado',fmtAt(new Date().toISOString())],['Filtro',nmFiltroTxt()],[],['Tipo','Personas'],['Efectivos',sum('EF')],['Fuera de convenio',sum('FC')],['Eventuales',sum('EV')]].concat(sum('')?[['Sin clasificar',sum('')]]:[]).concat([['Total',R.length]]);
+  const res=[['NÓMINA · CD ISIDRO CASANOVA'],['Generado',fmtAt(new Date().toISOString())],['Filtro',nmFiltroTxt()],[],['Tipo','Personas'],['Efectivos',sum('EF')],['Fuera de convenio',sum('FC')],['Eventuales',sum('EV')],['Personal externo',sum('EXT')]].concat(sum('')?[['Sin clasificar',sum('')]]:[]).concat([['Total',R.length]]);
   const w0=XLSX.utils.aoa_to_sheet(res); w0['!cols']=[{wch:22},{wch:40}]; XLSX.utils.book_append_sheet(wb,w0,'Resumen');
   for(const [k,lab] of [['sector','Por sector'],['turno','Por turno']]){ const g=nmGroup(R,k);
-    const a=[[k==='sector'?'Sector':'Turno','Efectivos','Fuera de convenio','Eventuales','Sin clasificar','Total']].concat(Object.keys(g).sort((x,y)=>x.localeCompare(y,'es')).map(s=>[s,g[s].EF,g[s].FC,g[s].EV,g[s][''],g[s].t])).concat([['Total',sum('EF'),sum('FC'),sum('EV'),sum(''),R.length]]);
-    const w=XLSX.utils.aoa_to_sheet(a); w['!cols']=[{wch:26},{wch:11},{wch:17},{wch:11},{wch:13},{wch:9}]; XLSX.utils.book_append_sheet(wb,w,lab); }
+    const a=[[k==='sector'?'Sector':'Turno','Efectivos','Fuera de convenio','Eventuales','Personal externo','Sin clasificar','Total']].concat(Object.keys(g).sort((x,y)=>x.localeCompare(y,'es')).map(s=>[s,g[s].EF,g[s].FC,g[s].EV,g[s].EXT,g[s][''],g[s].t])).concat([['Total',sum('EF'),sum('FC'),sum('EV'),sum('EXT'),sum(''),R.length]]);
+    const w=XLSX.utils.aoa_to_sheet(a); w['!cols']=[{wch:26},{wch:11},{wch:17},{wch:11},{wch:16},{wch:13},{wch:9}]; XLSX.utils.book_append_sheet(wb,w,lab); }
   const ts=uniq(R.map(r=>r.turno)).sort(), ss=uniq(R.map(r=>r.sector)).sort();
   const mx=[['Sector \\ Turno'].concat(ts,['Total'])].concat(ss.map(s=>[s].concat(ts.map(t=>R.filter(r=>r.sector===s&&r.turno===t).length),[R.filter(r=>r.sector===s).length]))).concat([['Total'].concat(ts.map(t=>R.filter(r=>r.turno===t).length),[R.length])]);
   const w3=XLSX.utils.aoa_to_sheet(mx); w3['!cols']=[{wch:26}].concat(ts.map(()=>({wch:12})),[{wch:9}]); XLSX.utils.book_append_sheet(wb,w3,'Sector x turno');
@@ -133,7 +134,7 @@ function nmExcel(){
 function nmInforme(){
   const R=nmFiltered(nmRows()); if(!R.length){ App.toast('No hay datos para el informe.',true); return; }
   const sum=k=>R.filter(r=>r.tipo===k).length;
-  const grp=(k,lab)=>{ const g=nmGroup(R,k); return `<h2>${lab}</h2><table><thead><tr><th class="l">${lab.replace('Por ','')}</th><th>Efectivos</th><th>Fuera de convenio</th><th>Eventuales</th><th>Total</th></tr></thead><tbody>${Object.keys(g).sort((a,b)=>g[b].t-g[a].t).map(s=>`<tr><td class="l">${esc(s)}</td><td>${g[s].EF||''}</td><td>${g[s].FC||''}</td><td>${g[s].EV||''}</td><td><b>${g[s].t}</b></td></tr>`).join('')}<tr class="t"><td class="l">Total</td><td>${sum('EF')}</td><td>${sum('FC')}</td><td>${sum('EV')}</td><td>${R.length}</td></tr></tbody></table>`; };
+  const grp=(k,lab)=>{ const g=nmGroup(R,k); return `<h2>${lab}</h2><table><thead><tr><th class="l">${lab.replace('Por ','')}</th><th>Efectivos</th><th>Fuera de convenio</th><th>Eventuales</th><th>Externos</th><th>Total</th></tr></thead><tbody>${Object.keys(g).sort((a,b)=>g[b].t-g[a].t).map(s=>`<tr><td class="l">${esc(s)}</td><td>${g[s].EF||''}</td><td>${g[s].FC||''}</td><td>${g[s].EV||''}</td><td>${g[s].EXT||''}</td><td><b>${g[s].t}</b></td></tr>`).join('')}<tr class="t"><td class="l">Total</td><td>${sum('EF')}</td><td>${sum('FC')}</td><td>${sum('EV')}</td><td>${sum('EXT')}</td><td>${R.length}</td></tr></tbody></table>`; };
   const ts=uniq(R.map(r=>r.turno)).sort(), ss=uniq(R.map(r=>r.sector)).sort();
   const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Nómina · ${dmy(hoy())}</title><style>
   @page{size:A4;margin:12mm} body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px;font-size:12px}
@@ -142,7 +143,7 @@ function nmInforme(){
   .pb{page-break-before:always} tr{page-break-inside:avoid} button{font:inherit;padding:7px 14px;border-radius:6px;border:0;background:#0f172a;color:#fff;cursor:pointer;margin-bottom:12px} @media print{button{display:none}}</style></head><body>
   <button onclick="window.print()">Imprimir / guardar PDF</button>
   <h1>Nómina · CD Isidro Casanova</h1><p class="sub">${esc(nmFiltroTxt())} · generado ${fmtAt(new Date().toISOString())}</p>
-  <div class="k"><div><span>Total</span><b>${R.length}</b></div><div><span>Efectivos</span><b>${sum('EF')}</b></div><div><span>Fuera de convenio</span><b>${sum('FC')}</b></div><div><span>Eventuales</span><b>${sum('EV')}</b></div>${sum('')?`<div><span>Sin clasificar</span><b>${sum('')}</b></div>`:''}</div>
+  <div class="k"><div><span>Total</span><b>${R.length}</b></div><div><span>Efectivos</span><b>${sum('EF')}</b></div><div><span>Fuera de convenio</span><b>${sum('FC')}</b></div><div><span>Eventuales</span><b>${sum('EV')}</b></div>${sum('EXT')?`<div><span>Personal externo</span><b>${sum('EXT')}</b></div>`:''}${sum('')?`<div><span>Sin clasificar</span><b>${sum('')}</b></div>`:''}</div>
   ${grp('sector','Por sector')}${grp('turno','Por turno')}
   <h2>Sector × turno</h2><table><thead><tr><th class="l">Sector</th>${ts.map(t=>`<th>${esc(t)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${ss.map(s=>`<tr><td class="l">${esc(s)}</td>${ts.map(t=>`<td>${R.filter(r=>r.sector===s&&r.turno===t).length||''}</td>`).join('')}<td><b>${R.filter(r=>r.sector===s).length}</b></td></tr>`).join('')}</tbody></table>
   <h2 class="pb">Detalle</h2><table><thead><tr><th>Legajo</th><th class="l">Apellido y nombre</th><th>Tipo</th><th class="l">Sector</th><th class="l">Turno</th></tr></thead><tbody>${R.map(r=>`<tr><td>${esc(r.leg)}</td><td class="l">${esc(r.nombre)}</td><td>${esc(NM_TIPO[r.tipo])}</td><td class="l">${esc(r.sector)}</td><td class="l">${esc(r.turno)}</td></tr>`).join('')}</tbody></table>
