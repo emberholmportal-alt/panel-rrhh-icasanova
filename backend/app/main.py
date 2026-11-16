@@ -10,7 +10,9 @@ Sirve el panel (frontend/dist/index.html) y la API:
   /api/buzon/*    buzón de sugerencias
   /api/audit      registro de actividad (solo admin)
 """
+import copy
 import json
+import re
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -228,6 +230,55 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     auth.audit(db, u, "guardar", MODULES.get(key, key))
     db.commit()
     return {"version": d.version, "updated_at": iso(d.updated_at), "updated_by": d.updated_by}
+
+
+@app.post("/api/francos/celdas")
+async def francos_celdas(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Asigna o quita francos día por día desde la página. El servidor anota quién y cuándo,
+    y aplica el cambio sobre la última versión: dos coordinadores pueden cargar a la vez sin pisarse."""
+    if not writable(u, "francos"):
+        raise HTTPException(403, "No tenés permiso para asignar francos")
+    body = json.loads(await request.body() or b"{}")
+    cambios = body.get("cambios") or []
+    if not isinstance(cambios, list) or not cambios or len(cambios) > 400:
+        raise HTTPException(400, "Formato inválido")
+    d = db.scalar(select(Doc).where(Doc.key == "francos").with_for_update())
+    if d is None:
+        d = Doc(key="francos", data={}, version=0)
+        db.add(d)
+    prev = d.version
+    data = copy.deepcopy(d.data or {})
+    F = data.setdefault("francos", {})
+    F.setdefault("files", [])
+    emps, fa = F.setdefault("emps", {}), F.setdefault("fa", {})
+    ahora, quien = iso(now()), u.nombre
+    tocados = set()
+    for c in cambios:
+        key, fecha, valor = str(c.get("key") or "")[:40], str(c.get("fecha") or ""), c.get("valor")
+        if not key or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fecha) or valor not in ("F", ""):
+            continue
+        e = emps.get(key)
+        if e is None:
+            src = c.get("emp") or {}
+            e = emps[key] = {k: str(src.get(k) or "")[:120] for k in ("legajo", "nombre", "turno", "sector", "ingreso", "egreso")}
+            e["d"] = {}
+        e.setdefault("d", {})
+        if valor == "F":
+            e["d"][fecha] = "F"
+        elif e["d"].get(fecha) == "F":
+            e["d"][fecha] = "1"
+        fa.setdefault(key, {})[fecha] = {"v": valor, "by": quien, "at": ahora}
+        tocados.add(key)
+    if not tocados:
+        raise HTTPException(400, "No hubo cambios válidos")
+    F["at"] = ahora
+    d.data = data
+    d.version += 1
+    d.updated_at = now()
+    d.updated_by = quien
+    auth.audit(db, u, "francos_dia", f"{len(cambios)} cambio(s) en {len(tocados)} empleado(s)")
+    db.commit()
+    return {"version": d.version, "prev": prev, "emps": {k: emps[k] for k in tocados}, "fa": {k: fa[k] for k in tocados}, "at": ahora}
 
 
 @app.put("/api/me/docs/{key}")

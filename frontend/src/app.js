@@ -1131,7 +1131,42 @@ function frObs(rows){
 const frKey = e => (e.legajo&&e.legajo!=='0'?e.legajo:'')||e.nombre.toUpperCase();
 const normTxt=s=>String(s||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim().toUpperCase().normalize('NFD').replace(/([AEIOU])[\u0300-\u036f]+/g,'$1').normalize('NFC');   // quita tildes de vocales, conserva la Ñ
 // "Noche", "NOCHE " y "noche" son el mismo turno (igual con sectores)
-const FRE = () => { if(!DB.francos) return []; const L=Object.values(DB.francos.emps||{}); L.forEach(e=>{ if(!e._n){ e.turno=normTxt(e.turno); e.sector=normTxt(e.sector); e._n=1; } }); return L; };
+// Empleados de francos = plan de francos + lista de eventuales (Control de eventuales).
+// La lista de eventuales manda en sector (tarea), turno, ingreso y egreso; los eventuales activos
+// que no están en el plan aparecen igual, con jornadas planificadas hasta que se les asigne franco.
+const ANTOF=new Map(), FR_VIRT=new Map();
+const antOK=v=>v&&v!=='SIN DATO';
+const FRE = () => {
+  const L=DB.francos?Object.values(DB.francos.emps||{}):[];
+  L.forEach(e=>{ if(!e._n){ e.turno=normTxt(e.turno); e.sector=normTxt(e.sector); e._n=1; } });
+  const A=typeof antRows==='function'?antRows():[]; ANTOF.clear(); if(!A.length) return L;
+  const lim=addD(hoy(),-75), by={}; L.forEach(e=>{ if(e.legajo) by[e.legajo]=e; });
+  const out=L.slice();
+  for(const a of A){
+    if(!a.activo&&!(a.egreso&&a.egreso>=lim)) continue;
+    ANTOF.set(a.legajo,a);
+    const e=by[a.legajo];
+    if(e){ if(antOK(a.tarea)) e.sector=normTxt(a.tarea); if(antOK(a.turno)) e.turno=normTxt(a.turno);
+      if(a.ingreso) e.ingreso=a.ingreso; if(!a.activo&&a.egreso) e.egreso=a.egreso; continue; }
+    let v=FR_VIRT.get(a.legajo);
+    if(!v||v._a!==a){ v={legajo:a.legajo,nombre:a.nombre,turno:antOK(a.turno)?normTxt(a.turno):'',sector:antOK(a.tarea)?normTxt(a.tarea):'',ingreso:a.ingreso||'',egreso:a.activo?'':(a.egreso||''),d:{},_n:1};
+      Object.defineProperty(v,'_a',{value:a,enumerable:false}); FR_VIRT.set(a.legajo,v); }
+    out.push(v); }
+  return out; };
+// un empleado de la lista de eventuales que todavía no está en el plan pasa al plan cuando se le asigna algo
+function frMaterial(e){
+  DB.francos=DB.francos||{emps:{},files:[]}; const k=frKey(e);
+  if(!DB.francos.emps[k]){ const c={legajo:e.legajo,nombre:e.nombre,turno:e.turno,sector:e.sector,ingreso:e.ingreso||'',egreso:e.egreso||'',d:e.d||{},_n:1}; DB.francos.emps[k]=c; FR_VIRT.delete(e.legajo); return c; }
+  return DB.francos.emps[k]; }
+// Período de liquidación: del 23 del mes anterior al 22 del mes (noviembre = 23/10 al 22/11)
+const liqDe=iso=>{ const d=dObj(iso); let y=d.getFullYear(), m=d.getMonth(); if(d.getDate()>=23){ m++; if(m>11){ m=0; y++; } } return `${y}-${pad(m+1)}`; };
+const liqPer=ym=>{ const [y,m]=ym.split('-').map(Number), p=new Date(y,m-2,23); return {d0:`${p.getFullYear()}-${pad(p.getMonth()+1)}-23`,d1:`${y}-${pad(m)}-22`,ym}; };
+const liqNom=ym=>{ const [y,m]=ym.split('-').map(Number); return MESL[m-1][0].toUpperCase()+MESL[m-1].slice(1)+' '+y; };
+const liqMas=(ym,n)=>{ let [y,m]=ym.split('-').map(Number); m+=n; while(m>12){ m-=12; y++; } while(m<1){ m+=12; y--; } return `${y}-${pad(m)}`; };
+// quién cargó cada franco: {legajo: {fecha: {v, by, at}}}
+const frMeta=(e,d)=>{ const fa=DB.francos&&DB.francos.fa, m=fa&&fa[frKey(e)]; return m&&m[d]||null; };
+function frCanEdit(){ return !(window.SRV&&SRV.mode==='online')||SRV.user.rol==='admin'||(SRV.user.perms&&SRV.user.perms.francos)==='editar'; }
+const frUser=()=>(window.SRV&&SRV.mode==='online'&&SRV.user&&SRV.user.nombre)||'Este equipo';
 function frDates(){ const s=new Set(); FRE().forEach(e=>Object.keys(e.d).forEach(d=>s.add(d))); return [...s].sort(); }
 const frOn = iso => FRE().filter(e=>e.d[iso]==='F');
 const frWork = iso => FRE().filter(e=>e.d[iso]!=null&&e.d[iso]!=='F'&&e.d[iso]!=='B');
@@ -1155,7 +1190,7 @@ async function loadFrancos(files){
         try{ const r=parseFrancos(rows,f.name+' '+sn); if(/unificad/i.test(sn)&&r.length){ got=r; gotName=sn; break; } if(r.length>got.length){ got=r; gotName=sn; } }catch(e){ if(!got.length) errs.push(f.name+': '+e.message); } }
       if(movN){ n+=movN; App.toast(`Movimientos cargados: ${movN} legajo(s) · ${dmy(DB.francos.mov.d0)} al ${dmy(DB.francos.mov.d1)}`); continue; }
       if(!got.length) continue;
-      { const ds=[]; got.forEach(e=>Object.keys(e.d).forEach(d=>ds.push(d))); ds.sort(); if(ds.length) DB.francos.per={d0:ds[0],d1:ds[ds.length-1]}; }
+      { const ds=[]; got.forEach(e=>Object.keys(e.d).forEach(d=>ds.push(d))); ds.sort(); if(ds.length){ DB.francos.per={d0:ds[0],d1:ds[ds.length-1]}; frState.liq=liqDe(ds[ds.length-1]); } }
       got.forEach(e=>{ if(!e.obs&&obs[e.legajo]) e.obs=obs[e.legajo]; });
       DB.francos=DB.francos||{emps:{},files:[]}; DB.francos.hoja=gotName;
       for(const e of got){ const k=frKey(e), cur=DB.francos.emps[k];
@@ -1170,7 +1205,7 @@ async function loadFrancos(files){
   else if(errs.length) App.toast(errs[0],true);
   renderFrancos(); App.refresh();
 }
-let frState={date:'',turnos:[],sectors:[],q:'',emp:''};
+let frState={date:'',turnos:[],sectors:[],q:'',emp:'',liq:'',sel:[]};
 /* ================================================================
    FRANCOS · CRUCE PLAN x FICHADAS
    ================================================================ */
@@ -1211,14 +1246,15 @@ async function loadMovFrancos(rows,hi,name){
 const CX_DEF={obj:20,art:true};
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
 const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable/i.test(f.t||'')?f:null; };
-function cxPeriodo(){ const F=DB.francos; if(!F) return null; if(F.per&&F.per.d0) return F.per; const ds=frDates(); return ds.length?{d0:ds[0],d1:ds[ds.length-1]}:null; }
+function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(frState.liq); }
 function frCruce(){
-  const F=DB.francos, P=cxPeriodo(); if(!F||!P||!FRE().length) return null;
-  const M=F.mov&&F.mov.d1>=P.d0&&F.mov.d0<=P.d1?F.mov:null;   // movimientos de otro período no se cruzan
+  const F=DB.francos, P=cxPeriodo(), E=FRE(); if(!P||!E.length) return null;
+  const M=F&&F.mov&&F.mov.d1>=P.d0&&F.mov.d0<=P.d1?F.mov:null;   // movimientos de otro período no se cruzan
   const cfg=cxCfg(), corte=M?M.d1:'', out=[], dias=[];
   for(let d=P.d0; d<=P.d1; d=addD(d,1)) dias.push(d);
-  for(const e of FRE()){
-    if(!dias.some(d=>e.d[d]!=null)) continue;
+  for(const e of E){
+    const enLista=ANTOF.has(e.legajo)&&(!e.ingreso||e.ingreso<=P.d1)&&(!e.egreso||e.egreso>=P.d0);
+    if(!enLista&&!dias.some(d=>e.d[d]!=null)) continue;
     const mv=M?M.emps[e.legajo]||null:null, g={T:0,DT:0,FT:0,ENF:0,ART:0,AUS:0,VAC:0,LIC:0,OTRO:0,F:0,DOM:0,FER:0,P:0,PF:0,'-':0}, cal={};
     for(const d of dias){
       const dom=dObj(d).getDay()===0, fer=cxFer(d); let c;
@@ -1253,14 +1289,20 @@ function renderFrancos(){
   const F=DB.francos, E=FRE(), C=frCruce(), cfg=cxCfg();
   // pasos de carga
   const P=cxPeriodo(), M=F&&F.mov;
+  { const cur=liqDe(hoy()), opts=[]; for(let i=-4;i<=2;i++) opts.push(liqMas(cur,i)); if(!opts.includes(P.ym)) opts.push(P.ym); opts.sort();
+    $('#fr-liq').innerHTML=`<div class="fr-liq-l"><span class="eyebrow">Período de liquidación</span><select id="fr-liq-s">${opts.map(o=>`<option value="${o}"${o===P.ym?' selected':''}>${liqNom(o)}${o===cur?' · en curso':''}</option>`).join('')}</select></div>
+      <div class="fr-liq-r"><b>${dmy(P.d0)} al ${dmy(P.d1)}</b><span>Corte del 23 al 22 · ${C?C.rows.length+' eventuales en el período':'sin empleados'}${hoy()>=P.d0&&hoy()<=P.d1?` · faltan ${Math.round((dObj(P.d1)-dObj(hoy()))/864e5)} día(s) para el cierre`:hoy()>P.d1?' · cerrado':' · todavía no empezó'}</span></div>`; }
+  const nAnt=[...ANTOF.values()].filter(a=>a.activo).length, nBaja=ANTOF.size-nAnt, nPl=F?Object.keys(F.emps||{}).length:0;
   $('#fr-drop').classList.toggle('ok',!!E.length); $('#fr-mdrop').classList.toggle('ok',!!(C&&C.M));
   const LA=F&&F.asig&&F.asig[F.asig.length-1];
-  $('#fr-st-plan').innerHTML=E.length?`<b>${E.length} empleados</b> · período ${dmy(P.d0)} al ${dmy(P.d1)}<br>${esc((F.files||[]).slice(-1)[0]||'')} · ${fmtAt(F.at)}${LA?`<br>Última asignación cargada: <b>${esc(LA.file)}</b> · ${fmtAt(LA.at)} · ${LA.fr} franco(s)${LA.falt?` · <span class="w">${LA.falt} sin completar</span>`:''}`:''}`:'Sin cargar';
+  $('#fr-st-plan').innerHTML=(nAnt?`<b>${nAnt} eventuales activos</b> de la lista de eventuales${nBaja?` · ${nBaja} con baja reciente`:''}${nPl?` · ${nPl} en el plan`:''}`:nPl?`<b>${nPl} empleados</b> en el plan`:'Sin empleados: cargá la lista de eventuales (sección Eventuales) o un plan')+
+    (F&&(F.files||[]).length?`<br>${esc((F.files||[]).slice(-1)[0]||'')} · ${fmtAt(F.at)}`:'')+(LA?`<br>Última asignación cargada: <b>${esc(LA.file)}</b> · ${fmtAt(LA.at)} · ${LA.fr} franco(s)${LA.falt?` · <span class="w">${LA.falt} sin completar</span>`:''}`:'');
   $('#fr-st-mov').innerHTML=M?`<b>Fichadas del ${dmy(M.d0)} al ${dmy(M.d1)}</b><br>${esc(M.file||'')} · ${fmtAt(M.at)}${C&&!C.M?'<br><span class="w">⚠ No corresponde al período del plan</span>':''}${C&&C.M&&M.d1<addD(hoy(),-2)?'<br><span class="w">⚠ Hay días sin cruzar: subí un export más nuevo</span>':''}`:'Sin cargar · sin movimientos se usa solo el plan';
   $('#fr-cx-obj').value=cfg.obj; $('#fr-cx-art').checked=!!cfg.art;
   renderMsel('#fr-mt','turnos','Turno',E.map(e=>turKey(e.turno)));
   renderMsel('#fr-ms','sectors','Sector',E.map(e=>secKey(e.sector)));
   $('#fr-cx-f').value=cxState.f;
+  { const el=$('#fr-sel-n'); if(el) el.innerHTML=frState.sel.length?`<b>${frState.sel.length}</b> elegido(s) · las planillas salen solo con ellos <button type="button" class="btn ghost sm" id="fr-sel-x">Limpiar</button>`:'Elegí eventuales con las casillas, o filtrá por sector: la planilla sale con ellos'; }
   const q=frState.q.trim().toLowerCase();
   const flt=e=>(!frState.turnos.length||frState.turnos.includes(turKey(e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(e.sector)))&&(!q||e.nombre.toLowerCase().includes(q)||String(e.legajo).includes(q));
   // KPIs
@@ -1281,30 +1323,32 @@ function renderFrancos(){
   R.sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es'));
   const th=(t,ti,al)=>`<th style="text-align:${al||'center'}"${ti?` title="${esc(ti)}"`:''}>${t}</th>`;
   $('#fr-cx').innerHTML=!C?`<tbody><tr><td><div class="empty">Cargá el plan de francos (paso 1) y los movimientos del reloj (paso 2).</div></td></tr></tbody>`:
-    `<thead><tr><th>Legajo</th><th>Empleado</th><th>Turno / sector</th>${th('Fichadas','Días con fichada en el reloj (incluye domingos y feriados trabajados)')}${th('Francos<br>restantes','Francos que le faltan tomar para no pasar de '+cfg.obj+' jornadas')}${th('Jornadas<br>a la fecha','Fichadas + enfermedad'+(cfg.art?' + ART':''))}${th('Le quedan<br>planificadas','Jornadas del plan después del corte (sin domingos ni feriados)')}${th('Total al<br>cierre','Jornadas a la fecha + planificadas')}${th('Francos<br>tomados','Días sin fichada (+ francos ya planificados), sin contar domingos')}<th>Novedades</th></tr></thead><tbody>`+
+    `<thead><tr><th class="fr-ck"><input type="checkbox" id="fr-sel-all" title="Elegir todos los del filtro"${R.length&&R.every(r=>frState.sel.includes(cxKey(r.e)))?' checked':''}></th><th>Legajo</th><th>Empleado</th><th>Turno / sector</th>${th('Fichadas','Días con fichada en el reloj (incluye domingos y feriados trabajados)')}${th('Francos<br>restantes','Francos que le faltan tomar para no pasar de '+cfg.obj+' jornadas')}${th('Jornadas<br>a la fecha','Fichadas + enfermedad'+(cfg.art?' + ART':''))}${th('Le quedan<br>planificadas','Jornadas del plan después del corte (sin domingos ni feriados)')}${th('Total al<br>cierre','Jornadas a la fecha + planificadas')}${th('Francos<br>tomados','Días sin fichada (+ francos ya planificados), sin contar domingos')}<th>Novedades</th></tr></thead><tbody>`+
     (R.length?R.map(r=>{ const g=r.g, nov=[g.DT?g.DT+' dom. trab.':'',g.FT?g.FT+' fer. trab.':'',g.ENF?g.ENF+' enferm.':'',g.ART?g.ART+' ART':'',g.AUS?g.AUS+' ausencia':'',g.VAC?g.VAC+' vac.':'',g.LIC+g.OTRO?(g.LIC+g.OTRO)+' otras':'',r.mv?'':'sin fichadas',r.falt?`no llega a ${cfg.obj} (faltan ${r.falt})`:''].filter(Boolean).join(' · ');
-      return `<tr data-cxe="${esc(cxKey(r.e))}" class="${frState.emp===cxKey(r.e)?'sel':''}"><td class="mono">${esc(r.e.legajo)}</td><td><b>${esc(r.e.nombre)}</b></td>
+      return `<tr data-cxe="${esc(cxKey(r.e))}" class="${frState.emp===cxKey(r.e)?'sel':''}"><td class="fr-ck"><input type="checkbox" data-frsel="${esc(cxKey(r.e))}"${frState.sel.includes(cxKey(r.e))?' checked':''}></td><td class="mono">${esc(r.e.legajo)}</td><td><b>${esc(r.e.nombre)}</b></td>
       <td style="font-size:12.5px">${esc(r.e.turno||'')}<div style="color:var(--text3);font-size:11.5px">${esc(r.e.sector||'')}</div></td>
       <td class="mono" style="text-align:center;font-weight:600">${g.T+g.DT+g.FT}</td><td style="text-align:center">${cxTag(r,cfg)}</td><td class="mono" style="text-align:center">${r.comp}</td><td class="mono" style="text-align:center">${g.P}</td>
       <td class="mono" style="text-align:center;font-weight:600;color:${r.proy>cfg.obj?'#fcd34d':'var(--text)'}">${r.proy}</td><td class="mono" style="text-align:center">${r.ftom}</td>
       <td style="font-size:12px;color:var(--text2);white-space:normal;max-width:300px">${esc(nov)}</td></tr>`; }).join('')
-      :`<tr><td colspan="10"><div class="empty">Nadie en este filtro.</div></td></tr>`)+
-    (C.sinPl.length&&['all','sinmv'].includes(cxState.f)?`<tr><td colspan="9" style="font-size:12.5px;color:var(--text2);white-space:normal"><b>Fichan como eventuales pero no están en el plan:</b> ${C.sinPl.map(x=>esc(x.legajo+' '+x.nombre)).join(' · ')}</td></tr>`:'')+'</tbody>';
+      :`<tr><td colspan="11"><div class="empty">Nadie en este filtro.</div></td></tr>`)+
+    (C.sinPl.length&&['all','sinmv'].includes(cxState.f)?`<tr><td colspan="11" style="font-size:12.5px;color:var(--text2);white-space:normal"><b>Fichan como eventuales pero no están en la lista de eventuales ni en el plan:</b> ${C.sinPl.map(x=>esc(x.legajo+' '+x.nombre)).join(' · ')}</td></tr>`:'')+'</tbody>';
   renderFrEmp(C);
   // calendario día por día
   const ds=C?C.dias:frDates();
   if(!frState.date||(!ds.includes(frState.date)&&ds.length)) frState.date=ds.includes(hoy())?hoy():(ds.find(d=>d>=hoy())||ds[ds.length-1]||hoy());
   const D=frState.date; $('#fr-date').value=D;
   const code=(e,d)=>C&&C.by[cxKey(e)]?C.by[cxKey(e)].cal[d]:(e.d[d]==='B'?'-':e.d[d]==null?'':dObj(d).getDay()===0?'DOM':e.d[d]==='F'?'PF':'P');
-  const EF=E.filter(flt).filter(e=>ds.some(d=>e.d[d]!=null)).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const EF=(C?C.rows.map(r=>r.e):E.filter(e=>ds.some(d=>e.d[d]!=null))).filter(flt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const ED=frCanEdit();
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
       return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}<th title="Francos que faltan tomar">Faltan</th></tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
       return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}" title="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td style="text-align:center">${r?cxTag(r,cfg):''}</td></tr>`; }).join('')+'</tbody>'
+        const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
+        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\n'+(c==='PF'?'Clic para quitar el franco':'Clic para asignar franco'):''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td style="text-align:center">${r?cxTag(r,cfg):''}</td></tr>`; }).join('')+'</tbody>'
     :'<tbody><tr><td><div class="empty">Cargá el plan de francos.</div></td></tr></tbody>';
-  $('#fr-n').textContent=EF.length?`${EF.length} empleado(s)${C&&C.M?' · hasta el '+dm(C.corte)+' según fichadas, después según el plan':''}`:'';
+  $('#fr-n').textContent=EF.length?`${EF.length} empleado(s)${C&&C.M?' · hasta el '+dm(C.corte)+' según fichadas, después según el plan':''}${ED?' · clic en un día para asignar o quitar un franco':''}`:'';
   $('#fr-cx-ley').innerHTML=['T','F','PF','P','DOM','FER','ENF','ART','AUS','DT'].map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
   // francos por día + lista del día
   const cnt=ds.map(d=>EF.filter(e=>cxFr(code(e,d))).length);
@@ -1355,9 +1399,8 @@ function cxCoord(){
   const cfg=C.cfg, desde=[C.M?addD(C.corte,1):C.P.d0,hoy()].sort()[1];
   const fut=C.dias.filter(d=>d>=desde&&dObj(d).getDay()!==0);
   if(!fut.length){ App.toast('El período ya terminó: no quedan días para asignar francos.',true); return; }
-  const q=frState.q.trim().toLowerCase();
-  const base=C.rows.filter(r=>(!frState.turnos.length||frState.turnos.includes(turKey(r.e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(r.e.sector)))&&(!q||r.e.nombre.toLowerCase().includes(q)||String(r.e.legajo).includes(q))&&!(r.e.egreso&&r.e.egreso<desde));
-  const secs=frState.sectors.length?frState.sectors:uniq(base.map(r=>secKey(r.e.sector))).sort((a,b)=>a.localeCompare(b,'es'));
+  const base=cxBase(C,desde);
+  const secs=uniq(base.map(r=>secKey(r.e.sector))).sort((a,b)=>a.localeCompare(b,'es'));
   const pages=secs.map(sk=>{ const R=base.filter(r=>secKey(r.e.sector)===sk).sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es'));
     const pend=R.filter(r=>r.pend>0||r.sup), ok=R.filter(r=>!(r.pend>0||r.sup));
     return {sk,R,pend,ok}; }).filter(p=>p.R.length);
@@ -1397,17 +1440,20 @@ function cxCoord(){
 }
 
 /* ---------- Asignación de francos por Excel (ida y vuelta con el coordinador) ---------- */
+// a quién se le arma la planilla: los elegidos uno por uno (casillas de la tabla) o, si no hay, el filtro de turno/sector/búsqueda
+function cxBase(C,desde){
+  const q=frState.q.trim().toLowerCase(), sel=frState.sel;
+  return C.rows.filter(r=>(sel.length?sel.includes(cxKey(r.e)):(!frState.turnos.length||frState.turnos.includes(turKey(r.e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(r.e.sector)))&&(!q||r.e.nombre.toLowerCase().includes(q)||String(r.e.legajo).includes(q)))&&!(r.e.egreso&&r.e.egreso<desde)); }
 function cxCoordData(){
   const C=frCruce(); if(!C) return {err:'Cargá el plan de francos y los movimientos.'};
   const desde=[C.M?addD(C.corte,1):C.P.d0,hoy()].sort()[1];
   const fut=C.dias.filter(d=>d>=desde&&dObj(d).getDay()!==0);
   if(!fut.length) return {err:'El período ya terminó: no quedan días para asignar francos.'};
-  const q=frState.q.trim().toLowerCase();
-  const base=C.rows.filter(r=>(!frState.turnos.length||frState.turnos.includes(turKey(r.e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(r.e.sector)))&&(!q||r.e.nombre.toLowerCase().includes(q)||String(r.e.legajo).includes(q))&&!(r.e.egreso&&r.e.egreso<desde));
-  const secs=frState.sectors.length?frState.sectors:uniq(base.map(r=>secKey(r.e.sector))).sort((a,b)=>a.localeCompare(b,'es'));
+  const base=cxBase(C,desde);
+  const secs=uniq(base.map(r=>secKey(r.e.sector))).sort((a,b)=>a.localeCompare(b,'es'));
   const pages=secs.map(sk=>{ const R=base.filter(r=>secKey(r.e.sector)===sk).sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es'));
     return {sk,R,pend:R.filter(r=>r.pend>0||r.sup),ok:R.filter(r=>!(r.pend>0||r.sup))}; }).filter(p=>p.R.length);
-  if(!pages.length) return {err:'No hay empleados en esos sectores.'};
+  if(!pages.length) return {err:frState.sel.length?'Los elegidos ya no tienen días para asignar en este período.':'No hay empleados en esos sectores.'};
   return {C,desde,fut,pages};
 }
 async function cxCoordExcel(){
@@ -1431,7 +1477,7 @@ async function cxCoordExcel(){
     const r5=ws.getRow(5); r5.getCell(1).value='#FRANCOS'; r5.getCell(2).value=C.P.d0+'|'+C.P.d1; fut.forEach((d,j)=>r5.getCell(FC+j).value=d); r5.hidden=true;
     const h=ws.getRow(6); ['Legajo','Empleado','Turno','Fichadas','A asignar'].concat(fut.map(d=>`${DOW[dObj(d).getDay()].slice(0,2)} ${dObj(d).getDate()}/${dObj(d).getMonth()+1}`)).concat(['Asignados','Faltan']).forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,size:9.5}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(j===4?'FFFDE68A':cxFer(fut[j-FC+1])?'FFCBD5E1':'FFF1F5F9'); c.border=B; });
     h.height=30;
-    const L=p.pend;
+    const L=p.R;
     L.forEach((r,i)=>{ const row=ws.getRow(7+i), n=7+i;
       [r.e.legajo,r.e.nombre,r.e.turno||'',r.g.T+r.g.DT+r.g.FT,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j===1||j===2?'left':'center',vertical:'middle'}; if(j===4){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
       fut.forEach((d,j)=>{ const c=row.getCell(FC+j), st=r.cal[d]; c.border=B; c.alignment={horizontal:'center',vertical:'middle'};
@@ -1448,8 +1494,8 @@ async function cxCoordExcel(){
     if(L.length){ const fl=ws.getColumn(FC+fut.length+1).letter;
       ws.addConditionalFormatting({ref:`${fl}7:${fl}${6+L.length}`,rules:[{type:'cellIs',operator:'greaterThan',formulae:[0],style:{fill:fill('FFFECACA'),font:{color:{argb:'FFB91C1C'},bold:true}}},{type:'cellIs',operator:'equal',formulae:[0],style:{fill:fill('FFDCFCE7'),font:{color:{argb:'FF15803D'},bold:true}}}]}); }
     let rr=8+L.length;
-    if(!L.length){ ws.getCell(7,1).value='Nadie del sector tiene francos pendientes.'; rr=9; }
-    if(p.ok.length){ ws.mergeCells(rr,1,rr,last); ws.getCell(rr,1).value='Al día (sin francos pendientes): '+p.ok.map(r=>r.e.nombre).join(' · '); ws.getCell(rr,1).alignment={wrapText:true}; ws.getCell(rr,1).font={size:9.5,color:{argb:'FF475569'}}; }
+    if(!L.length){ ws.getCell(7,1).value='No hay eventuales en esta hoja.'; rr=9; }
+    if(false){ ws.mergeCells(rr,1,rr,last); ws.getCell(rr,1).value='Al día (sin francos pendientes): '+p.ok.map(r=>r.e.nombre).join(' · '); ws.getCell(rr,1).alignment={wrapText:true}; ws.getCell(rr,1).font={size:9.5,color:{argb:'FF475569'}}; }
     await ws.protect('',{selectLockedCells:true,selectUnlockedCells:true,formatColumns:true,formatRows:true});
     ctl.push([k,p.sk,L.length]);
   }
@@ -1457,13 +1503,16 @@ async function cxCoordExcel(){
   cs.addRow(['ASIGNACION_FRANCOS_PANEL_RRHH',1]); cs.addRow(['periodo',C.P.d0,C.P.d1]); cs.addRow(['emitido',new Date().toISOString()]); cs.addRow(['hojas']); ctl.forEach(x=>cs.addRow(x));
   const buf=await wb.xlsx.writeBuffer();
   download(buf,`asignar_francos_${pages.length===1?pages[0].sk.replace(/[^A-Z0-9Ñ]+/g,'_'):pages.length+'_sectores'}_${hoy()}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  App.toast(`Excel para completar: ${pages.length} sector(es), una hoja por sector`);
+  App.toast(`Excel para completar: ${pages.reduce((a,p)=>a+p.R.length,0)} eventual(es) en ${pages.length} hoja(s), una por sector${frState.sel.length?' · solo los elegidos':''}`);
 }
 // vuelta: el coordinador manda el Excel completo → actualiza el plan de francos
 function esAsignacion(wb){ return wb.SheetNames.some(sn=>{ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:true}); return rows.slice(0,8).some(r=>r&&r[0]==='#FRANCOS'); }); }
 async function loadAsignacion(wb,name){
-  const F=DB.francos; if(!F||!FRE().length) throw new Error('Primero cargá el plan de francos: la asignación se aplica sobre ese plan.');
+  if(!FRE().length) throw new Error('Primero cargá la lista de eventuales o el plan de francos: la asignación se aplica sobre esos empleados.');
+  DB.francos=DB.francos||{emps:{},files:[]}; const F=DB.francos;
   const byLeg={}; FRE().forEach(e=>{ if(e.legajo) byLeg[e.legajo]=e; });
+  const quien=frUser()+' · Excel '+name, at=new Date().toISOString(), fa=F.fa||(F.fa={});
+  const marca=(e,d,v)=>{ (fa[frKey(e)]||(fa[frKey(e)]={}))[d]={v,by:quien,at}; };
   let fr=0, jo=0, emp=new Set(), noEnc=[], hojas=0, falt=[];
   for(const sn of wb.SheetNames){
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:true});
@@ -1471,12 +1520,12 @@ async function loadAsignacion(wb,name){
     const H=rows[hi], cols=[]; H.forEach((v,j)=>{ if(j>0&&typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)) cols.push([j,v]); });
     const hd=rows[hi+1]||[], ca=hd.findIndex(x=>/a asignar/i.test(String(x||'')));
     for(let i=hi+2;i<rows.length;i++){ const r=rows[i]; if(!r||r[0]==null||!/^\s*\d+/.test(String(r[0]))) continue;
-      const leg=String(r[0]).trim().replace(/\.0+$/,''), e=byLeg[leg]; if(!e){ noEnc.push(leg+' '+(r[1]||'')); continue; }
+      const leg=String(r[0]).trim().replace(/\.0+$/,''); let e=byLeg[leg]; if(!e){ noEnc.push(leg+' '+(r[1]||'')); continue; }
       let n=0;
       for(const [j,d] of cols){ const v=String(r[j]==null?'':r[j]).trim();
-        if(e.d[d]==null||e.d[d]==='B'||cxFer(d)||v==='Fe'||v==='–') continue;   // feriado / fuera de contrato: no se toca
-        if(/^(f|x|franco)/i.test(v)){ if(e.d[d]!=='F'){ e.d[d]='F'; fr++; } emp.add(leg); n++; }
-        else if(v===''&&e.d[d]==='F'){ e.d[d]='1'; jo++; emp.add(leg); } }
+        if(e.d[d]==='B'||cxFer(d)||v==='Fe'||v==='–'||(e.ingreso&&d<e.ingreso)||(e.egreso&&d>e.egreso)) continue;   // feriado / fuera de contrato: no se toca
+        if(/^(f|x|franco)/i.test(v)){ if(e.d[d]!=='F'){ e=frMaterial(e); byLeg[leg]=e; e.d[d]='F'; marca(e,d,'F'); fr++; } emp.add(leg); n++; }
+        else if(v===''&&e.d[d]==='F'){ e=frMaterial(e); byLeg[leg]=e; e.d[d]='1'; marca(e,d,''); jo++; emp.add(leg); } }
       const pedidos=ca>=0?+r[ca]||0:0; if(pedidos>n) falt.push(`${r[1]||leg}: ${n}/${pedidos}`);
     }
   }
@@ -1564,6 +1613,22 @@ function cxExcel(){
   XLSX.writeFile(wb,`francos_por_empleado_${C.P.d0}_al_${C.P.d1}.xlsx`); App.toast('Excel descargado');
 }
 App.renderFrancos=renderFrancos;
+// asignar o quitar un franco desde el calendario
+let frBusy=false;
+async function frToggle(id){
+  if(frBusy||!frCanEdit()) return;
+  const i=id.lastIndexOf('|'), key=id.slice(0,i), d=id.slice(i+1), e=FRE().find(x=>cxKey(x)===key); if(!e) return;
+  const C=frCruce(), r=C&&C.by[key], cur=r?r.cal[d]:null; if(cur!=='P'&&cur!=='PF') return;
+  const valor=cur==='P'?'F':'';
+  frBusy=true; document.querySelectorAll(`[data-fe="${CSS.escape(id)}"]`).forEach(x=>x.classList.add('busy'));
+  try{
+    if(window.SRV&&SRV.mode==='online'&&SRV.francosCeldas)
+      await SRV.francosCeldas([{key:frKey(e),fecha:d,valor,emp:{legajo:e.legajo,nombre:e.nombre,turno:e.turno,sector:e.sector,ingreso:e.ingreso,egreso:e.egreso}}]);
+    else { const m=frMaterial(e); m.d[d]=valor==='F'?'F':'1'; const fa=DB.francos.fa||(DB.francos.fa={}); (fa[frKey(m)]||(fa[frKey(m)]={}))[d]={v:valor,by:frUser(),at:new Date().toISOString()}; DB.francos.at=new Date().toISOString(); await persist(); }
+    App.toast(`${valor==='F'?'Franco asignado':'Franco quitado'} · ${shortName(e.nombre)} · ${lblDay(d)}`);
+  }catch(err){ App.toast('No se pudo guardar el franco: '+(err.message||err),true); }
+  finally{ frBusy=false; renderFrancos(); App.refresh(); }
+}
 function hookFrancos(){
   $('#fr-pick').onclick=()=>$('#fr-file').click();
   $('#fr-file').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
@@ -1583,7 +1648,11 @@ function hookFrancos(){
   $('#fr-coord-x').onclick=cxCoordExcel;
   $('#fr-asig-pick').onclick=()=>$('#fr-afile').click();
   $('#fr-afile').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
-  document.addEventListener('change',e=>{ const c=e.target.closest('input[data-ms]'); if(!c) return; const k=c.dataset.ms;
+  document.addEventListener('change',e=>{
+    if(e.target.id==='fr-liq-s'){ frState.liq=e.target.value; frState.date=''; renderFrancos(); return; }
+    const sk=e.target.closest('input[data-frsel]'); if(sk){ const k=sk.dataset.frsel; frState.sel=sk.checked?uniq(frState.sel.concat(k)):frState.sel.filter(x=>x!==k); renderFrancos(); return; }
+    if(e.target.id==='fr-sel-all'){ const ks=[...document.querySelectorAll('#fr-cx input[data-frsel]')].map(i=>i.dataset.frsel); frState.sel=e.target.checked?uniq(frState.sel.concat(ks)):frState.sel.filter(x=>!ks.includes(x)); renderFrancos(); return; }
+    const c=e.target.closest('input[data-ms]'); if(!c) return; const k=c.dataset.ms;
     frState[k]=c.checked?uniq(frState[k].concat(c.value)):frState[k].filter(x=>x!==c.value); renderFrancos(); });
   document.addEventListener('click',e=>{ if(!e.target.closest('.msel')) document.querySelectorAll('.msel.open').forEach(x=>x.classList.remove('open')); });
   let qt; $('#fr-q').oninput=e=>{ clearTimeout(qt); qt=setTimeout(()=>{ frState.q=e.target.value; renderFrancos(); },200); };
@@ -1591,11 +1660,21 @@ function hookFrancos(){
   $('#fr-prev').onclick=()=>{ frState.date=addD(frState.date,-1); renderFrancos(); };
   $('#fr-next').onclick=()=>{ frState.date=addD(frState.date,1); renderFrancos(); };
   document.addEventListener('click',e=>{ if(!e.target.closest('#v-francos')) return;
+    const fe=e.target.closest('[data-fe]'); if(fe){ frToggle(fe.dataset.fe); return; }
+    if(e.target.closest('.fr-ck')) return;
+    if(e.target.closest('#fr-sel-x')){ frState.sel=[]; renderFrancos(); return; }
     const c=e.target.closest('[data-frd]'); if(c){ frState.date=c.dataset.frd; renderFrancos(); return; }
     const mb=e.target.closest('.msel-b'); if(mb){ const m=mb.parentElement, was=m.classList.contains('open'); document.querySelectorAll('#v-francos .msel.open').forEach(x=>x.classList.remove('open')); m.classList.toggle('open',!was); return; }
     const ma=e.target.closest('[data-ms-all],[data-ms-none]'); if(ma){ const k=ma.dataset.msAll||ma.dataset.msNone; frState[k]=ma.dataset.msAll?[...ma.closest('.msel').querySelectorAll('input[data-ms]')].map(i=>i.value):[]; renderFrancos(); return; }
     if(e.target.closest('.msel')) return;
     const k=e.target.closest('[data-cxe]'); if(k){ frState.emp=frState.emp===k.dataset.cxe?'':k.dataset.cxe; renderFrancos(); if(frState.emp) $('#fr-emp-card').scrollIntoView({behavior:'smooth',block:'nearest'}); } });
+  // ventanita al pasar el mouse por un día: estado, novedad y quién cargó el franco
+  const tip=document.createElement('div'); tip.className='fr-tip'; tip.style.display='none'; document.body.appendChild(tip);
+  const grid=$('#fr-grid');
+  grid.addEventListener('mouseover',e=>{ const c=e.target.closest('[data-frtip]'); if(!c){ tip.style.display='none'; return; }
+    tip.textContent=c.dataset.frtip; tip.style.display='block'; const r=c.getBoundingClientRect(), w=tip.offsetWidth;
+    tip.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px'; tip.style.top=(r.bottom+8+tip.offsetHeight>innerHeight?r.top-tip.offsetHeight-8:r.bottom+8)+'px'; });
+  grid.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
   $('#fr-csv').onclick=()=>{ const D=frState.date, C=frCruce(), rows=[['Fecha','Legajo','Apellido y nombre','Turno','Sector','Estado']];
     FRE().forEach(e=>{ const r=C&&C.by[cxKey(e)], c=r?r.cal[D]:null, v=e.d[D]; rows.push([dmy(D),e.legajo,e.nombre,e.turno,e.sector,c?CX_LAB[c]:v==='F'?'FRANCO':v==null?'sin dato':'Jornada']); });
     download(csv(rows),`francos_${D}.csv`,'text/csv;charset=utf-8'); };

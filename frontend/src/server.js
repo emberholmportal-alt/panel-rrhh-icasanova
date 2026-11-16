@@ -144,6 +144,17 @@ const SRVX=(()=>{
     finally{ saving=false; }
   }
   S.save=db=>{ lastDB=db; clearTimeout(pending); pending=setTimeout(flush,500); return Promise.resolve(); };
+  // francos día por día: el servidor aplica el cambio sobre la última versión y anota quién y cuándo
+  S.francosCeldas=async cambios=>{
+    if(!canW('francos')) throw new Error('No tenés permiso para asignar francos.');
+    if(pending){ clearTimeout(pending); pending=null; await flush(); }
+    const r=await api('POST','/api/francos/celdas',{cambios});
+    if(r.prev!==(ver.francos||0)){ await pullDoc('francos',true); return r; }   // alguien más cambió algo: se trae todo
+    const F=DB.francos||(DB.francos={emps:{},files:[]}); F.emps=F.emps||{}; F.fa=F.fa||{};
+    for(const k in r.emps) F.emps[k]=r.emps[k];
+    for(const k in r.fa) F.fa[k]=r.fa[k];
+    F.at=r.at; ver.francos=r.version; snap.francos=JSON.stringify(pick(DB,S.MAP.francos));
+    setSt('Guardado','ok'); return r; };
   // F3 guarda directo en el navegador: se detecta y se sube
   const _set=Storage.prototype.setItem;
   Storage.prototype.setItem=function(k,v){ _set.call(this,k,v); if(this===window.localStorage&&S.F3K.includes(k)){ lastDB=lastDB||DB; clearTimeout(pending); pending=setTimeout(flush,800); } };

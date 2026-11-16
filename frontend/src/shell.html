@@ -191,14 +191,15 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
 
 <section class="view" id="v-francos">
   <div class="vhead"><div><div class="eyebrow">Módulo 06 · Gestión diaria</div><h2>Francos</h2>
-    <p>Cargá el plan de francos y los movimientos del reloj: el panel calcula cuántos francos le faltan tomar a cada empleado para cerrar el período sin pasar las jornadas del objetivo.</p></div></div>
+    <p>Los eventuales salen de la lista de eventuales. Con los movimientos del reloj, el panel calcula cuántos francos le faltan tomar a cada uno para cerrar el período de liquidación sin pasar las jornadas del objetivo. Los coordinadores asignan los francos acá mismo o con la planilla.</p></div></div>
   <div class="updbar" id="upd-fr"></div>
+  <div class="fr-liq" id="fr-liq"></div>
   <div class="cx-steps">
     <div class="cx-step" id="fr-drop">
       <div class="cx-n">1</div>
-      <div class="cx-sb"><h4>Plan de francos</h4><p>Planilla de eventuales · hoja <b>Unificado</b> · 1 = jornada · 0 = franco</p>
+      <div class="cx-sb"><h4>Eventuales y plan</h4><p>Salen de la <b>lista de eventuales</b>. El plan de francos (hoja <b>Unificado</b>, 1 = jornada · 0 = franco) es opcional.</p>
         <div class="cx-st" id="fr-st-plan"></div>
-        <button class="btn primary sm" id="fr-pick">Cargar plan…</button><input type="file" id="fr-file" accept=".xlsx,.xls,.csv" multiple hidden></div>
+        <button class="btn ghost sm" id="fr-pick">Cargar plan…</button><input type="file" id="fr-file" accept=".xlsx,.xls,.csv" multiple hidden></div>
     </div>
     <div class="cx-step" id="fr-mdrop">
       <div class="cx-n">2</div>
@@ -222,7 +223,7 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
         <div class="field"><label>Turno</label><div class="msel" id="fr-mt"></div></div>
         <div class="field"><label>Sector</label><div class="msel" id="fr-ms"></div></div>
         <div class="field"><label>Mostrar</label><select id="fr-cx-f"><option value="all">Todos</option><option value="pend">Con francos restantes</option><option value="falt">No llegan al objetivo</option><option value="sup">Superaron el objetivo</option><option value="sinmv">Sin fichadas / no cruzados</option></select></div>
-        <div class="cx-coord"><button class="btn primary sm" id="fr-coord" title="Un listado imprimible por cada sector elegido, con los días que quedan para que el coordinador marque los francos">Imprimir listado para coordinador</button><button class="btn ghost sm" id="fr-coord-x" title="Excel para que el coordinador escriba F en los días de franco y lo devuelva por correo">Descargar Excel para completar</button><button class="btn ghost sm" id="fr-asig-pick" title="Cargar el Excel que devolvió el coordinador: actualiza el plan de francos">Cargar Excel completado</button><input type="file" id="fr-afile" accept=".xlsx" multiple hidden></div>
+        <div class="cx-coord"><button class="btn primary sm" id="fr-coord" title="Un listado imprimible por cada sector elegido, con los días que quedan para que el coordinador marque los francos">Imprimir listado para coordinador</button><button class="btn ghost sm" id="fr-coord-x" title="Excel para que el coordinador escriba F en los días de franco y lo devuelva por correo">Descargar Excel para completar</button><button class="btn ghost sm" id="fr-asig-pick" title="Cargar el Excel que devolvió el coordinador: actualiza el plan de francos">Cargar Excel completado</button><input type="file" id="fr-afile" accept=".xlsx" multiple hidden><div class="fr-sel-n" id="fr-sel-n"></div></div>
       </div>
     </div>
     <div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="fr-cx"></table></div></div>
