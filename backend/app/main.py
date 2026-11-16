@@ -261,6 +261,7 @@ async def francos_celdas(request: Request, u: User = Depends(current_user), db: 
     F.setdefault("files", [])
     emps, fa = F.setdefault("emps", {}), F.setdefault("fa", {})
     ahora, quien = iso(now()), u.nombre
+    log = F.setdefault("log", [])
     tocados = set()
     for c in cambios:
         key, fecha, valor = str(c.get("key") or "")[:40], str(c.get("fecha") or ""), c.get("valor")
@@ -276,18 +277,24 @@ async def francos_celdas(request: Request, u: User = Depends(current_user), db: 
             e["d"][fecha] = "F"
         elif e["d"].get(fecha) == "F":
             e["d"][fecha] = "1"
-        fa.setdefault(key, {})[fecha] = {"v": valor, "by": quien, "at": ahora}
+        ant = fa.setdefault(key, {}).get(fecha)
+        hist = []
+        if ant:
+            hist = (ant.get("h") or []) + [{k: ant.get(k) for k in ("v", "by", "at")}]
+        fa[key][fecha] = {"v": valor, "by": quien, "at": ahora, "h": hist[-9:]}
+        log.append({"k": key, "l": e.get("legajo", ""), "n": e.get("nombre", ""), "d": fecha, "v": valor, "by": quien, "at": ahora})
         tocados.add(key)
     if not tocados:
         raise HTTPException(400, "No hubo cambios válidos")
     F["at"] = ahora
+    F["log"] = log[-500:]
     d.data = data
     d.version += 1
     d.updated_at = now()
     d.updated_by = quien
     auth.audit(db, u, "francos_dia", f"{len(cambios)} cambio(s) en {len(tocados)} empleado(s)")
     db.commit()
-    return {"version": d.version, "prev": prev, "emps": {k: emps[k] for k in tocados}, "fa": {k: fa[k] for k in tocados}, "at": ahora}
+    return {"version": d.version, "prev": prev, "emps": {k: emps[k] for k in tocados}, "fa": {k: fa[k] for k in tocados}, "log": F["log"][-len(cambios):], "at": ahora}
 
 
 @app.put("/api/me/docs/{key}")

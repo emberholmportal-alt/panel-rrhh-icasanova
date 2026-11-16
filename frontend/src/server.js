@@ -153,6 +153,7 @@ const SRVX=(()=>{
     const F=DB.francos||(DB.francos={emps:{},files:[]}); F.emps=F.emps||{}; F.fa=F.fa||{};
     for(const k in r.emps) F.emps[k]=r.emps[k];
     for(const k in r.fa) F.fa[k]=r.fa[k];
+    if(r.log&&r.log.length) F.log=(F.log||[]).concat(r.log).slice(-500);
     F.at=r.at; ver.francos=r.version; snap.francos=JSON.stringify(pick(DB,S.MAP.francos));
     setSt('Guardado','ok'); return r; };
   // F3 guarda directo en el navegador: se detecta y se sube

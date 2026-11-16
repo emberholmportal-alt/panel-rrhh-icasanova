@@ -1341,7 +1341,7 @@ function renderFrancos(){
       <td style="font-size:12px;color:var(--text2);white-space:normal;max-width:300px">${esc(nov)}</td></tr>`; }).join('')
       :`<tr><td colspan="11"><div class="empty">Nadie en este filtro.</div></td></tr>`)+
     (C.sinPl.length&&['all','sinmv'].includes(cxState.f)?`<tr><td colspan="11" style="font-size:12.5px;color:var(--text2);white-space:normal"><b>Fichan como eventuales pero no están en la lista de eventuales ni en el plan:</b> ${C.sinPl.map(x=>esc(x.legajo+' '+x.nombre)).join(' · ')}</td></tr>`:'')+'</tbody>';
-  renderFrEmp(C);
+  renderFrEmp(C); renderFrLog();
   // calendario día por día
   const ds=C?C.dias:frDates();
   if(!frState.date||(!ds.includes(frState.date)&&ds.length)) frState.date=ds.includes(hoy())?hoy():(ds.find(d=>d>=hoy())||ds[ds.length-1]||hoy());
@@ -1355,9 +1355,9 @@ function renderFrancos(){
       return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\n'+(c==='PF'?'Clic para quitar el franco':'Clic para asignar franco'):''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td class="frt"><span class="fr-cnt${frAsig(e,ds)?'':' z'}">${frAsig(e,ds)}</span></td>${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
+        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td class="frt"><span class="fr-cnt${frAsig(e,ds)?'':' z'}">${frAsig(e,ds)}</span></td>${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${E.length?'Nadie con ese filtro.':'No hay eventuales: cargá la lista en la sección Eventuales.'}</div></td></tr></tbody>`;
-  $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día para marcar franco</b>; tocalo de nuevo para quitarlo. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
+  $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día</b> para asignar o quitar el franco. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
   $('#fr-cx-ley').innerHTML=(C&&C.M?['PF','P','T','F','DOM','FER','ENF','ART','AUS']:['PF','P','DOM','FER']).map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
   // francos por día + lista del día
   const cnt=ds.map(d=>EF.filter(e=>cxFr(code(e,d))).length);
@@ -1521,7 +1521,7 @@ async function loadAsignacion(wb,name){
   DB.francos=DB.francos||{emps:{},files:[]}; const F=DB.francos;
   const byLeg={}; FRE().forEach(e=>{ if(e.legajo) byLeg[e.legajo]=e; });
   const quien=frUser()+' · Excel '+name, at=new Date().toISOString(), fa=F.fa||(F.fa={});
-  const marca=(e,d,v)=>{ (fa[frKey(e)]||(fa[frKey(e)]={}))[d]={v,by:quien,at}; };
+  const marca=(e,d,v)=>frMarca(F,frKey(e),e,d,v,quien,at);
   let fr=0, jo=0, emp=new Set(), noEnc=[], hojas=0, falt=[];
   for(const sn of wb.SheetNames){
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:true});
@@ -1681,19 +1681,49 @@ ${g.L.map(x=>`<tr><td>${esc(x.e.legajo)}</td><td>${esc(x.e.nombre)}</td><td clas
 }
 // asignar o quitar un franco desde el calendario
 let frBusy=false;
-async function frToggle(id){
+// marca local (sin servidor o desde Excel): mismo registro que el servidor
+function frMarca(F,key,e,d,v,by,at){
+  const fa=F.fa||(F.fa={}), m=fa[key]||(fa[key]={}), ant=m[d];
+  const h=ant?(ant.h||[]).concat([{v:ant.v,by:ant.by,at:ant.at}]).slice(-9):[];
+  m[d]={v,by,at,h};
+  (F.log||(F.log=[])).push({k:key,l:e.legajo||'',n:e.nombre||'',d,v,by,at}); F.log=F.log.slice(-500);
+}
+async function frSet(id,valor){
   if(frBusy||!frCanEdit()) return;
   const i=id.lastIndexOf('|'), key=id.slice(0,i), d=id.slice(i+1), e=FRE().find(x=>cxKey(x)===key); if(!e) return;
-  const C=frCruce(), r=C&&C.by[key], cur=r?r.cal[d]:null; if(cur!=='P'&&cur!=='PF') return;
-  const valor=cur==='P'?'F':'';
   frBusy=true; document.querySelectorAll(`[data-fe="${CSS.escape(id)}"]`).forEach(x=>x.classList.add('busy'));
   try{
     if(window.SRV&&SRV.mode==='online'&&SRV.francosCeldas)
       await SRV.francosCeldas([{key:frKey(e),fecha:d,valor,emp:{legajo:e.legajo,nombre:e.nombre,turno:e.turno,sector:e.sector,ingreso:e.ingreso,egreso:e.egreso}}]);
-    else { const m=frMaterial(e); m.d[d]=valor==='F'?'F':'1'; const fa=DB.francos.fa||(DB.francos.fa={}); (fa[frKey(m)]||(fa[frKey(m)]={}))[d]={v:valor,by:frUser(),at:new Date().toISOString()}; DB.francos.at=new Date().toISOString(); await persist(); }
+    else { const m=frMaterial(e); m.d[d]=valor==='F'?'F':'1'; frMarca(DB.francos,frKey(m),m,d,valor,frUser(),new Date().toISOString()); DB.francos.at=new Date().toISOString(); await persist(); }
     App.toast(`${valor==='F'?'Franco asignado':'Franco quitado'} · ${shortName(e.nombre)} · ${lblDay(d)}`);
   }catch(err){ App.toast('No se pudo guardar el franco: '+(err.message||err),true); }
   finally{ frBusy=false; renderFrancos(); App.refresh(); }
+}
+// ventanita al hacer clic en un día: confirmar asignar o quitar, con el historial de ese día
+function frPop(id,cell){
+  frPopClose();
+  const i=id.lastIndexOf('|'), key=id.slice(0,i), d=id.slice(i+1), e=FRE().find(x=>cxKey(x)===key); if(!e) return;
+  const C=frCruce(), r=C&&C.by[key], cur=r?r.cal[d]:null; if(cur!=='P'&&cur!=='PF') return;
+  const mt=frMeta(e,d), es=cur==='PF', H=mt?(mt.h||[]).concat([{v:mt.v,by:mt.by,at:mt.at}]).reverse():[];
+  const box=document.createElement('div'); box.className='fr-pop'; box.id='fr-pop';
+  box.innerHTML=`<div class="fr-pop-h"><b>${esc(e.nombre)}</b><span>${esc(DOWL[dObj(d).getDay()])} ${dmy(d)}${cxFer(d)?' · feriado':''}</span></div>
+    <div class="fr-pop-st ${es?'f':''}">${es?'Tiene <b>franco asignado</b>':'Día de <b>trabajo</b>'}${es?(mt&&mt.v==='F'?`<em>por ${esc(mt.by)} · ${fmtAt(mt.at)}</em>`:'<em>del plan de francos</em>'):''}</div>
+    <div class="fr-pop-b">${es?`<button class="btn danger sm" data-fpset="">Quitar franco</button>`:`<button class="btn primary sm" data-fpset="F">Asignar franco</button>`}<button class="btn ghost sm" data-fpx>Cancelar</button></div>
+    ${H.length?`<div class="fr-pop-l"><span>Registro de este día</span>${H.map(x=>`<div><i class="${x.v==='F'?'a':'q'}">${x.v==='F'?'Asignó':'Quitó'}</i> ${esc(x.by||'—')} <em>${fmtAt(x.at)}</em></div>`).join('')}</div>`:''}`;
+  box.dataset.id=id; document.body.appendChild(box);
+  const rc=cell.getBoundingClientRect(), w=box.offsetWidth, h=box.offsetHeight;
+  box.style.left=Math.max(8,Math.min(innerWidth-w-8,rc.left+rc.width/2-w/2))+'px';
+  box.style.top=(rc.bottom+8+h>innerHeight?Math.max(8,rc.top-h-8):rc.bottom+8)+'px';
+  cell.classList.add('pick'); const tip=document.querySelector('.fr-tip'); if(tip) tip.style.display='none';
+}
+function frPopClose(){ const b=$('#fr-pop'); if(b) b.remove(); document.querySelectorAll('#fr-grid .pick').forEach(x=>x.classList.remove('pick')); }
+// registro general de cambios (control de RRHH)
+function renderFrLog(){
+  const el=$('#fr-log'); if(!el) return;
+  const L=((DB.francos&&DB.francos.log)||[]).slice().reverse().slice(0,200);
+  el.innerHTML=L.length?`<thead><tr><th>Cuándo</th><th>Quién</th><th>Acción</th><th>Empleado</th><th>Día</th></tr></thead><tbody>${L.map(x=>`<tr><td class="mono">${fmtAt(x.at)}</td><td>${esc(x.by)}</td><td><span class="fr-lg2 ${x.v==='F'?'a':'q'}">${x.v==='F'?'Asignó franco':'Quitó franco'}</span></td><td>${esc(x.n)} <span style="color:var(--text3)">${esc(x.l)}</span></td><td class="mono">${esc(DOW[dObj(x.d).getDay()].slice(0,2))} ${dmy(x.d)}</td></tr>`).join('')}</tbody>`
+    :'<tbody><tr><td><div class="empty">Todavía no hay cambios registrados.</div></td></tr></tbody>';
 }
 function hookFrancos(){
   $('#fr-dl-x').onclick=frListadoXlsx; $('#fr-dl-p').onclick=frListadoPrint;
@@ -1728,7 +1758,7 @@ function hookFrancos(){
   $('#fr-prev').onclick=()=>{ frState.date=addD(frState.date,-1); renderFrancos(); };
   $('#fr-next').onclick=()=>{ frState.date=addD(frState.date,1); renderFrancos(); };
   document.addEventListener('click',e=>{ if(!e.target.closest('#v-francos')) return;
-    const fe=e.target.closest('[data-fe]'); if(fe){ frToggle(fe.dataset.fe); return; }
+    const fe=e.target.closest('[data-fe]'); if(fe){ frPop(fe.dataset.fe,fe); e.stopPropagation(); return; }
     const lq=e.target.closest('[data-liq]'); if(lq){ const n=+lq.dataset.liq; frState.liq=n?liqMas(cxPeriodo().ym,n):liqDe(hoy()); frState.date=''; renderFrancos(); return; }
     const ca=e.target.closest('[data-chall]'); if(ca){ frState[ca.dataset.chall]=[]; renderFrancos(); return; }
     const ch=e.target.closest('[data-ch]'); if(ch){ const k=ch.dataset.ch, v=ch.dataset.chv; frState[k]=frState[k].includes(v)?frState[k].filter(x=>x!==v):frState[k].concat(v); renderFrancos(); return; }
@@ -1739,10 +1769,15 @@ function hookFrancos(){
     const ma=e.target.closest('[data-ms-all],[data-ms-none]'); if(ma){ const k=ma.dataset.msAll||ma.dataset.msNone; frState[k]=ma.dataset.msAll?[...ma.closest('.msel').querySelectorAll('input[data-ms]')].map(i=>i.value):[]; renderFrancos(); return; }
     if(e.target.closest('.msel')) return;
     const k=e.target.closest('[data-cxe]'); if(k){ frState.emp=frState.emp===k.dataset.cxe?'':k.dataset.cxe; renderFrancos(); if(frState.emp) $('#fr-emp-card').scrollIntoView({behavior:'smooth',block:'nearest'}); } });
+  document.addEventListener('click',e=>{ const pop=$('#fr-pop'); if(!pop) return;
+    const b=e.target.closest('[data-fpset]'); if(b&&pop.contains(b)){ const id=pop.dataset.id, v=b.dataset.fpset; frPopClose(); frSet(id,v); return; }
+    if(e.target.closest('[data-fpx]')||(!pop.contains(e.target)&&!e.target.closest('[data-fe]'))) frPopClose(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') frPopClose(); });
+  document.addEventListener('scroll',()=>frPopClose(),true);
   // ventanita al pasar el mouse por un día: estado, novedad y quién cargó el franco
   const tip=document.createElement('div'); tip.className='fr-tip'; tip.style.display='none'; document.body.appendChild(tip);
   const grid=$('#fr-grid');
-  grid.addEventListener('mouseover',e=>{ const c=e.target.closest('[data-frtip]'); if(!c){ tip.style.display='none'; return; }
+  grid.addEventListener('mouseover',e=>{ const c=e.target.closest('[data-frtip]'); if(!c||$('#fr-pop')){ tip.style.display='none'; return; }
     tip.textContent=c.dataset.frtip; tip.style.display='block'; const r=c.getBoundingClientRect(), w=tip.offsetWidth;
     tip.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px'; tip.style.top=(r.bottom+8+tip.offsetHeight>innerHeight?r.top-tip.offsetHeight-8:r.bottom+8)+'px'; });
   grid.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
