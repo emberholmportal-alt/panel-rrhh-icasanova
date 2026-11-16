@@ -1165,6 +1165,14 @@ const liqNom=ym=>{ const [y,m]=ym.split('-').map(Number); return MESL[m-1][0].to
 const liqMas=(ym,n)=>{ let [y,m]=ym.split('-').map(Number); m+=n; while(m>12){ m-=12; y++; } while(m<1){ m+=12; y--; } return `${y}-${pad(m)}`; };
 // quién cargó cada franco: {legajo: {fecha: {v, by, at}}}
 const frMeta=(e,d)=>{ const fa=DB.francos&&DB.francos.fa, m=fa&&fa[frKey(e)]; return m&&m[d]||null; };
+function frDeFranco(d){ return FRE().filter(e=>(!ANTOF.size||ANTOF.has(e.legajo))&&e.d[d]==='F'&&!(e.ingreso&&d<e.ingreso)&&!(e.egreso&&d>e.egreso)); }
+function renderFrDia(){
+  const el=$('#fr-dia'); if(!el) return; const d=frState.dia||hoy();
+  const L=frDeFranco(d).filter(frFlt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')), G={};
+  L.forEach(e=>{ const k=secKey(e.sector)+' · '+turKey(e.turno); (G[k]||(G[k]=[])).push(e); });
+  el.innerHTML=`<div class="fr-dnav"><button class="fr-arr" data-frdia="-1">‹</button><div><b>${esc(DOWL[dObj(d).getDay()][0].toUpperCase()+DOWL[dObj(d).getDay()].slice(1))} ${dmy(d)}</b><span>${L.length?`${L.length} colaborador(es) con franco asignado${frState.sectors.length||frState.turnos.length||frState.q?' en este filtro':''}`:'Nadie con franco asignado'}</span></div><button class="fr-arr" data-frdia="1">›</button>${d!==hoy()?'<button class="btn ghost sm" data-frdia="0">Hoy</button>':''}<input type="date" id="fr-dia-i" value="${d}"></div>
+    ${Object.keys(G).sort((a,b)=>a.localeCompare(b,'es')).map(k=>`<div class="fr-dg"><h4>${esc(k)} <i>${G[k].length}</i></h4><div>${G[k].map(e=>{ const m=frMeta(e,d); return `<span class="fr-dp" title="${esc(m&&m.v==='F'?'Cargado por '+m.by+' · '+fmtAt(m.at):'Del plan de francos')}">${esc(e.nombre)}<em>${esc(e.legajo||'')}</em></span>`; }).join('')}</div></div>`).join('')||'<div class="empty">No hay francos asignados ese día con este filtro.</div>'}`;
+}
 function frFlt(e){ const q=frState.q.trim().toLowerCase(); return (!frState.turnos.length||frState.turnos.includes(turKey(e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(e.sector)))&&(!q||e.nombre.toLowerCase().includes(q)||String(e.legajo).includes(q)); }
 const frAsig=(e,ds)=>ds.reduce((a,d)=>a+(e.d[d]==='F'&&!(e.ingreso&&d<e.ingreso)&&!(e.egreso&&d>e.egreso)&&dObj(d).getDay()!==0?1:0),0);
 function frCanEdit(){ return !(window.SRV&&SRV.mode==='online')||SRV.user.rol==='admin'||(SRV.user.perms&&SRV.user.perms.francos)==='editar'; }
@@ -1207,7 +1215,7 @@ async function loadFrancos(files){
   else if(errs.length) App.toast(errs[0],true);
   renderFrancos(); App.refresh();
 }
-let frState={date:'',turnos:[],sectors:[],q:'',emp:'',liq:'',sel:[]};
+let frState={date:'',turnos:[],sectors:[],q:'',emp:'',liq:'',sel:[],modo:'',dia:''};
 /* ================================================================
    FRANCOS · CRUCE PLAN x FICHADAS
    ================================================================ */
@@ -1291,6 +1299,11 @@ function renderFrancos(){
   const F=DB.francos, E=FRE(), C=frCruce(), cfg=cxCfg();
   // pasos de carga
   const P=cxPeriodo(), M=F&&F.mov;
+  { const H=hoy(), n=frDeFranco(H).length, nf=(frState.sectors.length||frState.turnos.length)?frDeFranco(H).filter(frFlt).length:null;
+    $('#fr-hoy').innerHTML=`<span class="fr-hoy-i">🏖</span><div><b>Hoy ${dm(H)} hay ${n} colaborador${n===1?'':'es'} con franco asignado</b>${nf!=null?`<span>${nf} en el sector y turno elegidos</span>`:''}</div><button class="btn ghost sm" data-frmodo="lista" data-frhoy="1">Ver quiénes</button>`; }
+  if(!frState.modo) frState.modo=frCanEdit()?'plan':'lista';
+  document.querySelectorAll('#fr-modo [data-frmodo]').forEach(b=>b.classList.toggle('on',b.dataset.frmodo===frState.modo));
+  { const lista=frState.modo==='lista'; $('#fr-gridw').hidden=lista; $('#fr-cx-ley').hidden=lista; $('#fr-n').hidden=lista; $('#fr-dia').hidden=!lista; if(lista) renderFrDia(); }
   { const cur=liqDe(hoy()), rows=C?C.rows:[], asig=rows.reduce((a,r)=>a+frAsig(r.e,C.dias),0), sin=rows.filter(r=>!frAsig(r.e,C.dias)).length,
       falta=hoy()>=P.d0&&hoy()<=P.d1?Math.round((dObj(P.d1)-dObj(hoy()))/864e5):null;
     const nA=rows.length;
@@ -1747,6 +1760,7 @@ function hookFrancos(){
   $('#fr-asig-pick').onclick=()=>$('#fr-afile').click();
   $('#fr-afile').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
   document.addEventListener('change',e=>{
+    if(e.target.id==='fr-dia-i'&&e.target.value){ frState.dia=e.target.value; renderFrDia(); return; }
     if(e.target.id==='fr-liq-s'){ frState.liq=e.target.value; frState.date=''; renderFrancos(); return; }
     const sk=e.target.closest('input[data-frsel]'); if(sk){ const k=sk.dataset.frsel; frState.sel=sk.checked?uniq(frState.sel.concat(k)):frState.sel.filter(x=>x!==k); renderFrancos(); return; }
     if(e.target.id==='fr-sel-all'){ const ks=[...document.querySelectorAll('#fr-cx input[data-frsel]')].map(i=>i.dataset.frsel); frState.sel=e.target.checked?uniq(frState.sel.concat(ks)):frState.sel.filter(x=>!ks.includes(x)); renderFrancos(); return; }
@@ -1759,6 +1773,8 @@ function hookFrancos(){
   $('#fr-next').onclick=()=>{ frState.date=addD(frState.date,1); renderFrancos(); };
   document.addEventListener('click',e=>{ if(!e.target.closest('#v-francos')) return;
     const fe=e.target.closest('[data-fe]'); if(fe){ frPop(fe.dataset.fe,fe); e.stopPropagation(); return; }
+    const md=e.target.closest('[data-frmodo]'); if(md){ frState.modo=md.dataset.frmodo; if(md.dataset.frhoy) frState.dia=hoy(); renderFrancos(); return; }
+    const dn=e.target.closest('[data-frdia]'); if(dn){ const n=+dn.dataset.frdia; frState.dia=n?addD(frState.dia||hoy(),n):hoy(); renderFrDia(); return; }
     const lq=e.target.closest('[data-liq]'); if(lq){ const n=+lq.dataset.liq; frState.liq=n?liqMas(cxPeriodo().ym,n):liqDe(hoy()); frState.date=''; renderFrancos(); return; }
     const ca=e.target.closest('[data-chall]'); if(ca){ frState[ca.dataset.chall]=[]; renderFrancos(); return; }
     const ch=e.target.closest('[data-ch]'); if(ch){ const k=ch.dataset.ch, v=ch.dataset.chv; frState[k]=frState[k].includes(v)?frState[k].filter(x=>x!==v):frState[k].concat(v); renderFrancos(); return; }

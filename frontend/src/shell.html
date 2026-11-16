@@ -192,18 +192,21 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
 <section class="view" id="v-francos">
   <div class="vhead"><div><div class="eyebrow">Módulo 06 · Gestión diaria</div><h2>Francos</h2>
     <p>Elegí tu sector y turno, tocá los días para marcar francos y descargá el listado. Los eventuales salen solos de la sección Eventuales.</p></div></div>
+  <div class="fr-hoyb" id="fr-hoy"></div>
   <div class="fr-hero" id="fr-liq"></div>
   <div class="card fr-plan">
     <div class="fr-bar">
       <div class="fr-chips"><span class="fr-chl">Sector</span><div id="fr-ch-s"></div></div>
       <div class="fr-chips"><span class="fr-chl">Turno</span><div id="fr-ch-t"></div></div>
       <div class="fr-bar2">
+        <div class="fr-modo" id="fr-modo"><button type="button" data-frmodo="plan">Planificación</button><button type="button" data-frmodo="lista">Listado por día</button></div>
         <input type="search" id="fr-q" placeholder="Buscar apellido o legajo" class="fr-search">
         <div class="fr-dl"><button class="btn primary" id="fr-dl-x">⬇ Descargar francos asignados</button><button class="btn ghost" id="fr-dl-p">Imprimir</button></div>
       </div>
     </div>
     <div class="fr-ley" id="fr-cx-ley"></div>
-    <div class="tscroll fr-scroll"><table id="fr-grid" class="fr-grid"></table></div>
+    <div class="tscroll fr-scroll" id="fr-gridw"><table id="fr-grid" class="fr-grid"></table></div>
+    <div class="fr-dia" id="fr-dia" hidden></div>
     <div class="fr-foot" id="fr-n"></div>
   </div>
 

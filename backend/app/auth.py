@@ -97,10 +97,17 @@ def require_admin(u: User = Depends(current_user)) -> User:
     return u
 
 
+# El menú semanal lo edita solo el comedor (Milagros Marchioro) y el administrador.
+MENU_EDITORES = {"mmarchioro"}
+
+
 def level(u: User, modulo: str) -> str:
     if u.rol == "admin":
         return "editar"
-    return (u.perms or {}).get(modulo, "") or DEFAULT_LEVEL.get(modulo, "")
+    lv = (u.perms or {}).get(modulo, "") or DEFAULT_LEVEL.get(modulo, "")
+    if modulo == "menu" and lv == "editar" and u.username not in MENU_EDITORES:
+        return "ver"
+    return lv
 
 
 def can_read(u: User, modulo: str) -> bool:

@@ -384,3 +384,26 @@ body.light .fr-tip,html.light .fr-tip{background:#fff;color:#0f172a}
 .ag-tab tr.ag-new input{border-color:rgba(148,163,184,.3)}
 .ag-tab tr.ag-baja-r td{opacity:.6}
 .ag-tab select option{background:#0f172a}
+
+/* ---- francos: hoy y listado por día ---- */
+.fr-hoyb{display:flex;align-items:center;gap:14px;margin:0 0 12px;padding:14px 18px;border-radius:16px;background:linear-gradient(90deg,rgba(245,158,11,.16),rgba(245,158,11,.04));border:1px solid rgba(245,158,11,.35)}
+.fr-hoyb:empty{display:none}
+.fr-hoy-i{font-size:26px}
+.fr-hoyb b{font-size:17px}
+.fr-hoyb div{flex:1;display:flex;flex-direction:column}
+.fr-hoyb div span{font-size:12.5px;color:var(--text2)}
+.fr-modo{display:flex;border:1px solid rgba(148,163,184,.35);border-radius:12px;overflow:hidden}
+.fr-modo button{background:transparent;border:0;color:inherit;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.fr-modo button.on{background:#22d3ee;color:#0b1222}
+.fr-dia{padding:16px 18px}
+.fr-dnav{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.fr-dnav>div{display:flex;flex-direction:column;min-width:220px}
+.fr-dnav b{font-size:18px}
+.fr-dnav span{font-size:13px;color:var(--text2)}
+.fr-dnav input{width:160px}
+.fr-dg{margin-bottom:14px}
+.fr-dg h4{margin:0 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+.fr-dg h4 i{font-style:normal;color:#67e8f9;margin-left:6px}
+.fr-dg>div{display:flex;flex-wrap:wrap;gap:8px}
+.fr-dp{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.25);font-size:13px;font-weight:600}
+.fr-dp em{font-style:normal;font-weight:400;color:var(--text3);font-size:11.5px}
