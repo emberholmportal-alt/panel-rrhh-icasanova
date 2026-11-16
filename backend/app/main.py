@@ -26,6 +26,7 @@ from sqlalchemy import select, func, inspect, text
 from sqlalchemy.orm import Session
 
 from . import auth, seed
+from .feriados import FERIADOS
 from .auth import current_user, require_admin, can_read, can_write, MODULES, LEVELS, DEFAULT_PERMS
 from .db import Base, engine, get_db, SessionLocal
 from .models import User, Doc, UserDoc, PizarraItem, BuzonItem, Audit, now
@@ -234,6 +235,18 @@ def sync(u: User = Depends(current_user), db: Session = Depends(get_db)):
 # ------------------------------------------------------------------ solicitudes de vacaciones
 # Coordinadores y supervisores cargan el pedido; RRHH (administrador o quien edita Vacaciones) lo aprueba o rechaza.
 VS_ANTICIPO = 15   # días mínimos de anticipación para pedir vacaciones
+VS_REGLAS = (f"las vacaciones tienen que empezar un lunes (o el martes, si el lunes es feriado) y pedirse con al menos "
+             f"{VS_ANTICIPO} días de anticipación. Toda solicitud queda pendiente hasta que RRHH la apruebe.")
+
+
+def vs_inicio_ok(desde: str, sector: str) -> bool:
+    """Lunes, o martes si el lunes es feriado. El personal de mantenimiento puede empezar cualquier día."""
+    if "MANTENIM" in sector.upper():
+        return True
+    d = datetime.fromisoformat(desde).date()
+    if d.weekday() == 0:
+        return True
+    return d.weekday() == 1 and (d - timedelta(days=1)).isoformat() in FERIADOS
 
 
 def vs_aprueba(u: User) -> bool:
@@ -300,9 +313,11 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
     hoy_ar = (now() - timedelta(hours=3)).date()
     minimo = hoy_ar + timedelta(days=VS_ANTICIPO)
     fuera = datetime.fromisoformat(desde).date() < minimo
-    # sin 15 días de anticipación se niega; solo RRHH puede cargarla igual, confirmándolo expresamente
-    if fuera and not (directa and b.get("forzar") is True):
-        raise HTTPException(400, f"Denegado: las vacaciones se piden con al menos {VS_ANTICIPO} días de anticipación (la salida tendría que ser desde el {minimo.strftime('%d/%m/%Y')})")
+    dia_mal = not vs_inicio_ok(desde, str(b.get("sector") or ""))
+    # reglas: 15 días de anticipación y salida un lunes (o martes si el lunes es feriado).
+    # Se niega; solo RRHH puede cargarla igual, confirmándolo expresamente.
+    if (fuera or dia_mal) and not (directa and b.get("forzar") is True):
+        raise HTTPException(400, "Denegado: " + VS_REGLAS)
     d = vs_doc(db, True)
     items = list((d.data or {}).get("items", []))
     legajo = str(b.get("legajo") or "").strip()[:20]
@@ -316,10 +331,29 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
         it.update(estado="aprobada", rby=u.nombre, rat=it["at"], directa=True)
     if fuera:
         it["fuera_plazo"] = True
+    if dia_mal:
+        it["fuera_dia"] = True
     items.append(it)
-    vs_guardar(db, d, items, u, ("vacaciones_carga" if directa else "vacaciones_solicitud") + ("_fuera_de_plazo" if fuera else ""),
-               f"{nombre} {desde} al {hasta}" + (f" · sin los {VS_ANTICIPO} días de anticipación" if fuera else ""))
+    vs_guardar(db, d, items, u, ("vacaciones_carga" if directa else "vacaciones_solicitud") + ("_fuera_de_regla" if (fuera or dia_mal) else ""),
+               f"{nombre} {desde} al {hasta}" + (f" · sin los {VS_ANTICIPO} días de anticipación" if fuera else "") + (" · no empieza un lunes" if dia_mal else ""))
     return {"item": it, "version": d.version}
+
+
+@app.post("/api/vacsol/visto")
+async def vacsol_visto(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """El coordinador ya vio la respuesta de RRHH (aprobada, rechazada o anulada) de sus pedidos."""
+    ids = set((json.loads(await request.body() or b"{}")).get("ids") or [])
+    d = vs_doc(db, True)
+    items, n = [], 0
+    for x in (d.data or {}).get("items", []):
+        if x.get("id") in ids and x.get("uid") == u.id and not x.get("visto"):
+            x = {**x, "visto": True}
+            n += 1
+        items.append(x)
+    if n:
+        d.data = {"items": items}
+        db.commit()
+    return {"ok": True, "n": n}
 
 
 @app.post("/api/vacsol/{sid}/{accion}")
