@@ -64,7 +64,9 @@ function nmRows(){
   const N=DB.nomina; if(!N||!N.emps) return [];
   const fr={}; try{ FRE().forEach(e=>{ if(e.legajo) fr[nmLeg(e.legajo)]=e; }); }catch(e){}
   const hoyI=hoy();
-  return Object.values(N.emps).filter(e=>!(e.egreso&&e.egreso<hoyI)).map(e=>{ const f=fr[e.leg]||{};
+  // agregados a mano (ej. delegados, que no fichan): se suman y pisan sector/tipo aunque se recargue el reloj
+  const base=Object.assign({},N.emps); Object.values(N.extra||{}).forEach(x=>{ if(x&&x.leg) base[x.leg]=Object.assign({},base[x.leg]||{},Object.fromEntries(Object.entries(x).filter(([k,v])=>v!=null&&v!==''&&k!=='at'&&k!=='por'))); });
+  return Object.values(base).filter(e=>!(e.egreso&&e.egreso<hoyI)).map(e=>{ const f=fr[e.leg]||{};
     return {leg:e.leg,nombre:e.nombre||f.nombre||'',tipo:e.tipo||(f.legajo?'EV':''),sector:e.sector||normTxt(f.sector)||'SIN SECTOR',turno:e.turno||normTxt(f.turno)||'SIN TURNO',ingreso:e.ingreso||f.ingreso||''}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
 }

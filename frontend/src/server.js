@@ -193,6 +193,9 @@ const SRVX=(()=>{
       for(const m in s.docs){ if(s.docs[m].version>(ver[m]||0)&&(m==='f3'||S.MAP[m]||m==='otros')) await pullDoc(m); }
       if(s.vacsol&&typeof VS!=='undefined'){ if(s.vacsol.v!==VS.ver){ const nuevo=VS.ok&&VS.aprueba&&s.vacsol.pend>VS.items.filter(x=>x.estado==='pendiente').length; await vsLoad(); if(nuevo) App.toast('Llegó una solicitud de vacaciones para revisar.'); } else vsBadge(s.vacsol.pend); }
       if(pzLast!==null&&(s.pizarra.last!==pzLast.last||s.pizarra.n!==pzLast.n||s.buzon!==bzLast)) SOC.refresh(); pzLast=s.pizarra; bzLast=s.buzon;
+      // versión nueva del panel publicada mientras la pestaña estaba abierta: avisar para recargar
+      if(s.build){ if(!S.build) S.build=s.build; else if(s.build!==S.build&&!document.getElementById('srv-upd')){ const b=document.createElement('div'); b.id='srv-upd';
+        b.innerHTML='<span>🔄 Hay una versión nueva del panel.</span><button type="button" class="btn primary sm">Recargar ahora</button>'; b.querySelector('button').onclick=()=>location.reload(); document.body.appendChild(b); } }
       if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol) App.toast('Tus permisos cambiaron: recargá la página para aplicarlos.',true);
       setSt('Guardado','ok');
     }catch(err){ if(err.status===401) loginScreen(); else setSt('Sin conexión','err'); }

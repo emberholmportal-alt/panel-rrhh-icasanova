@@ -33,6 +33,18 @@ from .models import User, Doc, UserDoc, PizarraItem, BuzonItem, Audit, now
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "frontend" / "dist" / "index.html"
+
+
+def _build_id() -> str:
+    """Huella de la versión publicada del panel: si cambia, los navegadores abiertos avisan que hay que recargar."""
+    import hashlib
+    try:
+        return hashlib.md5(DIST.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
+BUILD = _build_id()
 DOC_KEYS = set(MODULES) | {"otros"}
 USER_DOC_KEYS = {"fich"}
 MAX_DOC = 15 * 1024 * 1024       # 15 MB por módulo
@@ -86,6 +98,26 @@ def startup():
                 if uu:
                     uu.perms = {**(uu.perms or {}), **perms}
                     auth.audit(db, "sistema", "permisos", f"{username}: {perms}")
+            nuevas.append(clave)
+        for clave, extra in seed.NOMINA_EXTRA:
+            if clave in hechas:
+                continue
+            nd = db.get(Doc, "nomina")
+            if nd is None:
+                nd = Doc(key="nomina", data={}, version=0)
+                db.add(nd)
+            data = dict(nd.data or {})
+            nom = dict(data.get("nomina") or {"emps": {}, "files": []})
+            ex = dict(nom.get("extra") or {})
+            for leg, e in extra.items():
+                ex[leg] = {"leg": leg, **e, "at": iso(now()), "por": "sistema"}
+            nom["extra"] = ex
+            data["nomina"] = nom
+            nd.data = data
+            nd.version = (nd.version or 0) + 1
+            nd.updated_at = now()
+            nd.updated_by = "sistema"
+            auth.audit(db, "sistema", "nomina_extra", f"{clave}: {', '.join(extra)}")
             nuevas.append(clave)
         if nuevas:
             if mg is None:
@@ -227,7 +259,7 @@ def bootstrap(u: User = Depends(current_user), db: Session = Depends(get_db)):
     docs = {d.key: doc_out(d) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
     mine = {d.key: d.data for d in db.scalars(select(UserDoc).where(UserDoc.user_id == u.id))}
     return {"user": user_out(u), "modules": MODULES, "docs": docs, "user_docs": mine,
-            "server_time": iso(now())}
+            "server_time": iso(now()), "build": BUILD}
 
 
 @app.get("/api/sync")
@@ -246,7 +278,7 @@ def sync(u: User = Depends(current_user), db: Session = Depends(get_db)):
         d = db.get(Doc, "vacsol")
         it = (d.data or {}).get("items", []) if d else []
         vs = {"v": d.version if d else 0, "pend": sum(1 for x in it if x.get("estado") == "pendiente" and (vs_aprueba(u) or x.get("uid") == u.id))}
-    return {"docs": docs, "pizarra": {"last": iso(pz), "n": pz_n}, "buzon": bz, "vacsol": vs, "user": user_out(u)}
+    return {"docs": docs, "pizarra": {"last": iso(pz), "n": pz_n}, "buzon": bz, "vacsol": vs, "user": user_out(u), "build": BUILD}
 
 
 # ------------------------------------------------------------------ solicitudes de vacaciones

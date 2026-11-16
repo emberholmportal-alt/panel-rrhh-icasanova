@@ -16,7 +16,7 @@
   catch(e){ S.mode='error'; S.err='No hay conexión con el servidor.'; }
   if(x.status===200){
     var B=JSON.parse(x.responseText);
-    S.mode='online'; S.user=B.user; S.modules=B.modules; S.docs=B.docs||{}; S.userDocs=B.user_docs||{};
+    S.mode='online'; S.user=B.user; S.modules=B.modules; S.docs=B.docs||{}; S.userDocs=B.user_docs||{}; S.build=B.build||'';
     // F3 guarda sus datos en el navegador: se reemplazan por los del servidor
     var f3=(S.docs.f3&&S.docs.f3.data)||{};
     F3K.forEach(function(k){ try{ if(f3[k]!=null) localStorage.setItem(k,f3[k]); else localStorage.removeItem(k); }catch(e){} });

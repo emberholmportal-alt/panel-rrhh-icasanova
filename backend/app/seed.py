@@ -61,3 +61,15 @@ MIGRACIONES = [
         ("rcampos", {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}),
     ]),
 ]
+
+
+# Personas que se suman a la nómina a mano (no figuran en el reloj, ej. delegados gremiales).
+# Se guardan en nomina.extra: sobreviven a cada carga nueva del export de Movimientos.
+# Cada entrada se aplica una sola vez (clave en "_migraciones").
+NOMINA_EXTRA = [
+    ("2026-11-16-delegados", {
+        "199123": {"nombre": "BARRAZA, OMAR ARNALDO", "tipo": "EF", "sector": "DELEGADOS"},
+        "181543": {"nombre": "NAVARRO, GUSTAVO DANIEL", "tipo": "EF", "sector": "DELEGADOS"},
+        "208124": {"nombre": "OZORIO, MATIAS NICOLAS LEONEL", "tipo": "EF", "sector": "DELEGADOS"},
+    }),
+]
