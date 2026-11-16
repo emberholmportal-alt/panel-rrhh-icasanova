@@ -33,6 +33,33 @@ async function mnGuardar(){
   const ks=Object.keys(DB.menu.semanas).sort(); ks.slice(0,Math.max(0,ks.length-12)).forEach(k=>delete DB.menu.semanas[k]);
   await persist(); renderMenu(); App.refresh(); App.toast('Menú de la semana guardado');
 }
+// subir el Excel del comedor: filas MENÚ / OP1 / OP2 / OP3 (o Menú I a IV) y columnas de lunes a sábado.
+// Si el encabezado trae fechas ("Lunes 16/11"), el menú se carga en esa semana; si no, en la que está a la vista.
+async function mnSubir(f){
+  if(typeof XLSX==='undefined'){ App.toast('No cargó la librería de Excel.',true); return; }
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+    const fila=t=>{ const x=normTxt(t).replace(/\./g,'').replace(/\s+/g,' ');
+      if(/^(MENU( DEL DIA)?|MENU I|MENU 1|OPCION 0)$/.test(x)) return 'm';
+      if(/^(OP ?1|OPCION 1|MENU II|MENU 2)$/.test(x)) return 'o1';
+      if(/^(OP ?2|OPCION 2|MENU III|MENU 3)$/.test(x)) return 'o2';
+      if(/^(OP ?3|OPCION 3|MENU IV|MENU 4)$/.test(x)) return 'o3'; return ''; };
+    let got=null;
+    for(const sn of wb.SheetNames){ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:''});
+      const set={}; let hi=-1; rows.forEach((r,i)=>{ const k=fila(r[0]); if(k&&!set[k]){ set[k]=r; if(hi<0) hi=i; } });
+      if(Object.keys(set).length){ got={set,head:rows.slice(0,Math.max(0,hi)).reverse().find(r=>r.slice(1).some(c=>String(c).trim()))||[]}; break; } }
+    if(!got){ App.toast('No reconocí el Excel: necesito filas MENÚ, OP1, OP2 y OP3 (o Menú I a IV) con los días en columnas.',true); return; }
+    // semana: la primera fecha dd/mm del encabezado
+    const m=got.head.map(c=>String(c)).join(' ').match(/(\d{1,2})\/(\d{1,2})/);
+    if(m){ const y=new Date().getFullYear(); let best=null; for(const yy of [y-1,y,y+1]){ const iso=`${yy}-${pad(+m[2])}-${pad(+m[1])}`; if(!best||Math.abs(dObj(iso)-new Date())<Math.abs(dObj(best)-new Date())) best=iso; } mnState.sem=lunesDe(best); }
+    renderMenu();
+    const L=mnState.sem; let n=0;
+    for(const [k,r] of Object.entries(got.set)){ const cells=r.slice(1).map(c=>String(c).replace(/\s+/g,' ').trim());
+      MN_DIAS.forEach((_,i)=>{ const t=document.querySelector(`#mn-grid textarea[data-mn="${addD(L,i)}|${k}"]`); if(t&&cells[i]!=null){ t.value=cells[i]; if(cells[i]) n++; } }); }
+    if(!n){ App.toast('El Excel no trae platos en las columnas de lunes a sábado.',true); return; }
+    await mnGuardar(); App.toast(`Menú de la semana del ${dmy(L)} cargado desde ${f.name}: ${n} platos`);
+  }catch(e){ App.toast('No se pudo leer el Excel: '+e.message,true); }
+}
 // pegar la tabla copiada del Excel del comedor (filas MENÚ / OP1 / OP2 / OP3, 6 columnas)
 function mnPegar(txt){
   const rows=txt.replace(/\r/g,'').split('\n').map(l=>l.split('\t'));
@@ -119,7 +146,8 @@ function hookComedor(){
   $('#mn-save').onclick=mnGuardar;
   $('#mn-copy').onclick=()=>{ const P=mnSemana(addD(mnState.sem,-7)); if(!P){ App.toast('La semana anterior está vacía.',true); return; }
     MN_DIAS.forEach((_,i)=>MN_FILAS.forEach(([k])=>{ const t=document.querySelector(`#mn-grid textarea[data-mn="${addD(mnState.sem,i)}|${k}"]`), v=(P.dias[addD(mnState.sem,i-7)]||{})[k]; if(t&&v) t.value=v; })); $('#mn-nota').value=$('#mn-nota').value||P.nota||''; App.toast('Se copió la semana anterior: revisala y tocá Guardar'); };
-  $('#mn-paste').onclick=()=>{ const t=prompt('Pegá acá la tabla copiada del Excel del comedor (filas MENÚ, OP1, OP2 y OP3):'); if(t) mnPegar(t); };
+  $('#mn-up').onclick=()=>$('#mn-file').click();
+  $('#mn-file').onchange=e=>{ const f=e.target.files[0]; if(f) mnSubir(f); e.target.value=''; };
   document.addEventListener('paste',e=>{ if(!e.target.closest||!e.target.closest('#mn-grid')) return; const t=(e.clipboardData||window.clipboardData).getData('text'); if(t&&t.includes('\t')&&t.includes('\n')){ e.preventDefault(); mnPegar(t); } });
   $('#cu-mes').onchange=e=>{ cuState.mes=+e.target.value; renderCumple(); };
   $('#cu-xls').onclick=cuExcel;
