@@ -48,7 +48,7 @@ function renderVacsol(){
   $('#vs-tit').textContent=VS.aprueba?'Cargar vacaciones y pedidos':VS.pide?'Pedir vacaciones':'Pedidos de vacaciones';
   $('#vs-sub').textContent=VS.aprueba?'Lo que cargás acá queda aprobado. Los pedidos de coordinadores esperan tu aprobación.':VS.pide?`Con al menos ${VS_ANT} días de anticipación (desde el ${dmy(vsMin())}). RRHH lo aprueba o lo rechaza.`:'Vacaciones aprobadas por RRHH.';
   $('#vs-go').textContent=VS.aprueba?'Cargar vacaciones':'Enviar a RRHH';
-  $('#vs-d').min=VS.aprueba?'':vsMin(); $('#vs-h').min=VS.aprueba?'':vsMin();
+  $('#vs-d').min=''; $('#vs-h').min='';
   if(VS.pide){ const E=vsEmps(); $('#vs-emps').innerHTML=E.map(e=>`<option value="${esc(e.nombre+' · '+e.leg)}">${esc([e.sector,e.turno].filter(Boolean).join(' · '))}</option>`).join(''); vsCalc(); }
   const cnt=k=>VS.items.filter(x=>k==='todas'||x.estado===k||(k==='pend'&&x.estado==='pendiente')).length;
   $('#vs-tabs').innerHTML=[['pend','Pendientes'],['aprobada','Aprobadas'],['rechazada','Rechazadas'],['todas','Todas']].map(([k,l])=>`<button type="button" class="fr-ch${VS.f===k?' on':''}" data-vsf="${k}">${l} <i>${cnt(k)}</i></button>`).join('');
@@ -63,21 +63,23 @@ function renderVacsol(){
       return `<tr><td><b>${esc(x.nombre)}</b><span>${esc([x.legajo,x.sector,x.turno].filter(Boolean).join(' · '))}</span></td>
         <td><b>${dmy(x.desde)} al ${dmy(x.hasta)}</b><span>${x.dias} día(s)${x.obs?' · '+esc(x.obs):''}</span></td>
         <td>${esc(x.by)}<span>${fmtAt(x.at)}</span></td>
-        <td><em class="vs-e ${x.estado}">${x.directa?'Cargada por RRHH':(VS_EST[x.estado]||x.estado)}</em>${x.rby?`<span>${esc(x.rby)} · ${fmtAt(x.rat)}</span>`:''}${x.motivo?`<span>Motivo: ${esc(x.motivo)}</span>`:''}</td>
+        <td><em class="vs-e ${x.estado}">${x.directa&&x.estado==='aprobada'?'Cargada por RRHH':(VS_EST[x.estado]||x.estado)}</em>${x.fuera_plazo?'<em class="vs-e vs-fp" title="Se cargó sin los 15 días de anticipación">Fuera de plazo</em>':''}${x.rby?`<span>${esc(x.rby)} · ${fmtAt(x.rat)}</span>`:''}${x.motivo?`<span>Motivo: ${esc(x.motivo)}</span>`:''}</td>
         <td class="vs-acc">${acc}</td></tr>`; }).join('')}</tbody></table>`
     :`<div class="empty">${VS.f==='pend'?'No hay pedidos pendientes.':'No hay solicitudes en esta lista.'}</div>`;
   vsBadge();
 }
-function vsCalc(){ const d=$('#vs-d').value, h=$('#vs-h').value, n=vsDias(d,h), tarde=!VS.aprueba&&d&&d<vsMin();
-  $('#vs-n').innerHTML=tarde?`<b class="vs-warn">Falta anticipación: la salida tiene que ser desde el ${dmy(vsMin())}</b>`:n?`${n} día(s) corridos`:(d&&h?'El regreso no puede ser antes de la salida':''); $('#vs-go').disabled=!!tarde; }
-async function vsEnviar(){
+function vsCalc(){ const d=$('#vs-d').value, h=$('#vs-h').value, n=vsDias(d,h), tarde=!!(d&&d<vsMin());
+  const den=$('#vs-den'); if(den){ den.hidden=!tarde;
+    if(tarde) den.innerHTML=`<span><b>⛔ Denegado:</b> las vacaciones se piden con al menos ${VS_ANT} días de anticipación. Para cargarlas, la salida tendría que ser desde el <b>${dmy(vsMin())}</b>.</span>${VS.aprueba?`<button type="button" class="btn danger sm" id="vs-force">Cargar de todas maneras</button>`:''}`; }
+  $('#vs-n').innerHTML=!tarde&&n?`${n} día(s) corridos`:(!tarde&&d&&h?'El regreso no puede ser antes de la salida':''); $('#vs-go').disabled=tarde; }
+async function vsEnviar(forzar){
   const sel=$('#vs-emp').value.trim(), m=sel.match(/·\s*(\S+)\s*$/), E=vsEmps(), e=m&&E.find(x=>x.leg===m[1]);
   if(!e){ App.toast('Elegí el empleado de la lista (escribí el apellido y elegilo).',true); return; }
   const desde=$('#vs-d').value, hasta=$('#vs-h').value;
   if(!vsDias(desde,hasta)){ App.toast('Revisá las fechas de salida y regreso.',true); return; }
-  if(!VS.aprueba&&desde<vsMin()){ App.toast(`Las vacaciones se piden con al menos ${VS_ANT} días de anticipación: la salida tiene que ser desde el ${dmy(vsMin())}.`,true); return; }
+  if(desde<vsMin()&&!(VS.aprueba&&forzar)){ App.toast(`Denegado: las vacaciones se piden con al menos ${VS_ANT} días de anticipación (desde el ${dmy(vsMin())}).`,true); return; }
   const b=$('#vs-go'); b.disabled=true;
-  try{ await SRV.api('POST','/api/vacsol',{legajo:e.leg,nombre:e.nombre,sector:e.sector,turno:e.turno,desde,hasta,obs:$('#vs-obs').value.trim()});
+  try{ await SRV.api('POST','/api/vacsol',{legajo:e.leg,nombre:e.nombre,sector:e.sector,turno:e.turno,desde,hasta,obs:$('#vs-obs').value.trim(),forzar:!!forzar});
     App.toast(VS.aprueba?`Vacaciones cargadas: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`:`Pedido enviado a RRHH: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`);
     $('#vs-emp').value=''; $('#vs-d').value=''; $('#vs-h').value=''; $('#vs-obs').value=''; VS.f=VS.aprueba?'aprobada':'pend'; await vsLoad(); }
   catch(err){ App.toast(err.message,true); }
@@ -100,7 +102,8 @@ async function vsExcel(){
 }
 function hookVacsol(){
   if(!vsOn()){ const w=$('#vs-wrap'); if(w) w.hidden=true; return; }
-  $('#vs-go').onclick=vsEnviar; $('#vs-xls').onclick=vsExcel;
+  $('#vs-go').onclick=()=>vsEnviar(false);
+  document.addEventListener('click',e=>{ if(e.target.closest('#vs-force')){ e.target.closest('#vs-force').disabled=true; vsEnviar(true); } }); $('#vs-xls').onclick=vsExcel;
   ['#vs-d','#vs-h'].forEach(s=>$(s).addEventListener('change',()=>{ if(s==='#vs-d'&&$('#vs-d').value&&(!$('#vs-h').value||$('#vs-h').value<$('#vs-d').value)) $('#vs-h').value=$('#vs-d').value; vsCalc(); }));
   document.addEventListener('click',e=>{ if(!e.target.closest('#vs-wrap')) return;
     const f=e.target.closest('[data-vsf]'); if(f){ VS.f=f.dataset.vsf; VS.rech=''; renderVacsol(); return; }

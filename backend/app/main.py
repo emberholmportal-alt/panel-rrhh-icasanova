@@ -297,11 +297,12 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
     if dias > 60:
         raise HTTPException(400, "El período es demasiado largo (más de 60 días)")
     directa = vs_aprueba(u)
-    if not directa:
-        hoy_ar = (now() - timedelta(hours=3)).date()
-        minimo = hoy_ar + timedelta(days=VS_ANTICIPO)
-        if datetime.fromisoformat(desde).date() < minimo:
-            raise HTTPException(400, f"Las vacaciones se piden con al menos {VS_ANTICIPO} días de anticipación: la salida tiene que ser desde el {minimo.strftime('%d/%m/%Y')}")
+    hoy_ar = (now() - timedelta(hours=3)).date()
+    minimo = hoy_ar + timedelta(days=VS_ANTICIPO)
+    fuera = datetime.fromisoformat(desde).date() < minimo
+    # sin 15 días de anticipación se niega; solo RRHH puede cargarla igual, confirmándolo expresamente
+    if fuera and not (directa and b.get("forzar") is True):
+        raise HTTPException(400, f"Denegado: las vacaciones se piden con al menos {VS_ANTICIPO} días de anticipación (la salida tendría que ser desde el {minimo.strftime('%d/%m/%Y')})")
     d = vs_doc(db, True)
     items = list((d.data or {}).get("items", []))
     legajo = str(b.get("legajo") or "").strip()[:20]
@@ -313,8 +314,11 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
           "estado": "pendiente", "uid": u.id, "by": u.nombre, "at": iso(now())}
     if directa:   # RRHH la carga sin pedir autorización
         it.update(estado="aprobada", rby=u.nombre, rat=it["at"], directa=True)
+    if fuera:
+        it["fuera_plazo"] = True
     items.append(it)
-    vs_guardar(db, d, items, u, "vacaciones_carga" if directa else "vacaciones_solicitud", f"{nombre} {desde} al {hasta}")
+    vs_guardar(db, d, items, u, ("vacaciones_carga" if directa else "vacaciones_solicitud") + ("_fuera_de_plazo" if fuera else ""),
+               f"{nombre} {desde} al {hasta}" + (f" · sin los {VS_ANTICIPO} días de anticipación" if fuera else ""))
     return {"item": it, "version": d.version}
 
 
