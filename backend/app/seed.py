@@ -16,6 +16,9 @@ def perfil(tipo: str) -> dict:
         p = {"nomina": "ver", "francos": "ver", "menu": "editar", "cumpleanos": "ver"}
     elif tipo == "coordinador":    # nómina, lista de eventuales, asigna francos, pide vacaciones; vacaciones y cumpleaños solo en pantalla
         p = {"nomina": "ver", "eventuales": "ver", "francos": "editar", "vacsol": "editar", "vacaciones": "consulta", "cumpleanos": "consulta"}
+    elif tipo == "lectura":        # ve todas las secciones y descarga informes, sin modificar nada
+        p = {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}
+        return p
     elif tipo == "aylen":          # vacaciones (próximas y en curso) y nómina
         p = {"vacaciones": "ver", "nomina": "ver"}
     else:
@@ -29,7 +32,7 @@ USUARIOS = [
     ("cbertetti", "Bertetti, Cynthia", "todos", "$2b$12$ygJmn82KnyVKzw9FuZHiS.bgURITnD5MCSuQNV6NCPGin8ryI0Cze"),
     ("joliva", "Oliva, Joaquín", "todos", "$2b$12$EK7kl.NTVcbwieI2hb.O/eHenAteFLXxVPfFcr2phK2JXTD7Bug1i"),
     ("lmunoz", "Muñoz, Luis", "sin_ropa", "$2b$12$BAyGnlyR3En4ZWITncztvOSV1Z4IFcM5MSs6.I4Er62yPt.i7XxoK"),
-    ("rcampos", "Campos, Rubén", "sin_ropa", "$2b$12$1R31TnKWCT2xtJ4hSr0szuwVI67cie3EAqJIvPZ/ex0yXv3PbXkRO"),
+    ("rcampos", "Campos, Rubén", "lectura", "$2b$12$1R31TnKWCT2xtJ4hSr0szuwVI67cie3EAqJIvPZ/ex0yXv3PbXkRO"),
     ("avivone", "Vivone, Aylén", "aylen", "$2b$12$5qmwwOlRlCleVF4kg8.gpeRkNM5OvO4JPYKTR/Opr0zoreH8aLfBq"),
     ("mmarchioro", "Marchioro, Milagros", "milagros", "$2b$12$EfYydoVP4K3ZRW4ryGGre.uzbEuAitYu1o3gfZlbiiWiP0CMrZ5Ve"),
     # coordinadores (alta 16/11/2026)
@@ -52,5 +55,9 @@ MIGRACIONES = [
         *[(u, {"vacaciones": "consulta", "cumpleanos": "consulta"}) for u in COORDINADORES],
         # Joaquín carga vacaciones directo y aprueba pedidos
         ("joliva", {"vacaciones": "editar"}),
+    ]),
+    ("2026-11-16-rcampos", [
+        # Rubén Campos: todas las secciones, solo ver y descargar informes
+        ("rcampos", {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}),
     ]),
 ]

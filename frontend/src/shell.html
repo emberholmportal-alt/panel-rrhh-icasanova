@@ -34,6 +34,7 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <div class="lg-chip"><img alt="Grupo Gestión" src="@@LOGO@@"></div>
     <div><b>RRHH</b><span>I.CASANOVA</span></div>
   </div>
+  <button class="nav-arr up" id="navUp" type="button" title="Subir" aria-label="Subir el menú"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
   <nav class="nav" id="modnav">
     <div class="nav-lab">Centro de control</div>
     <button class="nav-item mod on" data-v="v-home"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Inicio<span class="nb" id="nb-home"></span></button>
@@ -56,6 +57,7 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <div class="nav-lab">Sistema</div>
     <button class="nav-item mod" data-v="v-config"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Configuración</button>
   </nav>
+  <button class="nav-arr dn" id="navDn" type="button" title="Bajar" aria-label="Bajar el menú"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
   <div class="side-foot">
     <label class="switch"><input type="checkbox" id="optAnim" checked> Animaciones de entrada</label>
     <label class="switch"><input type="checkbox" id="opt3d" checked> Fondo 3D</label>
@@ -368,11 +370,6 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <p>Un tablero para todos: dejá una nota, un dibujo o una imagen y pegala donde quieras. Cada uno mueve, edita o borra lo suyo.</p></div>
     <div class="pz-new"><button class="btn primary" data-pznew="texto"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg>Escribir</button><button class="btn primary" data-pznew="dibujo"><svg viewBox="0 0 24 24"><path d="M3 21c3-1 4-3 5-5l9-9a2.1 2.1 0 0 0-3-3l-9 9c-2 1-4 2-5 5z"/></svg>Dibujar</button><button class="btn primary" data-pznew="imagen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>Imagen</button></div></div>
   <div class="local-note" id="pz-note"></div>
-  <div class="filters pz-flt">
-    <div class="field" style="min-width:220px;flex:1"><label>Buscar</label><input type="text" id="pz-q" placeholder="texto o autor"></div>
-    <div class="field"><label>Mostrar</label><select id="pz-f"><option value="all">Todos los aportes</option><option value="mine">Mis aportes</option><option value="pin">Anclados</option><option value="new">Nuevos para mí</option></select></div>
-    <div class="field"><label>Tipo</label><select id="pz-t"><option value="">Todos</option><option value="texto">Texto</option><option value="dibujo">Dibujo</option><option value="imagen">Imagen</option></select></div>
-  </div>
   <div class="pz-wall" id="pz-wall"></div>
 </section>
 

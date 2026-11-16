@@ -32,3 +32,6 @@ html.gris .sl-box{background:#fff;border-color:#d6dae1;box-shadow:0 10px 30px rg
 
 /* solo lectura / consulta: sin vínculos de archivos ni configuración de fuentes */
 .view.ro [data-odlink],.view.ro [data-m365cfg],.view.ro [data-odref],.view.ro [data-odun]{display:none!important}
+/* solo lectura: no se marca "Notificado" ni se cambia el plus; tampoco se abre ni se sube el Excel de origen */
+.view.ro .vnot,.view.ro .vplus{pointer-events:none;opacity:.55}
+.view.ro .srcbar .acts{display:none!important}

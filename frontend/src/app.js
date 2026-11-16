@@ -2919,4 +2919,17 @@ M365.boot();
 renderAnticipos();
 App.onView('v-home');
 refreshBadges();
+/* menú lateral: flechitas para subir y bajar cuando las secciones no entran en pantalla */
+(function navArrows(){
+  const nav=$('#modnav'), up=$('#navUp'), dn=$('#navDn'); if(!nav||!up||!dn) return;
+  const upd=()=>{ const max=nav.scrollHeight-nav.clientHeight, t=nav.scrollTop;
+    up.hidden=t<=2; dn.hidden=max<=2||t>=max-2; nav.classList.toggle('fu',!up.hidden); nav.classList.toggle('fd',!dn.hidden); };
+  const paso=()=>Math.max(120,nav.clientHeight*.6);
+  up.onclick=()=>nav.scrollBy({top:-paso(),behavior:'smooth'}); dn.onclick=()=>nav.scrollBy({top:paso(),behavior:'smooth'});
+  nav.addEventListener('scroll',upd,{passive:true}); window.addEventListener('resize',upd);
+  if(window.ResizeObserver) new ResizeObserver(upd).observe(nav);
+  // la sección activa siempre queda a la vista
+  nav.addEventListener('click',e=>{ const b=e.target.closest('.nav-item'); if(b) b.scrollIntoView({block:'nearest',behavior:'smooth'}); });
+  setTimeout(upd,300); upd();
+})();
 })();

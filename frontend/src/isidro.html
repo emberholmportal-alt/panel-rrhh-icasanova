@@ -1973,11 +1973,13 @@ $('#tVac').addEventListener('change',async e=>{
   if(c){ vacManual=true; c.checked?vacSel.add(c.dataset.id):vacSel.delete(c.dataset.id);
     $('#vCount').textContent=`${vacSel.size} de ${vacProx().length} seleccionadas`; return }
   const n=e.target.closest('.vnot');
+  if(n&&$('#v-vacaciones').classList.contains('ro')){ n.checked=!n.checked; return; }
   if(n){ DB.vacOv=DB.vacOv||{}; (DB.vacOv[n.dataset.id]||(DB.vacOv[n.dataset.id]={})).notif=n.checked;
     await persist(); renderVac(); avisos(); }
 });
 $('#tVac').addEventListener('input',e=>{
   const p=e.target.closest('.vplus'); if(!p) return;
+  if($('#v-vacaciones').classList.contains('ro')) return;
   DB.vacOv=DB.vacOv||{}; (DB.vacOv[p.dataset.id]||(DB.vacOv[p.dataset.id]={})).plus=+p.value||0;
   clearTimeout(vacT); vacT=setTimeout(()=>{persist(); renderLiq()},600);
 });

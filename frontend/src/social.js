@@ -128,7 +128,7 @@ const BW=1400;                                   // ancho lógico del tablero (l
 const PZ_TAM={s:210,m:270,l:370};
 const PZ_W=c=>PZ_TAM[c.tam]||PZ_TAM.m;
 const PZ_SUP={corcho:'Corcho',blanca:'Pizarra blanca',verde:'Pizarrón'};
-const pzSupGet=()=>{ try{ return localStorage.getItem('rrhh-ic-pzsup')||'corcho'; }catch(e){ return 'corcho'; } };
+const pzSupGet=()=>'blanca';   // la cartelera es siempre una pizarra blanca
 let pzZoom=1, pzDrag=null;
 const canMove=c=>isAdmin()||(c.autor&&c.autor.id===ME.id&&!c.pin);
 function pzRot(id){ let h=0; for(const ch of String(id)) h=(h*33+ch.charCodeAt(0))%1000; return ((h%50)/10-2.5).toFixed(2); }
@@ -158,7 +158,7 @@ function pzFit(){
   const fit=(wrap.clientWidth-2)/BW, s=fit*pzZoom; inner.style.transform=`scale(${s})`; inner.dataset.s=s;
   let H=1000; inner.querySelectorAll('.pz-card').forEach(el=>{ H=Math.max(H,el.offsetTop+el.offsetHeight+120); });
   inner.style.height=H+'px'; $('#pz-stage').style.height=H*s+'px'; $('#pz-stage').style.width=BW*s+'px';
-  $('#pz-zv').textContent=Math.round(pzZoom*100)+'%';
+  const zv=$('#pz-zv'); if(zv) zv.textContent=Math.round(pzZoom*100)+'%';
 }
 function renderPizarra(){
   const wall=$('#pz-wall'); if(!wall) return;
@@ -171,10 +171,8 @@ function renderPizarra(){
     (!q||(c.autor&&c.autor.nombre.toLowerCase().includes(q))||rtText(c.html).toLowerCase().includes(q)||String(c.cap||'').toLowerCase().includes(q));
   const filtra=!!(pzState.t||pzState.f!=='all'||q), n=SOC.pz.filter(pasa).length;
   wall.innerHTML=`<div class="pz-bar">
-      <span class="pz-cnt">${SOC.pz.length?`${SOC.pz.length} aporte(s)${filtra?` · ${n} con el filtro (el resto queda atenuado)`:''}`:''}</span>
+      <span class="pz-cnt">${SOC.pz.length?`${SOC.pz.length} aporte(s)`:''}</span>
       <span class="pz-tip">Arrastrá tus notas para pegarlas donde quieras · doble clic para editar</span>
-      <select id="pz-sup" title="Superficie del tablero">${Object.entries(PZ_SUP).map(([k,v])=>`<option value="${k}"${k===sup?' selected':''}>${v}</option>`).join('')}</select>
-      <div class="pz-zoom"><button id="pz-zm" title="Alejar">−</button><b id="pz-zv">100%</b><button id="pz-zp" title="Acercar">+</button><button id="pz-zf" title="Ver el tablero entero">Ajustar</button></div>
     </div>
     <div class="pz-frame f-${sup}" data-nogris><div class="pz-wrap" id="pz-wrap"><div class="pz-stage" id="pz-stage"><div class="pz-board s-${sup}" id="pz-board" style="width:${BW}px">
       ${SOC.pz.map(c=>pzCardHTML(c,isN(c),filtra&&!pasa(c))).join('')}
@@ -440,8 +438,7 @@ function hookSocial(){
   pzBoardHooks();
   $('#pz-cancel').onclick=pzClose; $('#pz-save').onclick=pzSave;
   $('#pz-dlg').addEventListener('click',e=>{ if(e.target.id==='pz-dlg') pzClose(); });
-  let qt; $('#pz-q').oninput=e=>{ clearTimeout(qt); qt=setTimeout(()=>{ pzState.q=e.target.value; renderPizarra(); },200); };
-  $('#pz-f').onchange=e=>{ pzState.f=e.target.value; renderPizarra(); }; $('#pz-t').onchange=e=>{ pzState.t=e.target.value; renderPizarra(); };
+
   // buzón
   $('#bz-send').onclick=bzSend;
   $('#bz-att-b').onclick=()=>$('#bz-att').click();
