@@ -13,6 +13,7 @@ Sirve el panel (frontend/dist/index.html) y la API:
 import copy
 import json
 import re
+import secrets
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -175,6 +176,8 @@ def doc_out(d: Doc) -> dict:
 
 
 def readable(u: User, key: str) -> bool:
+    if key == "eventuales" and can_read(u, "francos"):
+        return True        # Francos arma su lista con los eventuales activos
     return key == "otros" or can_read(u, key)
 
 
@@ -201,7 +204,120 @@ def sync(u: User = Depends(current_user), db: Session = Depends(get_db)):
         bz = db.scalar(select(func.count()).select_from(BuzonItem).where(BuzonItem.estado == "nueva"))
     else:
         bz = db.scalar(select(func.count()).select_from(BuzonItem).where(BuzonItem.autor_id == u.id, BuzonItem.resp_vista == False, BuzonItem.resp.is_not(None)))  # noqa: E712
-    return {"docs": docs, "pizarra": {"last": iso(pz), "n": pz_n}, "buzon": bz, "user": user_out(u)}
+    vs = None
+    if vs_ve(u):
+        d = db.get(Doc, "vacsol")
+        it = (d.data or {}).get("items", []) if d else []
+        vs = {"v": d.version if d else 0, "pend": sum(1 for x in it if x.get("estado") == "pendiente" and (vs_aprueba(u) or x.get("uid") == u.id))}
+    return {"docs": docs, "pizarra": {"last": iso(pz), "n": pz_n}, "buzon": bz, "vacsol": vs, "user": user_out(u)}
+
+
+# ------------------------------------------------------------------ solicitudes de vacaciones
+# Coordinadores y supervisores cargan el pedido; RRHH (administrador o quien edita Vacaciones) lo aprueba o rechaza.
+def vs_aprueba(u: User) -> bool:
+    return u.rol == "admin" or can_write(u, "vacaciones")
+
+
+def vs_pide(u: User) -> bool:
+    return vs_aprueba(u) or can_write(u, "vacsol")
+
+
+def vs_ve(u: User) -> bool:
+    return vs_pide(u) or can_read(u, "vacaciones") or can_read(u, "vacsol")
+
+
+def vs_visibles(u: User, items: list) -> list:
+    if vs_aprueba(u):
+        return items
+    return [x for x in items if x.get("uid") == u.id or (x.get("estado") == "aprobada" and can_read(u, "vacaciones"))]
+
+
+def vs_doc(db: Session, lock: bool = False) -> Doc:
+    q = select(Doc).where(Doc.key == "vacsol")
+    d = db.scalar(q.with_for_update() if lock else q)
+    if d is None:
+        d = Doc(key="vacsol", data={"items": []}, version=0)
+        db.add(d)
+        db.flush()
+    return d
+
+
+def vs_guardar(db: Session, d: Doc, items: list, u: User, accion: str, detalle: str):
+    d.data = {"items": items[-2000:]}
+    d.version += 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    auth.audit(db, u, accion, detalle)
+    db.commit()
+
+
+@app.get("/api/vacsol")
+def vacsol_list(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not vs_ve(u):
+        raise HTTPException(403, "No tenés acceso a las solicitudes de vacaciones")
+    d = db.get(Doc, "vacsol")
+    items = (d.data or {}).get("items", []) if d else []
+    return {"version": d.version if d else 0, "items": vs_visibles(u, items), "aprueba": vs_aprueba(u), "pide": vs_pide(u)}
+
+
+@app.post("/api/vacsol")
+async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not vs_pide(u):
+        raise HTTPException(403, "No tenés permiso para cargar solicitudes de vacaciones")
+    b = json.loads(await request.body() or b"{}")
+    desde, hasta = str(b.get("desde") or ""), str(b.get("hasta") or "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", desde) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", hasta) or hasta < desde:
+        raise HTTPException(400, "Revisá las fechas: el regreso no puede ser antes de la salida")
+    nombre = str(b.get("nombre") or "").strip()[:120]
+    if not nombre:
+        raise HTTPException(400, "Elegí el empleado")
+    dias = (datetime.fromisoformat(hasta) - datetime.fromisoformat(desde)).days + 1
+    if dias > 60:
+        raise HTTPException(400, "El período es demasiado largo (más de 60 días)")
+    d = vs_doc(db, True)
+    items = list((d.data or {}).get("items", []))
+    legajo = str(b.get("legajo") or "").strip()[:20]
+    for x in items:
+        if x.get("estado") in ("pendiente", "aprobada") and legajo and x.get("legajo") == legajo and not (x["hasta"] < desde or x["desde"] > hasta):
+            raise HTTPException(409, f"{x.get('nombre')} ya tiene una solicitud {x.get('estado')} que se superpone ({x['desde']} al {x['hasta']})")
+    it = {"id": secrets.token_hex(6), "legajo": legajo, "nombre": nombre, "sector": str(b.get("sector") or "")[:60],
+          "turno": str(b.get("turno") or "")[:40], "desde": desde, "hasta": hasta, "dias": dias, "obs": str(b.get("obs") or "")[:300],
+          "estado": "pendiente", "uid": u.id, "by": u.nombre, "at": iso(now())}
+    items.append(it)
+    vs_guardar(db, d, items, u, "vacaciones_solicitud", f"{nombre} {desde} al {hasta}")
+    return {"item": it, "version": d.version}
+
+
+@app.post("/api/vacsol/{sid}/{accion}")
+async def vacsol_accion(sid: str, accion: str, request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    b = json.loads(await request.body() or b"{}")
+    d = vs_doc(db, True)
+    items = list((d.data or {}).get("items", []))
+    x = next((i for i in items if i.get("id") == sid), None)
+    if not x:
+        raise HTTPException(404, "La solicitud ya no existe")
+    x = dict(x)
+    if accion in ("aprobar", "rechazar"):
+        if not vs_aprueba(u):
+            raise HTTPException(403, "Solo RRHH puede aprobar o rechazar solicitudes")
+        if x["estado"] != "pendiente":
+            raise HTTPException(409, f"La solicitud ya está {x['estado']}")
+        x.update(estado="aprobada" if accion == "aprobar" else "rechazada", rby=u.nombre, rat=iso(now()), motivo=str(b.get("motivo") or "")[:300])
+    elif accion == "cancelar":
+        if x.get("uid") != u.id and not vs_aprueba(u):
+            raise HTTPException(403, "Solo quien la cargó puede cancelarla")
+        if x["estado"] != "pendiente":
+            raise HTTPException(409, f"La solicitud ya está {x['estado']}: pedile a RRHH que la anule")
+        x.update(estado="cancelada", rby=u.nombre, rat=iso(now()))
+    elif accion == "anular":
+        if not vs_aprueba(u):
+            raise HTTPException(403, "Solo RRHH puede anular una solicitud aprobada")
+        x.update(estado="anulada", rby=u.nombre, rat=iso(now()), motivo=str(b.get("motivo") or "")[:300])
+    else:
+        raise HTTPException(404, "Acción desconocida")
+    items = [x if i.get("id") == sid else i for i in items]
+    vs_guardar(db, d, items, u, "vacaciones_" + accion, f"{x['nombre']} {x['desde']} al {x['hasta']}")
+    return {"item": x, "version": d.version}
 
 
 @app.get("/api/docs/{key}")

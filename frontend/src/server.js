@@ -85,8 +85,11 @@ const SRVX=(()=>{
 
   /* ---------------- permisos ---------------- */
   const U=S.user, isAdm=U.rol==='admin';
-  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
-  const lvl=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
+  S.api=api;
+  const VIEW_MOD={'v-vacsol':'vacsol','v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
+  const lvl0=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
+  // solicitudes de vacaciones: las ven quienes las cargan y quienes ven o aprueban Vacaciones
+  const lvl=m=>m==='vacsol'?(lvl0('vacsol')||(lvl0('vacaciones')?'ver':'')):lvl0(m);
   const canW=m=>m==='otros'?isAdm:lvl(m)==='editar';
   for(const v in VIEW_MOD){ if(!lvl(VIEW_MOD[v])){ const n=document.querySelector(`.nav-item[data-v="${v}"]`); if(n) n.style.display='none'; } }
   const _gv=window.goView;
@@ -96,7 +99,7 @@ const SRVX=(()=>{
   };
   function applyRO(id){
     const m=VIEW_MOD[id], sec=document.getElementById(id); if(!sec||!m) return;
-    const ro=lvl(m)==='ver'; sec.classList.toggle('ro',ro);
+    const ro=lvl(m)==='ver'&&m!=='vacsol'; sec.classList.toggle('ro',ro);
     let b=sec.querySelector('.ro-banner');
     if(ro&&!b){ b=document.createElement('div'); b.className='ro-banner'; b.innerHTML='<b>Solo lectura.</b> Podés ver y descargar informes de este módulo, pero no cargar archivos ni modificar datos.'; const vh=sec.querySelector('.vhead'); (vh||sec.firstChild).after(b); }
     if(!ro&&b) b.remove();
@@ -177,6 +180,7 @@ const SRVX=(()=>{
     if(document.hidden||saving) return;
     try{ const s=await api('GET','/api/sync');
       for(const m in s.docs){ if(s.docs[m].version>(ver[m]||0)&&(m==='f3'||S.MAP[m]||m==='otros')) await pullDoc(m); }
+      if(s.vacsol&&typeof VS!=='undefined'){ if(s.vacsol.v!==VS.ver){ const nuevo=VS.ok&&VS.aprueba&&s.vacsol.pend>VS.items.filter(x=>x.estado==='pendiente').length; await vsLoad(); if(nuevo) App.toast('Llegó una solicitud de vacaciones para revisar.'); } else vsBadge(s.vacsol.pend); }
       if(pzLast!==null&&(s.pizarra.last!==pzLast.last||s.pizarra.n!==pzLast.n||s.buzon!==bzLast)) SOC.refresh(); pzLast=s.pizarra; bzLast=s.buzon;
       if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol) App.toast('Tus permisos cambiaron: recargá la página para aplicarlos.',true);
       setSt('Guardado','ok');

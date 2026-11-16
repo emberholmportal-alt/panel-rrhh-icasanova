@@ -29,6 +29,7 @@ MODULES = {
     "nomina": "Nómina",
     "cumpleanos": "Cumpleaños",
     "menu": "Menú semanal",
+    "vacsol": "Solicitudes de vacaciones",
     "agenda": "Agenda y recordatorios",
 }
 # módulos que todos ven aunque no tengan permiso asignado

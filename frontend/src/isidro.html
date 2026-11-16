@@ -1453,7 +1453,7 @@ function parseVac(rows){
   return out;
 }
 
-const vacRows=()=>(DB.vac&&DB.vac.rows)||[];
+const vacRows=()=>((DB.vac&&DB.vac.rows)||[]).concat(window.VACSOL_OK||[]);   // + solicitudes aprobadas por RRHH
 const vacOv=id=>(DB.vacOv&&DB.vacOv[id])||{};
 function vacPlus(s){ const o=vacOv(s.id); return o.plus!=null?o.plus:s.dias }
 const esNotif=s=>{const o=vacOv(s.id); return o.notif!=null?o.notif:/^s[ií]$/i.test(s.notif)};
