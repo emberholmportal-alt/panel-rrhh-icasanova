@@ -371,3 +371,16 @@ body.light .fr-tip,html.light .fr-tip{background:#fff;color:#0f172a}
 .ag-baja{display:flex;gap:6px;justify-content:flex-end;align-items:center}
 .ag-baja input,.ag-baja select{width:auto}
 @media(max-width:900px){.ag-grid{grid-template-columns:1fr 1fr}}
+
+.hc-lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#f59e0b;font-weight:700;margin-bottom:4px}
+
+.ag-scroll{max-height:560px}
+.ag-tab td{padding:4px 6px;vertical-align:middle}
+.ag-tab th{white-space:nowrap}
+.ag-tab input,.ag-tab select{padding:6px 8px;font-size:12.5px;border-radius:8px;background:transparent;border:1px solid transparent;color:inherit}
+.ag-tab input:hover,.ag-tab select:hover{border-color:rgba(148,163,184,.35)}
+.ag-tab input:focus,.ag-tab select:focus{border-color:#22d3ee;background:rgba(34,211,238,.06);outline:none}
+.ag-tab tr.ag-new td{background:rgba(34,211,238,.06);border-bottom:2px solid rgba(34,211,238,.35)}
+.ag-tab tr.ag-new input{border-color:rgba(148,163,184,.3)}
+.ag-tab tr.ag-baja-r td{opacity:.6}
+.ag-tab select option{background:#0f172a}

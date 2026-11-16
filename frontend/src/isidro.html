@@ -539,7 +539,7 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <button class="tab on" data-p="pa-prox">Próximas bajas <span class="badge" id="baProx">0</span></button>
     <button class="tab" data-p="pa-dot">Dotación por turno y tarea</button>
     <button class="tab" data-p="pa-plantel">Plantel activo <span class="badge" id="baAct">0</span></button>
-    <button class="tab" data-p="pa-gest" id="tab-ant-gest">Altas y bajas</button>
+    <button class="tab" data-p="pa-gest" id="tab-ant-gest">Editar lista</button>
   </div>
 
   <div class="panel on" id="pa-prox">
@@ -590,27 +590,13 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
 
   <div class="panel" id="pa-gest">
     <div class="card">
-      <div class="card-h"><h3>Nuevo colaborador</h3><span class="meta">con las mismas columnas del Control de eventuales</span></div>
-      <div class="card-b"><div class="ag-grid">
-        <div class="field"><label>Legajo *</label><input type="text" id="ag-leg" inputmode="numeric"></div>
-        <div class="field ag-2"><label>Apellido y nombre *</label><input type="text" id="ag-nom" placeholder="APELLIDO NOMBRE"></div>
-        <div class="field"><label>Fecha de nacimiento</label><input type="date" id="ag-nac"></div>
-        <div class="field"><label>DNI / CUIL *</label><input type="text" id="ag-doc" placeholder="20-12345678-9"></div>
-        <div class="field"><label>F. ingreso *</label><input type="date" id="ag-ing"></div>
-        <div class="field"><label>Último día *</label><input type="date" id="ag-ult"></div>
-        <div class="field"><label>U.O. Cliente</label><input type="text" id="ag-uo" list="ag-uos"><datalist id="ag-uos"></datalist></div>
-        <div class="field"><label>Tarea *</label><input type="text" id="ag-tar" list="ag-tars"><datalist id="ag-tars"></datalist></div>
-        <div class="field"><label>Turno *</label><input type="text" id="ag-tur" list="ag-turs"><datalist id="ag-turs"></datalist></div>
-        <div class="ag-go"><span id="ag-msg"></span><button class="btn primary" id="ag-alta">Dar de alta</button></div>
-      </div></div>
+      <div class="card-h"><h3>Lista de eventuales</h3><span class="meta">editá cualquier casilla: se guarda al salir de ella · la primera fila es para agregar</span>
+        <div class="field" style="margin:0;min-width:220px"><input type="text" id="ag-q" placeholder="Buscar apellido o legajo"></div><div class="fr-chips"><div id="ag-f"></div></div></div>
+      <div class="card-b flush"><div class="tscroll ag-scroll"><table id="ag-t" class="ag-tab"></table></div></div>
+      <div class="card-b" id="ag-msg"></div>
     </div>
     <div class="card">
-      <div class="card-h"><h3>Cambiar estado</h3><div class="field" style="margin:0;min-width:220px"><input type="text" id="ag-q" placeholder="Buscar apellido o legajo"></div>
-        <div class="fr-chips"><div id="ag-f"></div></div></div>
-      <div class="card-b flush"><div class="tscroll" style="max-height:440px"><table id="ag-t"></table></div></div>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>Registro de cambios</h3><span class="meta">altas, bajas y reactivaciones hechas en el panel</span></div>
+      <div class="card-h"><h3>Registro de cambios</h3><span class="meta">altas, bajas y correcciones hechas en el panel</span></div>
       <div class="card-b flush"><div class="tscroll" style="max-height:320px"><table id="ag-log"></table></div></div>
     </div>
   </div>
@@ -1702,7 +1688,7 @@ function parseAnt(rows){
     const legajo=String(r[col.legajo]??'').trim(), nombre=String(r[col.nombre]??'').trim();
     if(!legajo||!nombre||HA.legajo.test(legajo)) continue;
     const estRaw=String(r[cEstado]??'').trim();
-    out.push({legajo,nombre,doc:String(r[col.doc]??'').trim(),
+    out.push({legajo,nombre,nac:excelDateToISO(r[col.nac]),doc:String(r[col.doc]??'').trim(),
       ingreso:excelDateToISO(r[col.ingreso]), egreso:excelDateToISO(r[col.egreso]),
       uo:String(r[col.uo]??'').trim(), antig:+r[col.antig]||0, ultimo:excelDateToISO(r[col.ultimo]),
       activo:/^activo$/i.test(estRaw), estRaw,
@@ -1720,8 +1706,10 @@ const antRows=()=>{
   const base=(DB.ant&&DB.ant.rows)||[], add=DB.antAdd||{}, ov=DB.antOv||{};
   if(_antM.b===base&&_antM.a===add&&_antM.o===ov&&_antM.v===window.ANTV) return _antM.r;
   const ya=new Set(base.map(r=>r.legajo));
-  const r=base.concat(Object.values(add).filter(x=>!ya.has(x.legajo))).map(x=>{ const e=ov[x.legajo]&&ov[x.legajo].est; if(!e) return x;
-    return Object.assign({},x,{activo:!!e.activo,egreso:e.activo?'':(e.egreso||x.egreso),estRaw:e.activo?'ACTIVO':'BAJA'}); });
+  const r=base.concat(Object.values(add).filter(x=>!ya.has(x.legajo))).map(x=>{ const o=ov[x.legajo]; if(!o||(!o.est&&!o.ed)) return x;
+    const y=o.ed?Object.assign({},x,o.ed):Object.assign({},x), e=o.est;
+    if(e) Object.assign(y,{activo:!!e.activo,egreso:e.activo?'':(e.egreso||y.egreso),estRaw:e.activo?'ACTIVO':'BAJA'});
+    return y; });
   _antM={b:base,a:add,o:ov,v:window.ANTV,r}; return r; };
 const antAct=()=>antRows().filter(r=>r.activo);
 const antOv=l=>(DB.antOv&&DB.antOv[l])||{};

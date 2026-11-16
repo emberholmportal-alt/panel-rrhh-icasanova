@@ -2265,7 +2265,7 @@ function welcome(){
     cards.push(`<div class="wl-c"><i>${ic}</i><b>${Math.round(c.temperature_2m)}°</b><span>${tx}${dd?` · máx ${Math.round(dd.temperature_2m_max[0])}°`:''}${dd&&dd.precipitation_probability_max[0]>=40?` · 💧${dd.precipitation_probability_max[0]}%`:''}</span></div>`); } }catch(e){}
   // menú de hoy
   try{ const M=typeof mnHoy==='function'?mnHoy():null;
-    cards.push(`<div class="wl-c"><i>🍽</i><b>Menú de hoy</b><span>${M&&M.m?esc(M.m)+([M.o1,M.o2,M.o3].filter(Boolean).length?` · y ${[M.o1,M.o2,M.o3].filter(Boolean).length} opciones más`:''):d.getDay()===0?'Hoy es domingo':'Todavía no se cargó'}</span></div>`); }catch(e){}
+    cards.push(`<div class="wl-c"><i>🍽</i><b>Plato del día</b><span>${M&&M.m?esc(M.m)+([M.o1,M.o2,M.o3].filter(Boolean).length?` · y ${[M.o1,M.o2,M.o3].filter(Boolean).length} opciones más`:''):d.getDay()===0?'Hoy es domingo':'Todavía no se cargó'}</span></div>`); }catch(e){}
   // cumpleaños
   try{ if(DB.cumple&&typeof cuRows==='function'){ const R=cuRows(+H.slice(5,7)).filter(r=>r.fecha>=H&&r.fecha<=addD(H,7)), hoyC=R.filter(r=>r.fecha===H);
     if(R.length) cards.push(`<div class="wl-c"><i>🎂</i><b>${hoyC.length?'Cumple hoy':'Cumpleaños'}</b><span>${hoyC.length?hoyC.slice(0,3).map(r=>esc(shortName(r.nombre))).join(', '):`${R.length} esta semana`}</span></div>`); } }catch(e){}

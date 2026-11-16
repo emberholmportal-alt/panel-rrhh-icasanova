@@ -6,7 +6,7 @@
      y se descarga la planilla del mes.
    ================================================================ */
 const MN_DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-const MN_FILAS=[['m','Menú del día'],['o1','Opción 1'],['o2','Opción 2'],['o3','Opción 3']];
+const MN_FILAS=[['m','Plato del día'],['o1','Opción 1'],['o2','Opción 2'],['o3','Opción 3']];
 const lunesDe=iso=>{ const d=dObj(iso), w=d.getDay(); return addD(iso,w===0?1:1-w); };   // domingo → semana siguiente
 let mnState={sem:''};
 const canEditMod=m=>!(window.SRV&&SRV.mode==='online')||SRV.user.rol==='admin'||(SRV.user.perms&&SRV.user.perms[m])==='editar';
@@ -130,7 +130,7 @@ function renderHomeCom(){
   const box=$('#h-com'); if(!box) return; const h=hoy(), M=mnHoy(), parts=[];
   const dw=dObj(h).getDay();
   parts.push(`<div class="card hc-menu"><div class="card-h"><h3>🍽 Menú de hoy</h3><button class="btn ghost sm" data-go="v-menu">Ver la semana</button></div><div class="card-b">`+
-    (M&&(M.m||M.o1)?`<div class="hc-main">${esc(M.m||'')}</div><div class="hc-ops">${[['o1','Opción 1'],['o2','Opción 2'],['o3','Opción 3']].filter(([k])=>M[k]).map(([k,l])=>`<div><span>${l}</span>${esc(M[k])}</div>`).join('')}</div>`
+    (M&&(M.m||M.o1)?`<div class="hc-lab">Plato del día</div><div class="hc-main">${esc(M.m||'')}</div><div class="hc-ops">${[['o1','Opción 1'],['o2','Opción 2'],['o3','Opción 3']].filter(([k])=>M[k]).map(([k,l])=>`<div><span>${l}</span>${esc(M[k])}</div>`).join('')}</div>`
       :`<div class="empty" style="padding:14px">${dw===0?'Hoy es domingo: no hay menú.':'Todavía no se cargó el menú de hoy.'}</div>`)+'</div></div>');
   if(DB.cumple){ const R=cuRows(+h.slice(5,7)).filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
     parts.push(`<div class="card hc-cu"><div class="card-h"><h3>🎂 Cumpleaños</h3><button class="btn ghost sm" data-go="v-cumple">Ver el mes</button></div><div class="card-b">`+
