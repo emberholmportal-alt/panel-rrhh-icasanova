@@ -14,8 +14,8 @@ def perfil(tipo: str) -> dict:
         p = {m: "ver" for m in TODOS if m != "indumentaria"}
     elif tipo == "milagros":       # nómina, francos de eventuales por día, menú semanal (carga) y cumpleaños del mes
         p = {"nomina": "ver", "francos": "ver", "menu": "editar", "cumpleanos": "ver"}
-    elif tipo == "coordinador":    # nómina, lista de eventuales, asigna francos, carga pedidos de vacaciones y ve el menú
-        p = {"nomina": "ver", "eventuales": "ver", "francos": "editar", "vacsol": "editar"}
+    elif tipo == "coordinador":    # nómina, lista de eventuales, asigna francos, pide vacaciones; vacaciones y cumpleaños solo en pantalla
+        p = {"nomina": "ver", "eventuales": "ver", "francos": "editar", "vacsol": "editar", "vacaciones": "consulta", "cumpleanos": "consulta"}
     elif tipo == "aylen":          # vacaciones (próximas y en curso) y nómina
         p = {"vacaciones": "ver", "nomina": "ver"}
     else:
@@ -41,4 +41,16 @@ USUARIOS = [
     ("ploiacono", "Loiacono, Pablo", "coordinador", "$2b$12$WAogFMDEeIKrQZPTlzFTO.vkYjetymqa11KvQgFdnC/rQVQwUe2ke"),
     ("psilva", "Silva, Pablo", "coordinador", "$2b$12$r0qxqtKTbUzRboqFC2WrrueOfy2bSSbm043z8RGa4aLy/gh74WBiu"),
     ("hsalinas", "Salinas, Hernán", "coordinador", "$2b$12$4uyaYRixETJ.Od4L1tbRsOTvJhlMKnOgvo/7N9mLMF3U.8W0sttry"),
+]
+
+
+# Cambios de permisos para usuarios que ya existen (se aplican una sola vez, en orden).
+COORDINADORES = ["wchaparro", "jovalles", "mleiva", "jalbarracin", "cdiarte", "ploiacono", "psilva", "hsalinas"]
+MIGRACIONES = [
+    ("2026-11-16-vacaciones", [
+        # coordinadores: ven vacaciones y cumpleaños sin descargar ni modificar
+        *[(u, {"vacaciones": "consulta", "cumpleanos": "consulta"}) for u in COORDINADORES],
+        # Joaquín carga vacaciones directo y aprueba pedidos
+        ("joliva", {"vacaciones": "editar"}),
+    ]),
 ]

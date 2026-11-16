@@ -86,7 +86,9 @@ const SRVX=(()=>{
   /* ---------------- permisos ---------------- */
   const U=S.user, isAdm=U.rol==='admin';
   S.api=api;
-  const VIEW_MOD={'v-vacsol':'vacsol','v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
+  // nota para el registro de cambios: se manda junto con el próximo guardado de ese módulo
+  S.notas={}; S.nota=(m,t)=>{ (S.notas[m]||(S.notas[m]=[])).push(t); };
+  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos'};
   const lvl0=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
   // solicitudes de vacaciones: las ven quienes las cargan y quienes ven o aprueban Vacaciones
   const lvl=m=>m==='vacsol'?(lvl0('vacsol')||(lvl0('vacaciones')?'ver':'')):lvl0(m);
@@ -97,16 +99,22 @@ const SRVX=(()=>{
     const m=VIEW_MOD[id]; if(m&&!lvl(m)){ App.toast('No tenés acceso a ese módulo.',true); id='v-home'; }
     _gv(id); applyRO(id);
   };
+  // modo consulta: sin botones de descarga, impresión ni exportación (se vuelve a aplicar cada vez que la vista se redibuja)
+  const DLRX=/descarg|excel|\bpdf\b|\bcsv\b|word|imprim|export|copiar para|planilla/i;
+  function noDl(sec){ const run=()=>sec.querySelectorAll('button,a').forEach(b=>{ if(!b.closest('.vs-keep')&&DLRX.test(b.textContent||'')) b.style.display='none'; });
+    run(); if(!sec._nodl){ sec._nodl=new MutationObserver(()=>{ if(sec.classList.contains('nodl')) run(); }); sec._nodl.observe(sec,{childList:true,subtree:true}); } }
   function applyRO(id){
     const m=VIEW_MOD[id], sec=document.getElementById(id); if(!sec||!m) return;
-    const ro=lvl(m)==='ver'&&m!=='vacsol'; sec.classList.toggle('ro',ro);
+    const L=lvl(m), ro=L==='ver'||L==='consulta'; sec.classList.toggle('ro',ro); sec.classList.toggle('nodl',L==='consulta'); if(L==='consulta') noDl(sec);
     let b=sec.querySelector('.ro-banner');
-    if(ro&&!b){ b=document.createElement('div'); b.className='ro-banner'; b.innerHTML='<b>Solo lectura.</b> Podés ver y descargar informes de este módulo, pero no cargar archivos ni modificar datos.'; const vh=sec.querySelector('.vhead'); (vh||sec.firstChild).after(b); }
+    const txt=L==='consulta'?'<b>Solo consulta.</b> Podés ver la información en pantalla, sin descargar ni modificar.':'<b>Solo lectura.</b> Podés ver y descargar informes de este módulo, pero no cargar archivos ni modificar datos.';
+    if(ro&&!b){ b=document.createElement('div'); b.className='ro-banner'; const vh=sec.querySelector('.vhead'); (vh||sec.firstChild).after(b); }
+    if(b) b.innerHTML=txt;
     if(!ro&&b) b.remove();
   }
   // en el servidor no se borra la base completa; importar una base solo lo hace un administrador
   const rst=$('#btnReset'); if(rst) rst.style.display='none';
-  if(!isAdm){ const im=$('#btnImportDB'); if(im) im.style.display='none'; }
+  if(!isAdm){ ['#btnImportDB','#btnExportDB'].forEach(q=>{ const im=$(q); if(im) im.style.display='none'; }); }   // el respaldo completo es solo del administrador
 
   /* ---------------- guardado ---------------- */
   const pick=(o,ks)=>{ const r={}; ks.forEach(k=>{ if(o[k]!==undefined) r[k]=o[k]; }); return r; };
@@ -124,8 +132,9 @@ const SRVX=(()=>{
   const setSt=(t,c)=>{ const e=stEl(); if(e){ e.textContent=t; e.className='srv-st '+(c||''); } };
   const LBL=m=>(S.modules&&S.modules[m])||(m==='otros'?'Configuración general':m);
   async function putDoc(m,data,json){
-    if(!canW(m)){ if(lvl(m)==='ver'&&Date.now()-lastAct<5000&&!roWarned[m]){ roWarned[m]=1; App.toast(`Solo lectura en ${LBL(m)}: tus cambios no se guardan en el servidor.`,true); } snap[m]=json; return; }
-    try{ const r=await api('PUT','/api/docs/'+m,{data,base:ver[m]}); ver[m]=r.version; snap[m]=json; }
+    if(!canW(m)){ if((lvl(m)==='ver'||lvl(m)==='consulta')&&Date.now()-lastAct<5000&&!roWarned[m]){ roWarned[m]=1; App.toast(`Solo lectura en ${LBL(m)}: tus cambios no se guardan en el servidor.`,true); } snap[m]=json; return; }
+    const nota=(S.notas[m]||[]).splice(0).join(' · ');
+    try{ const r=await api('PUT','/api/docs/'+m,{data,base:ver[m],nota}); ver[m]=r.version; snap[m]=json; }
     catch(err){
       if(err.status===409){ App.toast((err.message||'Otro usuario modificó '+LBL(m))+'. Se cargó su versión; repetí tu último cambio.',true); await pullDoc(m,true); }
       else if(err.status===401){ App.toast('Tu sesión venció: ingresá de nuevo.',true); loginScreen(); throw err; }
@@ -190,7 +199,7 @@ const SRVX=(()=>{
 
   /* ---------------- administración de usuarios (Configuración) ---------------- */
   let USR=[], MODS=S.modules||{};
-  const LV={'':'—','ver':'Ver','editar':'Editar'};
+  const LV={'':'—','consulta':'Consultar','ver':'Ver','editar':'Editar'};
   async function loadUsers(){ const r=await api('GET','/api/users'); USR=r.users; MODS=r.modules; }
   function renderAdmin(){
     const box=$('#us-list'); if(!box) return;

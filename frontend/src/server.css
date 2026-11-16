@@ -29,3 +29,6 @@ html.gris .sl-box{background:#fff;border-color:#d6dae1;box-shadow:0 10px 30px rg
 .sl-link{display:block;width:100%;margin-top:14px;background:none;border:0;color:var(--acc);font:inherit;font-size:13px;cursor:pointer;text-align:center;text-decoration:underline;text-underline-offset:3px}
 .sl-box textarea{font-size:14px;resize:vertical;text-transform:none;letter-spacing:0}
 .sl-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+
+/* solo lectura / consulta: sin vínculos de archivos ni configuración de fuentes */
+.view.ro [data-odlink],.view.ro [data-m365cfg],.view.ro [data-odref],.view.ro [data-odun]{display:none!important}

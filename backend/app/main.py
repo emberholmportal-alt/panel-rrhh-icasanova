@@ -15,7 +15,7 @@ import json
 import re
 import secrets
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -73,6 +73,25 @@ def startup():
                 db.add(User(username=username, nombre=nombre, rol="usuario", perms=seed.perfil(perfil), pass_hash=h, must_change=True))
                 auth.audit(db, "sistema", "crear_usuario", username)
         db.commit()
+        # cambios de permisos de una sola vez para usuarios existentes (ver seed.MIGRACIONES)
+        mg = db.get(Doc, "_migraciones")
+        hechas = set((mg.data or {}).get("hechas", [])) if mg else set()
+        nuevas = []
+        for clave, cambios in seed.MIGRACIONES:
+            if clave in hechas:
+                continue
+            for username, perms in cambios:
+                uu = db.scalar(select(User).where(User.username == username))
+                if uu:
+                    uu.perms = {**(uu.perms or {}), **perms}
+                    auth.audit(db, "sistema", "permisos", f"{username}: {perms}")
+            nuevas.append(clave)
+        if nuevas:
+            if mg is None:
+                mg = Doc(key="_migraciones", data={}, version=0)
+                db.add(mg)
+            mg.data = {"hechas": sorted(hechas | set(nuevas))}
+            db.commit()
         # recuperación del administrador: si ADMIN_RESET_PASSWORD está definida, la clave del admin
         # pasa a ser esa (temporal, hay que cambiarla al entrar). Borrar la variable después de usarla.
         # Se aplica UNA sola vez por valor: si la variable queda puesta, los reinicios de Render
@@ -214,6 +233,9 @@ def sync(u: User = Depends(current_user), db: Session = Depends(get_db)):
 
 # ------------------------------------------------------------------ solicitudes de vacaciones
 # Coordinadores y supervisores cargan el pedido; RRHH (administrador o quien edita Vacaciones) lo aprueba o rechaza.
+VS_ANTICIPO = 15   # días mínimos de anticipación para pedir vacaciones
+
+
 def vs_aprueba(u: User) -> bool:
     return u.rol == "admin" or can_write(u, "vacaciones")
 
@@ -274,6 +296,12 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
     dias = (datetime.fromisoformat(hasta) - datetime.fromisoformat(desde)).days + 1
     if dias > 60:
         raise HTTPException(400, "El período es demasiado largo (más de 60 días)")
+    directa = vs_aprueba(u)
+    if not directa:
+        hoy_ar = (now() - timedelta(hours=3)).date()
+        minimo = hoy_ar + timedelta(days=VS_ANTICIPO)
+        if datetime.fromisoformat(desde).date() < minimo:
+            raise HTTPException(400, f"Las vacaciones se piden con al menos {VS_ANTICIPO} días de anticipación: la salida tiene que ser desde el {minimo.strftime('%d/%m/%Y')}")
     d = vs_doc(db, True)
     items = list((d.data or {}).get("items", []))
     legajo = str(b.get("legajo") or "").strip()[:20]
@@ -283,8 +311,10 @@ async def vacsol_nueva(request: Request, u: User = Depends(current_user), db: Se
     it = {"id": secrets.token_hex(6), "legajo": legajo, "nombre": nombre, "sector": str(b.get("sector") or "")[:60],
           "turno": str(b.get("turno") or "")[:40], "desde": desde, "hasta": hasta, "dias": dias, "obs": str(b.get("obs") or "")[:300],
           "estado": "pendiente", "uid": u.id, "by": u.nombre, "at": iso(now())}
+    if directa:   # RRHH la carga sin pedir autorización
+        it.update(estado="aprobada", rby=u.nombre, rat=it["at"], directa=True)
     items.append(it)
-    vs_guardar(db, d, items, u, "vacaciones_solicitud", f"{nombre} {desde} al {hasta}")
+    vs_guardar(db, d, items, u, "vacaciones_carga" if directa else "vacaciones_solicitud", f"{nombre} {desde} al {hasta}")
     return {"item": it, "version": d.version}
 
 
@@ -352,7 +382,8 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     d.version += 1
     d.updated_at = now()
     d.updated_by = u.nombre
-    auth.audit(db, u, "guardar", MODULES.get(key, key))
+    nota = str(body.get("nota") or "")[:280]
+    auth.audit(db, u, "guardar", MODULES.get(key, key) + (": " + nota if nota else ""))
     db.commit()
     return {"version": d.version, "updated_at": iso(d.updated_at), "updated_by": d.updated_by}
 

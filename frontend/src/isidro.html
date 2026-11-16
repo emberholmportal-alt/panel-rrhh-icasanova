@@ -445,7 +445,21 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <div class="hint">Cada vez que subas una versión nueva reemplaza la anterior. Lo notificado a mano se conserva.</div>
   </div>
 
+  <div class="card vs-card vs-keep" id="vs-wrap">
+    <div class="card-h"><h3 id="vs-tit">Vacaciones</h3><span class="meta" id="vs-sub"></span><button class="btn ghost sm" id="vs-xls" hidden>Descargar aprobadas</button></div>
+    <div class="card-b vs-form" id="vs-form" hidden><div class="vs-grid">
+      <div class="field vs-wide"><label>Empleado</label><input type="text" id="vs-emp" list="vs-emps" placeholder="Escribí el apellido o el legajo y elegilo"><datalist id="vs-emps"></datalist></div>
+      <div class="field"><label>Sale el</label><input type="date" id="vs-d"></div>
+      <div class="field"><label>Último día de vacaciones</label><input type="date" id="vs-h"></div>
+      <div class="field"><label>Observación</label><input type="text" id="vs-obs" maxlength="300" placeholder="Opcional"></div>
+      <div class="vs-send"><span id="vs-n"></span><button class="btn primary" id="vs-go">Enviar</button></div>
+    </div></div>
+    <div class="card-b vs-lista"><div class="fr-chips"><div id="vs-tabs"></div></div></div>
+    <div class="card-b flush" id="vs-body"></div>
+  </div>
+
   <div class="kpis" id="kpisVac"></div>
+
 
   <div class="tabs" id="tabsVac">
     <button class="tab on" data-p="pv-prox">Próximas salidas <span class="badge" id="bvProx">0</span></button>
@@ -525,6 +539,7 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <button class="tab on" data-p="pa-prox">Próximas bajas <span class="badge" id="baProx">0</span></button>
     <button class="tab" data-p="pa-dot">Dotación por turno y tarea</button>
     <button class="tab" data-p="pa-plantel">Plantel activo <span class="badge" id="baAct">0</span></button>
+    <button class="tab" data-p="pa-gest" id="tab-ant-gest">Altas y bajas</button>
   </div>
 
   <div class="panel on" id="pa-prox">
@@ -570,6 +585,33 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <div class="card">
       <div class="card-h"><h3>Matriz turno × tarea</h3><button class="btn ghost sm" id="btnMatCsv">CSV</button></div>
       <div class="card-b flush"><div class="tscroll"><table id="tMatriz"></table></div></div>
+    </div>
+  </div>
+
+  <div class="panel" id="pa-gest">
+    <div class="card">
+      <div class="card-h"><h3>Nuevo colaborador</h3><span class="meta">con las mismas columnas del Control de eventuales</span></div>
+      <div class="card-b"><div class="ag-grid">
+        <div class="field"><label>Legajo *</label><input type="text" id="ag-leg" inputmode="numeric"></div>
+        <div class="field ag-2"><label>Apellido y nombre *</label><input type="text" id="ag-nom" placeholder="APELLIDO NOMBRE"></div>
+        <div class="field"><label>Fecha de nacimiento</label><input type="date" id="ag-nac"></div>
+        <div class="field"><label>DNI / CUIL *</label><input type="text" id="ag-doc" placeholder="20-12345678-9"></div>
+        <div class="field"><label>F. ingreso *</label><input type="date" id="ag-ing"></div>
+        <div class="field"><label>Último día *</label><input type="date" id="ag-ult"></div>
+        <div class="field"><label>U.O. Cliente</label><input type="text" id="ag-uo" list="ag-uos"><datalist id="ag-uos"></datalist></div>
+        <div class="field"><label>Tarea *</label><input type="text" id="ag-tar" list="ag-tars"><datalist id="ag-tars"></datalist></div>
+        <div class="field"><label>Turno *</label><input type="text" id="ag-tur" list="ag-turs"><datalist id="ag-turs"></datalist></div>
+        <div class="ag-go"><span id="ag-msg"></span><button class="btn primary" id="ag-alta">Dar de alta</button></div>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Cambiar estado</h3><div class="field" style="margin:0;min-width:220px"><input type="text" id="ag-q" placeholder="Buscar apellido o legajo"></div>
+        <div class="fr-chips"><div id="ag-f"></div></div></div>
+      <div class="card-b flush"><div class="tscroll" style="max-height:440px"><table id="ag-t"></table></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Registro de cambios</h3><span class="meta">altas, bajas y reactivaciones hechas en el panel</span></div>
+      <div class="card-b flush"><div class="tscroll" style="max-height:320px"><table id="ag-log"></table></div></div>
     </div>
   </div>
 
@@ -1672,7 +1714,15 @@ function parseAnt(rows){
   return out;
 }
 
-const antRows=()=>(DB.ant&&DB.ant.rows)||[];
+// lista de eventuales = archivo + altas cargadas en el panel, con las bajas/reactivaciones hechas en el panel
+let _antM={};
+const antRows=()=>{
+  const base=(DB.ant&&DB.ant.rows)||[], add=DB.antAdd||{}, ov=DB.antOv||{};
+  if(_antM.b===base&&_antM.a===add&&_antM.o===ov&&_antM.v===window.ANTV) return _antM.r;
+  const ya=new Set(base.map(r=>r.legajo));
+  const r=base.concat(Object.values(add).filter(x=>!ya.has(x.legajo))).map(x=>{ const e=ov[x.legajo]&&ov[x.legajo].est; if(!e) return x;
+    return Object.assign({},x,{activo:!!e.activo,egreso:e.activo?'':(e.egreso||x.egreso),estRaw:e.activo?'ACTIVO':'BAJA'}); });
+  _antM={b:base,a:add,o:ov,v:window.ANTV,r}; return r; };
 const antAct=()=>antRows().filter(r=>r.activo);
 const antOv=l=>(DB.antOv&&DB.antOv[l])||{};
 const motivoDe=r=>{const o=antOv(r.legajo); return o.motivo!=null?o.motivo:'FPP'};

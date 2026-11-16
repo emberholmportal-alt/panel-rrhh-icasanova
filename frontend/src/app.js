@@ -2257,21 +2257,40 @@ function lkTick(){ if(!locked) return; const d=new Date();
   setTimeout(lkTick,(60-d.getSeconds())*1000+50); }
 
 function welcome(){
-  const H=hoy(), hr=new Date().getHours(), A=computeAvisos(), alta=A.filter(a=>a.p==='alta').length, fs=fichState();
+  const H=hoy(), d=new Date(), hr=d.getHours(), online=window.SRV&&SRV.mode==='online', adm=!online||SRV.user.rol==='admin';
   const sal=hr<6?'Buenas noches':hr<13?'Buen día':hr<20?'Buenas tardes':'Buenas noches';
-  const items=[];
-  if(fs.needIn) items.push('⏱ Todavía no marcaste la entrada');
-  else if(fs.needOut&&fs.tarde) items.push('🚪 Acordate de fichar la salida');
-  items.push(alta?`<b>${alta}</b> tema(s) urgente(s) para hoy`:'Nada urgente pendiente');
-  const ev=Object.values(computeRange(H,H,{francos:true})[H]||{}).filter(x=>x.f!=='fr').reduce((a,x)=>a+x.names.length,0);
-  if(ev) items.push(`<b>${ev}</b> evento(s) en la agenda de hoy`);
+  const cards=[], items=[];
+  // clima
+  try{ if(WX&&WX.d&&WX.d.current){ const c=WX.d.current, dd=WX.d.daily, [ic,tx]=WMO(c.weather_code);
+    cards.push(`<div class="wl-c"><i>${ic}</i><b>${Math.round(c.temperature_2m)}°</b><span>${tx}${dd?` · máx ${Math.round(dd.temperature_2m_max[0])}°`:''}${dd&&dd.precipitation_probability_max[0]>=40?` · 💧${dd.precipitation_probability_max[0]}%`:''}</span></div>`); } }catch(e){}
+  // menú de hoy
+  try{ const M=typeof mnHoy==='function'?mnHoy():null;
+    cards.push(`<div class="wl-c"><i>🍽</i><b>Menú de hoy</b><span>${M&&M.m?esc(M.m)+([M.o1,M.o2,M.o3].filter(Boolean).length?` · y ${[M.o1,M.o2,M.o3].filter(Boolean).length} opciones más`:''):d.getDay()===0?'Hoy es domingo':'Todavía no se cargó'}</span></div>`); }catch(e){}
+  // cumpleaños
+  try{ if(DB.cumple&&typeof cuRows==='function'){ const R=cuRows(+H.slice(5,7)).filter(r=>r.fecha>=H&&r.fecha<=addD(H,7)), hoyC=R.filter(r=>r.fecha===H);
+    if(R.length) cards.push(`<div class="wl-c"><i>🎂</i><b>${hoyC.length?'Cumple hoy':'Cumpleaños'}</b><span>${hoyC.length?hoyC.slice(0,3).map(r=>esc(shortName(r.nombre))).join(', '):`${R.length} esta semana`}</span></div>`); } }catch(e){}
+  // lo de cada uno
+  try{ if(adm){ const fs=fichState(); if(fs.needIn) items.push('⏱ Todavía no marcaste la entrada'); else if(fs.needOut&&fs.tarde) items.push('🚪 Acordate de fichar la salida');
+      const alta=computeAvisos().filter(a=>a.p==='alta').length; items.push(alta?`<b>${alta}</b> tema(s) urgente(s) para hoy`:'Nada urgente pendiente');
+      const ev=Object.values(computeRange(H,H,{francos:true})[H]||{}).filter(x=>x.f!=='fr').reduce((a,x)=>a+x.names.length,0); if(ev) items.push(`<b>${ev}</b> evento(s) en la agenda de hoy`); } }catch(e){}
+  try{ if(typeof VS!=='undefined'&&VS.ok){ const pend=VS.items.filter(x=>x.estado==='pendiente');
+      if(VS.aprueba&&pend.length) items.push(`<b>${pend.length}</b> pedido(s) de vacaciones para revisar`);
+      else if(!VS.aprueba&&VS.pide){ const mio=VS.items.filter(x=>x.uid===SRV.user.id), res=mio.filter(x=>x.rat&&x.rat.slice(0,10)>=addD(H,-3)&&x.estado!=='pendiente');
+        if(res.length) items.push(`RRHH respondió <b>${res.length}</b> pedido(s) de vacaciones tuyo(s)`); else if(mio.some(x=>x.estado==='pendiente')) items.push(`<b>${mio.filter(x=>x.estado==='pendiente').length}</b> pedido(s) de vacaciones esperando a RRHH`); } } }catch(e){}
+  try{ if(online&&!adm&&frCanEdit()){ const C=frCruce(); if(C){ const sin=C.rows.filter(r=>!frAsig(r.e,C.dias)).length, P=C.P, falta=Math.round((dObj(P.d1)-dObj(H))/864e5);
+      items.push(`Francos de ${liqNom(P.ym).split(' ')[0].toLowerCase()}: ${falta>=0?`<b>${falta}</b> día(s) al cierre`:'período cerrado'}${sin?` · <b>${sin}</b> eventual(es) sin francos`:''}`); } } }catch(e){}
   const W=$('#welcome');
-  W.innerHTML=`<div class="wl-in"><div class="wl-ring"></div><div class="wl-hi">${sal},</div><h2>${esc(NOMBRE())}</h2><p class="wl-sub">Bienvenido de nuevo al panel de trabajo</p>
-    <div class="wl-items">${items.map((t,i)=>`<span style="animation-delay:${.45+i*.12}s">${t}</span>`).join('')}</div></div>`;
-  W.classList.add('on'); SND.play('notify');
-  clearTimeout(W._t); W._t=setTimeout(()=>{ W.classList.add('out'); setTimeout(()=>W.classList.remove('on','out'),500); App.refresh(); },2600);
-  W.onclick=()=>{ clearTimeout(W._t); W.classList.add('out'); setTimeout(()=>W.classList.remove('on','out'),500); };
+  W.innerHTML=`<div class="wl-in"><div class="wl-ring"></div><div class="wl-hi">${sal},</div><h2>${esc(NOMBRE())}</h2>
+    <p class="wl-sub">${DOWL[d.getDay()][0].toUpperCase()+DOWL[d.getDay()].slice(1)} ${d.getDate()} de ${MESL[d.getMonth()]} · bienvenido al panel de trabajo</p>
+    ${cards.length?`<div class="wl-cards">${cards.map((t,i)=>`<div style="animation-delay:${.3+i*.1}s">${t}</div>`).join('')}</div>`:''}
+    ${items.length?`<div class="wl-items">${items.map((t,i)=>`<span style="animation-delay:${.6+i*.12}s">${t}</span>`).join('')}</div>`:''}
+    <button class="btn primary wl-go">Empezar</button></div>`;
+  W.classList.add('on'); try{ SND.play('notify'); }catch(e){}
+  const cerrar=()=>{ clearTimeout(W._t); W.classList.add('out'); setTimeout(()=>W.classList.remove('on','out'),500); App.refresh(); };
+  clearTimeout(W._t); W._t=setTimeout(cerrar,9000); W.onclick=cerrar;
 }
+// en el servidor, el saludo aparece una vez por día al entrar
+App.saludoDelDia=()=>{ if(!(window.SRV&&SRV.mode==='online')) return; const k='rrhh-hola-'+SRV.user.id+'-'+hoy(); try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){} setTimeout(welcome,1500); };
 
 /* --- animación del protector (canvas 2D, liviana) --- */
 const lkAnim=(()=>{

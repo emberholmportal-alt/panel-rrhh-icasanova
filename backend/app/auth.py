@@ -34,7 +34,7 @@ MODULES = {
 }
 # módulos que todos ven aunque no tengan permiso asignado
 DEFAULT_LEVEL = {"menu": "ver"}
-LEVELS = ("", "ver", "editar")
+LEVELS = ("", "consulta", "ver", "editar")   # consulta = ve en pantalla, sin descargar ni modificar
 DEFAULT_PERMS = {"agenda": "editar"}
 
 
@@ -104,7 +104,7 @@ def level(u: User, modulo: str) -> str:
 
 
 def can_read(u: User, modulo: str) -> bool:
-    return level(u, modulo) in ("ver", "editar")
+    return level(u, modulo) in ("consulta", "ver", "editar")
 
 
 def can_write(u: User, modulo: str) -> bool:

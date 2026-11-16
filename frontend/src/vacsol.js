@@ -5,20 +5,26 @@
    Solo funciona con el servidor: en modo archivo la sección no se muestra.
    ================================================================ */
 const VS={items:[],aprueba:false,pide:false,ok:false,ver:-1,f:'pend',rech:''};
+const VS_ANT=15;   // días de anticipación para pedir (RRHH carga sin ese límite)
+const vsMin=()=>addD(hoy(),VS_ANT);
 const vsOn=()=>!!(window.SRV&&SRV.mode==='online'&&SRV.api);
 const VS_EST={pendiente:'Pendiente',aprobada:'Aprobada',rechazada:'Rechazada',cancelada:'Cancelada',anulada:'Anulada'};
 async function vsLoad(){
   if(!vsOn()) return;
   try{ const r=await SRV.api('GET','/api/vacsol'); Object.assign(VS,{items:r.items||[],aprueba:!!r.aprueba,pide:!!r.pide,ver:r.version,ok:true}); }
   catch(e){ VS.ok=false; return; }
-  vsMerge(); vsBadge(); if(typeof curView!=='undefined'&&curView==='v-vacsol') renderVacsol();
+  vsMerge(); vsBadge(); if(typeof curView!=='undefined'&&curView==='v-vacaciones') renderVacsol();
   try{ App.refresh(); }catch(e){}
 }
 // las aprobadas se suman al plan de vacaciones (si RRHH ya la cargó en el plan oficial, no se duplica)
 function vsMerge(){
   const plan=(DB.vac&&DB.vac.rows)||[], ya=new Set(plan.map(r=>String(r.legajo)+'|'+r.desde));
-  window.VACSOL_OK=VS.items.filter(x=>x.estado==='aprobada'&&!ya.has(String(x.legajo)+'|'+x.desde)).map(x=>({legajo:x.legajo,nombre:x.nombre,uo:'',cat:'',ingreso:'',doc:'',sector:x.sector||'',diasAno:0,n:1,
-    id:'sol|'+x.id,desde:x.desde,hasta:x.hasta,dias:x.dias,notif:'NO',fnotif:'',sol:true}));
+  // datos del legajo (para la planilla de firma): del plan de vacaciones o de la lista de eventuales
+  const ficha={}; plan.forEach(r=>{ if(!ficha[r.legajo]) ficha[r.legajo]=r; });
+  try{ antRows().forEach(r=>{ if(!ficha[r.legajo]) ficha[r.legajo]={uo:r.uo,ingreso:r.ingreso,doc:r.doc,cat:'Eventual'}; }); }catch(e){}
+  window.VACSOL_OK=VS.items.filter(x=>x.estado==='aprobada'&&!ya.has(String(x.legajo)+'|'+x.desde)).map(x=>{ const f=ficha[x.legajo]||{};
+    return {legajo:x.legajo,nombre:x.nombre,uo:f.uo||'',cat:f.cat||'',ingreso:f.ingreso||'',doc:f.doc||'',sector:x.sector||f.sector||'',diasAno:f.diasAno||0,n:1,
+      id:'sol|'+x.id,desde:x.desde,hasta:x.hasta,dias:x.dias,notif:'NO',fnotif:'',sol:true}; });
 }
 function vsBadge(n){
   const b=$('#nb-vacsol'); if(!b) return;
@@ -35,10 +41,14 @@ function vsEmps(){
 }
 const vsDias=(d,h)=>d&&h&&h>=d?Math.round((dObj(h)-dObj(d))/864e5)+1:0;
 function renderVacsol(){
-  const sec=$('#v-vacsol'); if(!sec) return;
+  const sec=$('#vs-wrap'); if(!sec) return;
+  if(!vsOn()){ sec.hidden=true; return; }
   if(!VS.ok){ $('#vs-body').innerHTML='<div class="empty">Cargando solicitudes…</div>'; vsLoad(); return; }
-  $('#vs-form').hidden=!VS.pide; $('#vs-xls').hidden=!VS.aprueba;
-  $('#vs-sub').textContent=VS.aprueba?'Revisá los pedidos de coordinadores y supervisores: al aprobarlos aparecen en Vacaciones.':'Cargá el pedido de vacaciones de tu gente. RRHH lo revisa y lo aprueba o lo rechaza; acá ves en qué estado está.';
+  $('#vs-form').hidden=!VS.pide; $('#vs-xls').style.display=VS.aprueba?'':'none';
+  $('#vs-tit').textContent=VS.aprueba?'Cargar vacaciones y pedidos':VS.pide?'Pedir vacaciones':'Pedidos de vacaciones';
+  $('#vs-sub').textContent=VS.aprueba?'Lo que cargás acá queda aprobado. Los pedidos de coordinadores esperan tu aprobación.':VS.pide?`Con al menos ${VS_ANT} días de anticipación (desde el ${dmy(vsMin())}). RRHH lo aprueba o lo rechaza.`:'Vacaciones aprobadas por RRHH.';
+  $('#vs-go').textContent=VS.aprueba?'Cargar vacaciones':'Enviar a RRHH';
+  $('#vs-d').min=VS.aprueba?'':vsMin(); $('#vs-h').min=VS.aprueba?'':vsMin();
   if(VS.pide){ const E=vsEmps(); $('#vs-emps').innerHTML=E.map(e=>`<option value="${esc(e.nombre+' · '+e.leg)}">${esc([e.sector,e.turno].filter(Boolean).join(' · '))}</option>`).join(''); vsCalc(); }
   const cnt=k=>VS.items.filter(x=>k==='todas'||x.estado===k||(k==='pend'&&x.estado==='pendiente')).length;
   $('#vs-tabs').innerHTML=[['pend','Pendientes'],['aprobada','Aprobadas'],['rechazada','Rechazadas'],['todas','Todas']].map(([k,l])=>`<button type="button" class="fr-ch${VS.f===k?' on':''}" data-vsf="${k}">${l} <i>${cnt(k)}</i></button>`).join('');
@@ -53,21 +63,23 @@ function renderVacsol(){
       return `<tr><td><b>${esc(x.nombre)}</b><span>${esc([x.legajo,x.sector,x.turno].filter(Boolean).join(' · '))}</span></td>
         <td><b>${dmy(x.desde)} al ${dmy(x.hasta)}</b><span>${x.dias} día(s)${x.obs?' · '+esc(x.obs):''}</span></td>
         <td>${esc(x.by)}<span>${fmtAt(x.at)}</span></td>
-        <td><em class="vs-e ${x.estado}">${VS_EST[x.estado]||x.estado}</em>${x.rby?`<span>${esc(x.rby)} · ${fmtAt(x.rat)}</span>`:''}${x.motivo?`<span>Motivo: ${esc(x.motivo)}</span>`:''}</td>
+        <td><em class="vs-e ${x.estado}">${x.directa?'Cargada por RRHH':(VS_EST[x.estado]||x.estado)}</em>${x.rby?`<span>${esc(x.rby)} · ${fmtAt(x.rat)}</span>`:''}${x.motivo?`<span>Motivo: ${esc(x.motivo)}</span>`:''}</td>
         <td class="vs-acc">${acc}</td></tr>`; }).join('')}</tbody></table>`
     :`<div class="empty">${VS.f==='pend'?'No hay pedidos pendientes.':'No hay solicitudes en esta lista.'}</div>`;
   vsBadge();
 }
-function vsCalc(){ const d=$('#vs-d').value, h=$('#vs-h').value, n=vsDias(d,h); $('#vs-n').textContent=n?`${n} día(s) corridos`:(d&&h?'El regreso no puede ser antes de la salida':''); }
+function vsCalc(){ const d=$('#vs-d').value, h=$('#vs-h').value, n=vsDias(d,h), tarde=!VS.aprueba&&d&&d<vsMin();
+  $('#vs-n').innerHTML=tarde?`<b class="vs-warn">Falta anticipación: la salida tiene que ser desde el ${dmy(vsMin())}</b>`:n?`${n} día(s) corridos`:(d&&h?'El regreso no puede ser antes de la salida':''); $('#vs-go').disabled=!!tarde; }
 async function vsEnviar(){
   const sel=$('#vs-emp').value.trim(), m=sel.match(/·\s*(\S+)\s*$/), E=vsEmps(), e=m&&E.find(x=>x.leg===m[1]);
   if(!e){ App.toast('Elegí el empleado de la lista (escribí el apellido y elegilo).',true); return; }
   const desde=$('#vs-d').value, hasta=$('#vs-h').value;
   if(!vsDias(desde,hasta)){ App.toast('Revisá las fechas de salida y regreso.',true); return; }
+  if(!VS.aprueba&&desde<vsMin()){ App.toast(`Las vacaciones se piden con al menos ${VS_ANT} días de anticipación: la salida tiene que ser desde el ${dmy(vsMin())}.`,true); return; }
   const b=$('#vs-go'); b.disabled=true;
   try{ await SRV.api('POST','/api/vacsol',{legajo:e.leg,nombre:e.nombre,sector:e.sector,turno:e.turno,desde,hasta,obs:$('#vs-obs').value.trim()});
-    App.toast(`Pedido enviado a RRHH: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`);
-    $('#vs-emp').value=''; $('#vs-d').value=''; $('#vs-h').value=''; $('#vs-obs').value=''; VS.f='pend'; await vsLoad(); }
+    App.toast(VS.aprueba?`Vacaciones cargadas: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`:`Pedido enviado a RRHH: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`);
+    $('#vs-emp').value=''; $('#vs-d').value=''; $('#vs-h').value=''; $('#vs-obs').value=''; VS.f=VS.aprueba?'aprobada':'pend'; await vsLoad(); }
   catch(err){ App.toast(err.message,true); }
   finally{ b.disabled=false; }
 }
@@ -87,15 +99,16 @@ async function vsExcel(){
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Aprobadas'); XLSX.writeFile(wb,`vacaciones_aprobadas_${hoy()}.xlsx`);
 }
 function hookVacsol(){
-  if(!vsOn()){ const n=document.querySelector('.nav-item[data-v="v-vacsol"]'); if(n) n.style.display='none'; return; }
+  if(!vsOn()){ const w=$('#vs-wrap'); if(w) w.hidden=true; return; }
   $('#vs-go').onclick=vsEnviar; $('#vs-xls').onclick=vsExcel;
   ['#vs-d','#vs-h'].forEach(s=>$(s).addEventListener('change',()=>{ if(s==='#vs-d'&&$('#vs-d').value&&(!$('#vs-h').value||$('#vs-h').value<$('#vs-d').value)) $('#vs-h').value=$('#vs-d').value; vsCalc(); }));
-  document.addEventListener('click',e=>{ if(!e.target.closest('#v-vacsol')) return;
+  document.addEventListener('click',e=>{ if(!e.target.closest('#vs-wrap')) return;
     const f=e.target.closest('[data-vsf]'); if(f){ VS.f=f.dataset.vsf; VS.rech=''; renderVacsol(); return; }
     const r=e.target.closest('[data-vsr]'); if(r){ VS.rech=r.dataset.vsr; renderVacsol(); setTimeout(()=>{ const i=$('#vs-mot'); if(i) i.focus(); },0); return; }
     if(e.target.closest('[data-vsno]')){ VS.rech=''; renderVacsol(); return; }
     const a=e.target.closest('[data-vsa]'); if(a){ a.disabled=true; vsAccion(a.dataset.id,a.dataset.vsa); } });
   vsLoad();
 }
-const _ovVs=App.onView; App.onView=(id,f)=>{ _ovVs(id,f); if(id==='v-vacsol') renderVacsol(); };
+const _ovVs=App.onView; App.onView=(id,f)=>{ _ovVs(id,f); if(id==='v-vacaciones') renderVacsol(); };
 try{ hookVacsol(); }catch(e){ console.error('vacsol',e); }
+try{ if(App.saludoDelDia) App.saludoDelDia(); }catch(e){}
