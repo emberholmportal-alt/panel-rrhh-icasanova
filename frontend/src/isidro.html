@@ -280,6 +280,7 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     <button class="tab" data-p="p-rank">Reincidencias <span class="badge" id="bRank">0</span></button>
     <button class="tab" data-p="p-pedidos">Pedidos de explicación <span class="badge" id="bPed">0</span></button>
     <button class="tab" data-p="p-pres">Presentes</button>
+    <button class="tab" data-p="p-mot">Por motivo</button>
     <button class="tab" data-p="p-sinf">Sin fichada <span class="badge" id="bSinf">0</span></button>
     <button class="tab" data-p="p-turnos">Turnos <span class="badge" id="bTurnos">0</span></button>
     <button class="tab" data-p="p-plantilla">Plantilla</button>
@@ -394,6 +395,37 @@ footer.foot{border-top:1px solid var(--line);margin-top:34px;padding:16px 0;colo
     </div>
     <div class="card"><div class="card-h"><h3>Sector × turno (presentes)</h3></div><div class="card-b flush"><div class="tscroll"><table id="pr-mx" class="nm-t"></table></div></div></div>
     <div class="card"><div class="card-h"><h3>Detalle</h3><span class="meta" id="pr-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:520px"><table id="pr-det"></table></div></div></div>
+  </div>
+
+  <!-- ============ AUSENTISMO POR MOTIVO ============ -->
+  <div class="panel" id="p-mot">
+    <div class="cx-step nm-drop" id="am-load">
+      <div class="cx-n">⇪</div>
+      <div class="cx-sb"><h4>Cargar export de Movimientos</h4><p>Soltá acá el <b>export de Movimientos</b> del reloj (anual o de un período). Trae, por persona y día, la jornada y los motivos de ausencia.
+        Los meses que vengan en el archivo nuevo reemplazan a los cargados antes.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary sm" id="am-pick">Elegir archivo…</button></div>
+        <input type="file" id="am-file" accept=".xlsx,.xls" hidden></div>
+    </div>
+    <div class="cx-st am-st" id="am-st"></div>
+    <div id="am-body">
+      <div class="card"><div class="card-b"><div class="filters">
+        <div class="field"><label>Mes</label><select id="am-mes"></select></div>
+        <div class="field"><label>Tipo</label><select id="am-tip"></select></div>
+        <div class="field"><label>Sector</label><select id="am-sec"></select></div>
+        <div class="field"><label>Turno</label><select id="am-tur"></select></div>
+        <label class="am-chk"><input type="checkbox" id="am-lic"> Sumar licencias (gremial, estudio, casamiento, etc.)</label>
+        <div class="field" style="align-self:flex-end;margin-left:auto"><button class="btn primary sm" id="am-xls">Descargar Excel</button></div>
+      </div>
+      <div class="am-nota">Tasa = días de ausencia ÷ días programados (jornadas de trabajo, sin francos ni vacaciones). Vacaciones, franco compensatorio, home office y capacitación no cuentan como ausentismo.</div></div></div>
+      <div class="kpis" id="am-kpis"></div>
+      <div class="card"><div class="card-h"><h3>Por mes y motivo</h3><span class="meta">clic en un mes para filtrarlo</span></div><div class="card-b flush"><div class="tscroll"><table id="am-mesT" class="nm-t am-t"></table></div></div></div>
+      <div class="card"><div class="card-h"><h3>Por motivo</h3></div><div class="card-b flush"><div class="tscroll"><table id="am-motT" class="nm-t"></table></div></div></div>
+      <div class="cgrid" style="grid-template-columns:1fr 1fr">
+        <div class="card"><div class="card-h"><h3>Por sector</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="am-secT" class="nm-t"></table></div></div></div>
+        <div class="card"><div class="card-h"><h3>Por turno</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="am-turT" class="nm-t"></table></div></div></div>
+      </div>
+      <div class="card"><div class="card-h"><h3>Por persona</h3><span class="meta" id="am-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:560px"><table id="am-perT"></table></div></div></div>
+    </div>
   </div>
 
   <!-- ============ SIN FICHADA ============ -->
