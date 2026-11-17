@@ -2250,7 +2250,8 @@ setInterval(()=>{ if(!locked&&LK.on&&Date.now()-lastAct>LK.min*60e3) lockNow('in
 
 function lockNow(why){
   if(locked) return;
-  if(window.SRV&&SRV.mode&&SRV.mode!=='online') return;   // sin sesión iniciada no hay nada que bloquear: manda el login locked=true;
+  if(window.SRV&&SRV.mode&&SRV.mode!=='online') return;   // sin sesión iniciada no hay nada que bloquear: manda el login
+  locked=true;
   try{ sessionStorage.setItem(LKK,'1'); }catch(e){}
   closeIntro(); $('#m365dlg').classList.remove('on'); $('#modal').classList.remove('on');
   const L=$('#lock');
