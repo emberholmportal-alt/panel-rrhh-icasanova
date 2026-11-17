@@ -78,9 +78,16 @@ async function amCargar(file){
     const todas=nuevo.ev.map(e=>e[1]).concat(Object.values(nuevo.prog).flatMap(p=>Object.keys(p).map(m=>m+'-01'))).sort();
     nuevo.desde=todas[0]||d0; nuevo.hasta=[d1,A.hasta||''].sort().pop();
     DB.ausmot=nuevo;
+    // el mismo export alimenta a Francos (fichadas de los últimos ~2 meses) si quien lo sube puede editar Francos
+    let frMsg='';
+    try{ if(canEditMod('francos')&&typeof parseMovimientos==='function'){ const M=parseMovimientos(rows,hi), desde=addD(hoy(),-70), cur=DB.francos&&DB.francos.mov;
+      Object.values(M.emps).forEach(e=>{ Object.keys(e.d).forEach(d=>{ if(d<desde){ delete e.d[d]; delete e.o[d]; } }); });
+      const d0=M.d0<desde?desde:M.d0;
+      if(M.d1>=d0&&(!cur||M.d1>=cur.d1)){ DB.francos=DB.francos||{emps:{},files:[]}; DB.francos.mov={at:new Date().toISOString(),file:file.name,d0,d1:M.d1,emps:M.emps};
+        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas para Francos desde Ausentismo: ${file.name} (${dmy(d0)} al ${dmy(M.d1)})`); frMsg=' · también actualizó las fichadas de Francos'; } } }catch(e){ console.warn('francos',e); }
     if(window.SRV&&SRV.nota) SRV.nota('ausmot',`Motivos de ausencia: ${file.name} (${dmy(d0)} al ${dmy(d1)}, ${ev.length} días con motivo)`);
     await persist(); amState.mes=''; renderAusmot();
-    App.toast(`Cargado: ${Object.keys(emps).length} personas, del ${dmy(d0)} al ${dmy(d1)}`);
+    App.toast(`Cargado: ${Object.keys(emps).length} personas, del ${dmy(d0)} al ${dmy(d1)}${frMsg}`);
   }catch(e){ console.error(e); st.innerHTML=`<span style="color:#fca5a5">${esc(e.message||String(e))}</span>`; App.toast(e.message||'No se pudo leer el archivo',true); }
 }
 

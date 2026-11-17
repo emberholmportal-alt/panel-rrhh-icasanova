@@ -1258,9 +1258,30 @@ const CX_DEF={obj:20,art:true};
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
 const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable/i.test(f.t||'')?f:null; };
 function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(frState.liq); }
+// fichadas para Francos: export de Movimientos (si cubre el día) + reportes diarios del reloj (Llegadas tarde)
+// d[fecha]: 'T' trabajó · 'ENF','ART','VAC','AUS','LIC','OTRO' novedad · '' no vino (= franco) · '?' turno no exportado (sin dato)
+function frFichadas(P){
+  const F=DB.francos, mov=F&&F.mov&&F.mov.d1>=P.d0&&F.mov.d0<=P.d1?F.mov:null, emps={}, cov=new Set();
+  const E=leg=>emps[leg]||(emps[leg]={n:'',c:'',d:{},o:{}});
+  if(mov){ for(let d=mov.d0<P.d0?P.d0:mov.d0; d<=mov.d1&&d<=P.d1; d=addD(d,1)) cov.add(d);
+    Object.entries(mov.emps).forEach(([leg,v])=>{ const x=E(leg); x.n=v.n; x.c=v.c; Object.entries(v.d).forEach(([d,k])=>{ if(d>=P.d0&&d<=P.d1){ x.d[d]=k; if(v.o&&v.o[d]) x.o[d]=v.o[d]; } }); }); }
+  // reportes diarios del reloj: completan los días que el export de Movimientos no trae
+  const R=Object.values(DB.records||{}).filter(r=>r.fecha>=P.d0&&r.fecha<=P.d1&&!cov.has(r.fecha));
+  const diasRec=new Set(R.map(r=>r.fecha));
+  for(const r of R){ const leg=String(r.legajo||'').trim().replace(/\.0+$/,''); if(!leg) continue; const x=E(leg);
+    if(!x.n) x.n=r.nombre||''; if(!x.c) x.c=r.empresa||'';
+    const marcas=(r.marcas||[]).length||r.entrada!=null||(r.eventos||[]).some(t=>MOV_MK.test(' '+String(t)));
+    const nov=(r.eventos||[]).filter(t=>!MOV_MK.test(' '+String(t))).join(' · ');
+    const k=marcas?'T':nov?(movClase(nov)||'OTRO'):r.status==='no_cubierto'?'?':'';
+    if(x.d[r.fecha]!=='T') x.d[r.fecha]=k; if(nov&&k!=='T') x.o[r.fecha]=nov.slice(0,60); }
+  diasRec.forEach(d=>cov.add(d));
+  if(!cov.size) return null;
+  const dias=[...cov].sort();
+  return {emps,cov,d0:dias[0],d1:dias[dias.length-1],src:[mov?`export de Movimientos (${dmy(mov.d0).slice(0,5)} al ${dmy(mov.d1).slice(0,5)})`:'',diasRec.size?`reporte diario del reloj (${diasRec.size} día(s))`:''].filter(Boolean).join(' + ')};
+}
 function frCruce(){
   const F=DB.francos, P=cxPeriodo(), E=FRE(); if(!P||!E.length) return null;
-  const M=F&&F.mov&&F.mov.d1>=P.d0&&F.mov.d0<=P.d1?F.mov:null;   // movimientos de otro período no se cruzan
+  const M=frFichadas(P);   // solo fichadas del período de liquidación
   const cfg=cxCfg(), corte=M?M.d1:'', out=[], dias=[];
   for(let d=P.d0; d<=P.d1; d=addD(d,1)) dias.push(d);
   for(const e of E){
@@ -1272,7 +1293,8 @@ function frCruce(){
       if(e.d[d]==='B'||(e.ingreso&&d<e.ingreso)||(e.egreso&&d>e.egreso)) c='-';
       else{
         const st=mv&&mv.d[d]!=null?mv.d[d]:'';
-        if(mv&&(d<corte||(d===corte&&st))){                      // el último día del export puede estar incompleto
+        // días con fichadas (export o reporte diario); el último puede estar incompleto y un turno no exportado no es dato
+        if(M&&M.cov.has(d)&&st!=='?'&&(d<corte||(d===corte&&st))){
           if(st==='T') c=dom?'DT':fer?'FT':'T';
           else if(st) c=st;
           else c=dom?'DOM':fer?'FER':'F';                         // sin fichada = no vino = franco
@@ -1317,7 +1339,8 @@ function renderFrancos(){
   const LA=F&&F.asig&&F.asig[F.asig.length-1];
   $('#fr-st-plan').innerHTML=(nAnt?`<b>${nAnt} eventuales activos</b> de la lista de eventuales`:nPl?`<b>${nPl} empleados</b> en el plan`:'Sin empleados: cargá la lista de eventuales (sección Eventuales) o un plan')+
     (F&&(F.files||[]).length?`<br>${esc((F.files||[]).slice(-1)[0]||'')} · ${fmtAt(F.at)}`:'')+(LA?`<br>Última asignación cargada: <b>${esc(LA.file)}</b> · ${fmtAt(LA.at)} · ${LA.fr} franco(s)${LA.falt?` · <span class="w">${LA.falt} sin completar</span>`:''}`:'');
-  $('#fr-st-mov').innerHTML=M?`<b>Fichadas del ${dmy(M.d0)} al ${dmy(M.d1)}</b><br>${esc(M.file||'')} · ${fmtAt(M.at)}${C&&!C.M?'<br><span class="w">⚠ No corresponde al período del plan</span>':''}${C&&C.M&&M.d1<addD(hoy(),-2)?'<br><span class="w">⚠ Hay días sin cruzar: subí un export más nuevo</span>':''}`:'Sin cargar · sin movimientos se usa solo el plan';
+  $('#fr-st-mov').innerHTML=C&&C.M?`<b>Fichadas del ${dmy(C.M.d0)} al ${dmy(C.M.d1)}</b><br>${esc(C.M.src)}${C.M.d1<addD(hoy(),-2)?`<br><span class="w">⚠ Faltan fichadas desde el ${dmy(addD(C.M.d1,1))}: cargá el reporte diario del reloj en Llegadas tarde o un export de Movimientos más nuevo</span>`:''}${(()=>{ const g=[]; for(let d=C.M.d0; d<=C.M.d1; d=addD(d,1)) if(!C.M.cov.has(d)) g.push(dmy(d).slice(0,5)); return g.length?`<br><span class="w">⚠ Días sin fichadas (se usa el plan): ${g.join(', ')}</span>`:''; })()}`
+    :M?`<b>Export del ${dmy(M.d0)} al ${dmy(M.d1)}</b><br><span class="w">⚠ No corresponde al período</span>`:'Sin fichadas del período: se usa solo el plan. Se toman solas del reporte diario del reloj (Llegadas tarde) o de un export de Movimientos.';
   $('#fr-cx-obj').value=cfg.obj; $('#fr-cx-art').checked=!!cfg.art;
   renderMsel('#fr-mt','turnos','Turno',E.map(e=>turKey(e.turno)));
   { const base=C?C.rows.map(r=>r.e):E, chip=(key,vals,el)=>{ const cnt={}; vals.forEach(k=>cnt[k]=(cnt[k]||0)+1); const ks=Object.keys(cnt).sort((x,y)=>x.localeCompare(y,'es')), on=frState[key];
