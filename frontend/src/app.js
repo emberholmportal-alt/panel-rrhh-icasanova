@@ -1296,6 +1296,7 @@ function frCruce(){
         // días con fichadas (export o reporte diario); el último puede estar incompleto y un turno no exportado no es dato
         if(M&&M.cov.has(d)&&st!=='?'&&(d<corte||(d===corte&&st))){
           if(st==='T') c=dom?'DT':fer?'FT':'T';
+          else if(st==='AUS') c=dom?'DOM':fer?'FER':'F';            // eventual ausente (con o sin aviso) = franco tomado
           else if(st) c=st;
           else c=dom?'DOM':fer?'FER':'F';                         // sin fichada = no vino = franco
         } else c=dom?'DOM':fer?'FER':(e.d[d]==='F'?'PF':'P');
@@ -1623,7 +1624,7 @@ function cxInforme(){
   <h2 class="pb">Calendario día por día</h2>
   <div class="ley" id="ley"></div>
   <table class="cal"><thead id="ch"></thead><tbody id="cb"></tbody></table>
-  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos y feriados trabajados). Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Ausencias no computan. Día sin fichada = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
+  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos y feriados trabajados). Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Día sin fichada o con ausencia (con o sin aviso) = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
   <script>
   const D=${JSON.stringify(data).replace(/</g,'\\u003c')}, PRE=${JSON.stringify(pre)};
   const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1661,7 +1662,7 @@ function cxExcel(){
   const CODE={T:'T',DT:'DT',FT:'FT',ENF:'ENF',ART:'ART',AUS:'AUS',VAC:'VAC',LIC:'LIC',OTRO:'NOV',F:'F',DOM:'DOM',FER:'FER',P:'P',PF:'PF','-':''};
   const cal=[['Legajo','Apellido y nombre'].concat(C.dias.map(d=>DOW[dObj(d).getDay()].slice(0,2)+' '+dm(d))).concat(['Faltan tomar'])].concat(R.map(r=>[r.e.legajo,r.e.nombre].concat(C.dias.map(d=>CODE[r.cal[d]])).concat([r.sup?'Superó':r.pend])));
   const w2=XLSX.utils.aoa_to_sheet(cal); w2['!cols']=[{wch:9},{wch:34}].concat(C.dias.map(()=>({wch:7}))); XLSX.utils.book_append_sheet(wb,w2,'Calendario');
-  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','Sí'],['FT','Feriado trabajado','Sí'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['AUS','Ausencia','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
+  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','Sí'],['FT','Feriado trabajado','Sí'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['F (ausencia)','Ausencia con o sin aviso: cuenta como franco tomado','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
     ['Período',`${dmy(C.P.d0)} al ${dmy(C.P.d1)}`],['Fichadas hasta',C.M?dmy(C.corte)+' (el último día solo cuenta si tiene fichada)':'sin movimientos'],['Objetivo de jornadas',cfg.obj],['Feriados del período',C.dias.filter(cxFer).map(d=>dmy(d)+' '+cxFer(d).n).join(' · ')||'ninguno'],
     ['Francos que faltan tomar','Total al cierre − objetivo (si da negativo, 0)'],[],['Fichan y no están en el plan',C.sinPl.map(x=>x.legajo+' '+x.nombre).join(' · ')||'ninguno']];
   const w3=XLSX.utils.aoa_to_sheet(ref); w3['!cols']=[{wch:30},{wch:70},{wch:16}]; XLSX.utils.book_append_sheet(wb,w3,'Criterios');
