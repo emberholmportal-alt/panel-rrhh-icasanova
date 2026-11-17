@@ -1364,12 +1364,12 @@ function renderFrancos(){
   const EF=(C?C.rows.map(r=>r.e):E.filter(e=>ds.some(d=>e.d[d]!=null))).filter(flt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const ED=frCanEdit();
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
-      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}<th class="frt" title="Francos asignados en el período">Francos</th>${C&&C.M?'<th class="frt" title="Francos que le faltan tomar según las fichadas">Faltan</th>':''}</tr></thead><tbody>`+
+      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C&&C.M?'<th class="frt" title="Francos que le faltan tomar según las fichadas">Faltan</th>':''}</tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
       return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}<td class="frt"><span class="fr-cnt${frAsig(e,ds)?'':' z'}">${frAsig(e,ds)}</span></td>${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
+        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${E.length?'Nadie con ese filtro.':'No hay eventuales: cargá la lista en la sección Eventuales.'}</div></td></tr></tbody>`;
   $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día</b> para asignar o quitar el franco. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
   $('#fr-cx-ley').innerHTML=(C&&C.M?['PF','P','T','F','DOM','FER','ENF','ART','AUS']:['PF','P','DOM','FER']).map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
@@ -1677,6 +1677,41 @@ async function frListadoXlsx(){
   download(buf,`francos_asignados_${C.P.ym}_${tag}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   App.toast(`Listado descargado: ${X.n} eventuales · ${X.tot} francos asignados`);
 }
+// detalle de francos pendientes de asignar (para no pasarnos de las jornadas del período)
+function frPendientesPrint(){
+  const C=frCruce(); if(!C||!C.M){ App.toast('Para calcular los francos pendientes hacen falta las fichadas del reloj (export de Movimientos) del período.',true); return; }
+  const cfg=C.cfg, R=C.rows.filter(r=>frFlt(r.e));
+  const P=R.filter(r=>r.pend>0), S=R.filter(r=>r.sup);
+  if(!P.length&&!S.length){ App.toast('Nadie tiene francos pendientes de asignar con este filtro.'); return; }
+  const fr=r=>C.dias.filter(d=>r.e.d[d]==='F'&&dObj(d).getDay()!==0).length;
+  const fila=(r,cols)=>`<tr><td>${esc(r.e.legajo)}</td><td class="l"><b>${esc(r.e.nombre)}</b></td>${cols?`<td class="l">${esc(secKey(r.e.sector))}</td><td class="l">${esc(turKey(r.e.turno))}</td>`:''}<td>${fr(r)}</td><td>${r.comp}</td><td>${r.proy}</td><td class="p">${r.pend}</td><td class="f"></td></tr>`;
+  const head=cols=>`<tr><th>Legajo</th><th class="l">Apellido y nombre</th>${cols?'<th class="l">Sector</th><th class="l">Turno</th>':''}<th>Francos asignados</th><th>Jornadas a la fecha</th><th>Proyección al cierre</th><th>Faltan asignar</th><th class="l" style="width:130px">Días elegidos (anotar)</th></tr>`;
+  const alfa=P.slice().sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es'));
+  const g={}; P.forEach(r=>{ const k=secKey(r.e.sector)+'\u0001'+turKey(r.e.turno); (g[k]||(g[k]=[])).push(r); });
+  const grupos=Object.keys(g).sort((a,b)=>a.localeCompare(b,'es')).map(k=>{ const [sec,tur]=k.split('\u0001'); return {sec,tur,L:g[k].sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es'))}; });
+  const tot=P.reduce((a,r)=>a+r.pend,0);
+  const filtro=[frState.sectors.length?'Sector: '+frState.sectors.join(', '):'Todos los sectores',frState.turnos.length?'Turno: '+frState.turnos.join(', '):'todos los turnos'].join(' · ');
+  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Francos pendientes ${esc(liqNom(C.P.ym))}</title><style>
+  @page{size:A4;margin:12mm} body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px;font-size:12px}
+  h1{font-size:20px;margin:0} p.m{color:#475569;font-size:12px;margin:4px 0 14px} h2{font-size:15px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #0f172a}
+  h3{font-size:13px;background:#fef3c7;padding:6px 10px;margin:14px 0 0;border-radius:6px;break-after:avoid}
+  .k{display:flex;gap:10px;margin:0 0 10px} .k div{border:1px solid #cbd5e1;border-radius:8px;padding:8px 14px} .k b{display:block;font-size:22px} .k span{font-size:11px;color:#475569;text-transform:uppercase}
+  table{width:100%;border-collapse:collapse;margin:0 0 6px} th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:center} th{background:#f1f5f9;font-size:10.5px} .l{text-align:left}
+  td.p{font-weight:bold;font-size:14px;color:#b45309;background:#fffbeb} td.f{min-width:110px} tr{break-inside:avoid} .nota{font-size:11px;color:#475569;margin:6px 0 0}
+  .pb{page-break-before:always} .firma{margin-top:28px;font-size:12px;color:#334155} button{font:inherit;padding:7px 14px;border-radius:6px;border:0;background:#0f172a;color:#fff;cursor:pointer;float:right}
+  @media print{button{display:none}}</style></head><body>
+  <button onclick="print()">Imprimir / guardar PDF</button>
+  <h1>Francos pendientes de asignar · ${esc(liqNom(C.P.ym))}</h1>
+  <p class="m">Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · ${esc(filtro)} · fichadas hasta el ${dmy(C.corte)} · objetivo ${cfg.obj} jornadas · emitido ${dmy(hoy())}</p>
+  <div class="k"><div><span>Personas con francos pendientes</span><b>${P.length}</b></div><div><span>Francos por asignar</span><b>${tot}</b></div>${S.length?`<div><span>Ya superaron el objetivo</span><b>${S.length}</b></div>`:''}</div>
+  <p class="nota">"Faltan asignar" = francos que todavía hay que darle para no pasar de ${cfg.obj} jornadas al cierre del período (proyección = jornadas a la fecha + días planificados de trabajo que le quedan). La última columna es para anotar a mano los días elegidos.</p>
+  <h2>1 · Por orden alfabético</h2><table>${head(true)}${alfa.map(r=>fila(r,true)).join('')}</table>
+  <h2 class="pb">2 · Por sector y turno</h2>
+  ${grupos.map(x=>`<h3>${esc(x.sec)} · ${esc(x.tur)} · ${x.L.length} persona(s) · ${x.L.reduce((a,r)=>a+r.pend,0)} francos por asignar</h3><table>${head(false)}${x.L.map(r=>fila(r,false)).join('')}</table>`).join('')}
+  ${S.length?`<h2>Ya superaron las ${cfg.obj} jornadas</h2><table><tr><th>Legajo</th><th class="l">Apellido y nombre</th><th class="l">Sector</th><th class="l">Turno</th><th>Jornadas a la fecha</th></tr>${S.sort((a,b)=>a.e.nombre.localeCompare(b.e.nombre,'es')).map(r=>`<tr><td>${esc(r.e.legajo)}</td><td class="l">${esc(r.e.nombre)}</td><td class="l">${esc(secKey(r.e.sector))}</td><td class="l">${esc(turKey(r.e.turno))}</td><td><b>${r.comp}</b></td></tr>`).join('')}</table>`:''}
+  <div class="firma">Coordinador/a: ______________________________ &nbsp;&nbsp; Firma: ____________________ &nbsp;&nbsp; Fecha: ____/____/______</div></body></html>`;
+  download(html,`francos_pendientes_${C.P.ym}.html`,'text/html;charset=utf-8'); App.toast(`Detalle descargado: ${P.length} persona(s) con ${tot} francos por asignar. Abrilo y usá Imprimir para PDF`);
+}
 function frListadoPrint(){
   const X=frListado(); if(!X||!X.n){ App.toast('No hay eventuales con ese filtro.',true); return; }
   const {C,G}=X;
@@ -1740,7 +1775,7 @@ function renderFrLog(){
     :'<tbody><tr><td><div class="empty">Todavía no hay cambios registrados.</div></td></tr></tbody>';
 }
 function hookFrancos(){
-  $('#fr-dl-x').onclick=frListadoXlsx; $('#fr-dl-p').onclick=frListadoPrint;
+  $('#fr-dl-x').onclick=frListadoXlsx; $('#fr-dl-p').onclick=frListadoPrint; $('#fr-dl-pend').onclick=frPendientesPrint;
   if(window.SRV&&SRV.mode==='online'&&SRV.user.rol!=='admin') $('#fr-rrhh').hidden=true;
   $('#fr-pick').onclick=()=>$('#fr-file').click();
   $('#fr-file').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
