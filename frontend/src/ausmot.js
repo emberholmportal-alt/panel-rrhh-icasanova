@@ -170,6 +170,62 @@ function amExcel(){
   XLSX.writeFile(wb,`ausentismo_motivos_${s.mes||'periodo'}.xlsx`); App.toast('Excel de ausentismo descargado');
 }
 
+/* ---------- informe mensual (HTML para imprimir o guardar como PDF) ---------- */
+function amInforme(){
+  const X0=amDatos(); if(!X0){ App.toast('Primero cargá el export de Movimientos.',true); return; }
+  const mes=amState.mes||X0.meses[X0.meses.length-1]; if(!mes){ App.toast('No hay meses cargados.',true); return; }
+  const conMes=m=>{ const s0=amState.mes; amState.mes=m; const X=amDatos(); amState.mes=s0; return X; };
+  const iM=X0.meses.indexOf(mes), ant=iM>0?X0.meses[iM-1]:null, X=conMes(mes), XP=ant?conMes(ant):null, XY=conMes('');
+  const progOf=Z=>Z.prog.reduce((a,r)=>a+r.n,0), tasa=Z=>{ const p=progOf(Z); return p?Z.D.length/p*100:0; };
+  const f1=v=>v.toFixed(1).replace('.',','), pp=(a,b)=>{ if(b==null) return ''; const d=a-b; return `<span class="${d>0.05?'up':d<-0.05?'dn':'eq'}">${d>0?'▲ +':d<0?'▼ ':''}${f1(d)} pp</span>`; };
+  const t=tasa(X), tP=XP?tasa(XP):null, prog=progOf(X);
+  // promedio del año calendario del mes elegido
+  const anio=mes.slice(0,4), XA={D:XY.D.filter(e=>e.mes.slice(0,4)===anio),prog:XY.prog.filter(r=>r.mes.slice(0,4)===anio)}, tA=tasa(XA);
+  const cnt=Z=>{ const o={}; Z.E.forEach(e=>o[e.m]=(o[e.m]||0)+1); return o; }, M=cnt(X), MP=XP?cnt(XP):{}, MT=Object.values(M).reduce((a,b)=>a+b,0);
+  const mots=Object.keys(M).sort((a,b)=>M[b]-M[a]);
+  const grupo=(k)=>{ const G=amPorGrupo(X,k), GP=XP?Object.fromEntries(amPorGrupo(XP,k).map(x=>[x.k,x])):{};
+    return `<table><thead><tr><th class="l">${k==='sector'?'Sector':'Turno'}</th><th>Días de ausencia</th><th>Días programados</th><th>Tasa</th>${XP?`<th>Mes anterior</th><th>Variación</th>`:''}<th class="l">Motivo principal</th></tr></thead><tbody>`+
+      G.map(x=>{ const tx=x.prog?x.dias/x.prog*100:0, p=GP[x.k], tp=p&&p.prog?p.dias/p.prog*100:null, top=Object.entries(x.mot).sort((a,b)=>b[1]-a[1])[0];
+        return `<tr><td class="l">${esc(x.k)}</td><td>${x.dias||''}</td><td>${x.prog||''}</td><td><b>${x.prog?f1(tx)+'%':'—'}</b></td>${XP?`<td>${tp!=null?f1(tp)+'%':'—'}</td><td>${tp!=null&&x.prog?pp(tx,tp):''}</td>`:''}<td class="l">${top?`${esc(top[0])} (${top[1]})`:''}</td></tr>`; }).join('')+'</tbody></table>'; };
+  // evolución mensual (gráfico de barras)
+  const ev=XY.meses.map(m=>{ const D=XY.D.filter(e=>e.mes===m).length, P=XY.prog.filter(r=>r.mes===m).reduce((a,r)=>a+r.n,0); return {m,v:P?D/P*100:0}; });
+  const mx=Math.max(1,...ev.map(x=>x.v))*1.15, bw=Math.min(52,Math.floor(660/Math.max(1,ev.length))-10), H=150;
+  const svg=`<svg viewBox="0 0 700 ${H+46}" width="100%" style="max-width:700px">`+ev.map((x,i)=>{ const h=x.v/mx*H, xx=20+i*(bw+10);
+    return `<rect x="${xx}" y="${H-h+16}" width="${bw}" height="${h}" rx="3" fill="${x.m===mes?'#dc2626':'#cbd5e1'}"/><text x="${xx+bw/2}" y="${H-h+11}" text-anchor="middle" font-size="10" fill="#0f172a">${f1(x.v)}%</text><text x="${xx+bw/2}" y="${H+32}" text-anchor="middle" font-size="10" fill="#475569">${MESES_N[+x.m.slice(5)-1].slice(0,3)}</text>`; }).join('')+`<line x1="14" x2="690" y1="${H+16}" y2="${H+16}" stroke="#94a3b8"/></svg>`;
+  // personas: más días y ausencias prolongadas (5 días seguidos o más)
+  const per={}; X.D.forEach(e=>{ const x=per[e.p.leg]||(per[e.p.leg]={p:e.p,f:[],mot:{}}); x.f.push(e.f); }); X.E.forEach(e=>{ const x=per[e.p.leg]; if(x) x.mot[e.m]=(x.mot[e.m]||0)+1; });
+  const PL=Object.values(per).sort((a,b)=>b.f.length-a.f.length||a.p.nombre.localeCompare(b.p.nombre,'es'));
+  const tramos=f=>{ const d=f.slice().sort(), r=[]; let a=d[0], b=d[0]; for(let i=1;i<=d.length;i++){ if(i<d.length&&addD(b,1)===d[i]){ b=d[i]; continue; } r.push(a===b?dmy(a).slice(0,5):`${dmy(a).slice(0,5)} al ${dmy(b).slice(0,5)}`); a=b=d[i]; } return r; };
+  const racha=f=>{ const d=f.slice().sort(); let best=1,c=1; for(let i=1;i<d.length;i++){ c=addD(d[i-1],1)===d[i]?c+1:1; best=Math.max(best,c); } return d.length?best:0; };
+  const largos=PL.filter(x=>racha(x.f)>=5);
+  const filtro=[amState.tipo?NM_TIPO[amState.tipo]:'',amState.sector,amState.turno].filter(Boolean).join(' · ')||'Todo el personal';
+  const mesL=amMesL(mes);
+  const finMes=(()=>{ const [y,m]=mes.split('-').map(Number); return addD(`${m===12?y+1:y}-${String(m===12?1:m+1).padStart(2,'0')}-01`,-1); })(), parcial=X.A.hasta<finMes&&X.A.hasta.slice(0,7)===mes;
+  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ausentismo · ${mesL}</title><style>
+  @page{size:A4;margin:12mm} body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px;font-size:12px}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:#475569;margin:0 0 14px} .k{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px} .k div{border:1px solid #cbd5e1;border-radius:8px;padding:8px 14px;min-width:120px} .k b{display:block;font-size:22px} .k span{font-size:11px;color:#475569;text-transform:uppercase} .k small{display:block;font-size:11px;color:#475569;margin-top:2px}
+  .k .main{border-color:#dc2626;background:#fef2f2} h2{font-size:14px;margin:20px 0 6px} table{border-collapse:collapse;width:100%;margin:0 0 10px} th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:center} th{background:#f1f5f9;font-size:11px} .l{text-align:left} tr.t td{font-weight:700;background:#f8fafc}
+  .up{color:#b91c1c;font-weight:700} .dn{color:#15803d;font-weight:700} .eq{color:#475569} .nota{color:#475569;font-size:11px;margin:4px 0 0}
+  .pb{page-break-before:always} tr{page-break-inside:avoid} button{font:inherit;padding:7px 14px;border-radius:6px;border:0;background:#0f172a;color:#fff;cursor:pointer;margin-bottom:12px} @media print{button{display:none}}</style></head><body>
+  <button onclick="window.print()">Imprimir / guardar PDF</button>
+  <h1>Informe de ausentismo · ${esc(mesL)}</h1><p class="sub">CD Isidro Casanova · ${esc(filtro)}${amState.lic?' · incluye licencias':''}${parcial?` · <b style="color:#b45309">mes parcial: datos hasta el ${dmy(X.A.hasta)}</b>`:''} · generado ${fmtAt(new Date().toISOString())}</p>
+  <div class="k"><div class="main"><span>Tasa de ausentismo</span><b>${f1(t)}%</b><small>${XP?`${pp(t,tP)} vs ${esc(amMesL(ant))}`:'&nbsp;'}</small></div>
+    <div><span>Días de ausencia</span><b>${X.D.length}</b><small>sobre ${prog} programados</small></div>
+    <div><span>Personas con ausencias</span><b>${PL.length}</b><small>${XP?`${new Set(XP.D.map(e=>e.p.leg)).size} el mes anterior`:'&nbsp;'}</small></div>
+    <div><span>Promedio ${anio}</span><b>${f1(tA)}%</b><small>${pp(t,tA)} este mes</small></div></div>
+  <h2>Evolución mensual de la tasa</h2>${svg}
+  <h2>Por motivo</h2><table><thead><tr><th class="l">Motivo</th><th>Días</th><th>% del total</th><th>Personas</th>${XP?'<th>Mes anterior</th>':''}</tr></thead><tbody>${mots.map(m=>`<tr><td class="l">${esc(m)}</td><td><b>${M[m]}</b></td><td>${f1(M[m]/MT*100)}%</td><td>${new Set(X.E.filter(e=>e.m===m).map(e=>e.p.leg)).size}</td>${XP?`<td>${MP[m]||0}</td>`:''}</tr>`).join('')}
+    <tr class="t"><td class="l">Total</td><td>${MT}</td><td>100%</td><td>${PL.length}</td>${XP?`<td>${Object.values(MP).reduce((a,b)=>a+b,0)}</td>`:''}</tr></tbody></table>
+  <p class="nota">Tasa = días de ausencia ÷ días programados (jornadas de trabajo, sin francos ni vacaciones). Si una persona tiene dos motivos el mismo día cuenta un solo día. ${amState.lic?'Incluye licencias (gremial, estudio, casamiento, etc.).':'No incluye licencias, vacaciones ni franco compensatorio.'}</p>
+  <h2>Por sector</h2>${grupo('sector')}
+  <h2>Por turno</h2>${grupo('turno')}
+  ${largos.length?`<h2>Ausencias prolongadas (5 días seguidos o más)</h2><table><thead><tr><th>Legajo</th><th class="l">Apellido y nombre</th><th class="l">Sector</th><th>Días</th><th class="l">Motivo</th><th class="l">Períodos</th></tr></thead><tbody>${largos.map(x=>`<tr><td>${esc(x.p.leg)}</td><td class="l">${esc(x.p.nombre)}</td><td class="l">${esc(x.p.sector)}</td><td><b>${x.f.length}</b></td><td class="l">${Object.entries(x.mot).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`${esc(m)} (${n})`).join(', ')}</td><td class="l">${tramos(x.f).join(' · ')}</td></tr>`).join('')}</tbody></table>`:''}
+  <h2 class="pb">Detalle por persona · ${esc(mesL)}</h2><table><thead><tr><th>Legajo</th><th class="l">Apellido y nombre</th><th class="l">Sector</th><th class="l">Turno</th><th>Días</th><th class="l">Motivos y fechas</th></tr></thead><tbody>${PL.map(x=>`<tr><td>${esc(x.p.leg)}</td><td class="l">${esc(x.p.nombre)}${x.p.baja?' <i>(baja)</i>':''}</td><td class="l">${esc(x.p.sector)}</td><td class="l">${esc(x.p.turno)}</td><td><b>${x.f.length}</b></td><td class="l">${Object.keys(x.mot).map(m=>`<b>${esc(m)}:</b> ${tramos(X.E.filter(e=>e.p.leg===x.p.leg&&e.m===m).map(e=>e.f)).join(', ')}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
+  <p class="nota">Fuente: ${esc(X.A.file)} (datos del ${dmy(X.A.desde)} al ${dmy(X.A.hasta)}).</p>
+  </body></html>`;
+  download(html,`informe_ausentismo_${mes}.html`,'text/html;charset=utf-8'); App.toast(`Informe de ${mesL} descargado: abrilo y usá Imprimir para PDF`);
+}
+
 (function hookAusmot(){
   if(!$('#p-mot')) return;
   $('#am-pick').onclick=()=>$('#am-file').click();
@@ -181,7 +237,7 @@ function amExcel(){
   $('#am-sec').onchange=e=>{ amState.sector=e.target.value; renderAusmot(); };
   $('#am-tur').onchange=e=>{ amState.turno=e.target.value; renderAusmot(); };
   $('#am-lic').onchange=e=>{ amState.lic=e.target.checked; renderAusmot(); };
-  $('#am-xls').onclick=amExcel;
+  $('#am-xls').onclick=amExcel; $('#am-rep').onclick=amInforme;
   document.addEventListener('click',e=>{
     const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); } });
 })();

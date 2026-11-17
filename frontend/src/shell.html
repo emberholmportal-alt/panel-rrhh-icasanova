@@ -212,7 +212,7 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
         <div class="field"><label>Sector</label><select id="am-sec"></select></div>
         <div class="field"><label>Turno</label><select id="am-tur"></select></div>
         <label class="am-chk"><input type="checkbox" id="am-lic"> Sumar licencias (gremial, estudio, casamiento, etc.)</label>
-        <div class="field" style="align-self:flex-end;margin-left:auto"><button class="btn primary sm" id="am-xls">Descargar Excel</button></div>
+        <div class="field" style="align-self:flex-end;margin-left:auto;flex-direction:row;display:flex;gap:8px"><button class="btn primary sm" id="am-rep" title="Del mes elegido (o el último cargado), con los filtros de tipo, sector y turno">Informe mensual (PDF)</button><button class="btn ghost sm" id="am-xls">Descargar Excel</button></div>
       </div>
       <div class="am-nota">Tasa = días de ausencia ÷ días programados (jornadas de trabajo, sin francos ni vacaciones). Vacaciones, franco compensatorio, home office y capacitación no cuentan como ausentismo.</div></div></div>
       <div class="kpis" id="am-kpis"></div>
