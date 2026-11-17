@@ -33,6 +33,7 @@ MODULES = {
     "vacsol": "Solicitudes de vacaciones",
     "agenda": "Agenda y recordatorios",
     "hextras": "Horas extras",
+    "viandas": "Viandas (estimativo)",
 }
 # Toda sección nueva se agrega acá con su propio permiso: por defecto NADIE la ve (solo el admin)
 # hasta que se le asigna a cada usuario en Configuración → Usuarios y permisos.

@@ -120,10 +120,11 @@ const SRVX=(()=>{
   S.api=api;
   // nota para el registro de cambios: se manda junto con el próximo guardado de ese módulo
   S.notas={}; S.nota=(m,t)=>{ (S.notas[m]||(S.notas[m]=[])).push(t); };
-  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos','v-hextras':'hextras','v-ausmot':'ausmot'};
+  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos','v-hextras':'hextras','v-ausmot':'ausmot','v-viandas':'viandas'};
   const lvl0=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
   // solicitudes de vacaciones: las ven quienes las cargan y quienes ven o aprueban Vacaciones
   const lvl=m=>m==='vacsol'?(lvl0('vacsol')||(lvl0('vacaciones')?'ver':'')):lvl0(m);
+  S.can=m=>!!lvl(m);
   const canW=m=>m==='otros'?isAdm:lvl(m)==='editar';
   for(const v in VIEW_MOD){ if(!lvl(VIEW_MOD[v])){ const n=document.querySelector(`.nav-item[data-v="${v}"]`); if(n) n.style.display='none'; } }
   const _gv=window.goView;

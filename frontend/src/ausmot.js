@@ -134,6 +134,7 @@ window.movTodo=function(rows,fname){
     rec=importRows(rr,fname); if(typeof recompute==='function') recompute(); partes.push(`Llegadas tarde: ${rec.added} registros`); }
   let am=null; if(canEditMod('ausmot')){ am=amMerge(rows,fname); partes.push(`Ausentismo: ${am.agregadas} ausencia(s) nueva(s), ${am.quitadas} corregida(s)`); }
   if(canEditMod('francos')&&frMerge(rows,fname)) partes.push('Francos actualizado');
+  if(rec&&window.vdActualizar&&vdActualizar(fname)) partes.push(`Viandas: ${DB.viandas.total} estimadas`);
   if(L.ok) partes.push(`${L.ok} fila(s) sin legajo reconocidas por CUIL o nombre`);
   return {rec,am,L,msg:partes.join(' · ')};
 };

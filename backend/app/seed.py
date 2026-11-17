@@ -61,6 +61,10 @@ MIGRACIONES = [
         ("cbertetti", {"hextras": "ver"}), ("joliva", {"hextras": "ver"}),
         ("rcampos", {"hextras": "ver"}), ("lmunoz", {"hextras": "ver"}),
     ]),
+    ("2026-11-17-viandas", [
+        # Estimativo de viandas: lo ve Milagros Marchioro (comedor)
+        ("mmarchioro", {"viandas": "ver"}),
+    ]),
     ("2026-11-17-llegadas-tarde", [
         # Llegadas tarde (antes "Ausentismo"): Cynthia, Joaquín, Rubén y Luis la ven (solo tardanzas y reincidencias)
         ("cbertetti", {"ausentismo": "min:ver"}), ("joliva", {"ausentismo": "min:ver"}),

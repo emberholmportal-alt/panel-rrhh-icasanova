@@ -93,3 +93,17 @@ body.srv-imp{padding-top:40px}
 .am-hist table{margin-top:6px;font-size:12.5px;width:100%} .am-hist th,.am-hist td{padding:4px 8px;text-align:left} .am-hist .num{text-align:right}
 .fr-upd{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.025);font-size:13px;line-height:1.55}
 .fr-upd.w{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)} .fr-upd.w .dot{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.15)}
+/* viandas */
+.vd-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.vd-lab{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.vd-tot{font-size:46px;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#22d3ee,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vd-src{font-size:12.5px;color:var(--text2);text-align:right} .vd-src.w{color:#fbbf24}
+.vd-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.vd-c{border:1px solid var(--stroke);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.025)}
+.vd-c.ok{border-color:rgba(34,197,94,.35)}
+.vd-ct{display:flex;justify-content:space-between;align-items:center;gap:8px} .vd-ct span{font-size:11.5px;color:var(--text3)}
+.vd-n{font-size:30px;font-weight:800;margin:4px 0 2px}
+.vd-d{font-size:12.5px;color:var(--text2)}
+.vd-bar{height:6px;border-radius:4px;background:rgba(148,163,184,.18);margin-top:8px;overflow:hidden} .vd-bar i{display:block;height:100%;background:#22c55e}
+.vd-nota{font-size:12px;color:var(--text3);margin-top:10px}
+#h-viandas{margin:0 0 16px}
