@@ -45,7 +45,7 @@ def _build_id() -> str:
 
 
 BUILD = _build_id()
-DOC_KEYS = set(MODULES) | {"otros", "ausmot"}   # ausmot: ausentismo por motivo (permisos de Ausentismo)
+DOC_KEYS = set(MODULES) | {"otros"}
 USER_DOC_KEYS = {"fich"}
 MAX_DOC = 15 * 1024 * 1024       # 15 MB por módulo
 MAX_ITEM = 4 * 1024 * 1024       # 4 MB por nota o sugerencia (imágenes incluidas)
@@ -96,7 +96,15 @@ def startup():
             for username, perms in cambios:
                 uu = db.scalar(select(User).where(User.username == username))
                 if uu:
-                    uu.perms = {**(uu.perms or {}), **perms}
+                    nuevos = dict(uu.perms or {})
+                    for m, v in perms.items():
+                        if isinstance(v, str) and v.startswith("min:"):
+                            # "min:ver": sube a ese nivel solo si hoy tiene menos (no baja a nadie)
+                            v = v[4:]
+                            if auth.LEVELS.index(nuevos.get(m, "") or "") >= auth.LEVELS.index(v):
+                                continue
+                        nuevos[m] = v
+                    uu.perms = nuevos
                     auth.audit(db, "sistema", "permisos", f"{username}: {perms}")
             nuevas.append(clave)
         for clave, extra in seed.NOMINA_EXTRA:
@@ -275,14 +283,10 @@ def readable(u: User, key: str) -> bool:
         return True        # Francos arma su lista con los eventuales activos
     if key in ("ausentismo", "nomina") and can_read(u, "hextras"):
         return True        # Horas extras se calcula con las fichadas y la nómina
-    if key == "ausmot":
-        return can_read(u, "ausentismo")
     return key == "otros" or can_read(u, key)
 
 
 def writable(u: User, key: str) -> bool:
-    if key == "ausmot":
-        return can_write(u, "ausentismo")
     return (u.rol == "admin") if key == "otros" else can_write(u, key)
 
 

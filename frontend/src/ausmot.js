@@ -116,7 +116,7 @@ function amTablaGrupo(G,lab){
 
 function renderAusmot(){
   const W=$('#p-mot'); if(!W) return;
-  const ed=canEditMod('ausentismo'); $('#am-load').style.display=ed?'':'none';
+  const ed=canEditMod('ausmot'); $('#am-load').style.display=ed?'':'none';
   const X=amDatos(), s=amState;
   if(!X){ $('#am-st').innerHTML='Todavía no se cargó el export de Movimientos.'; $('#am-body').style.display='none'; return; }
   $('#am-body').style.display='';

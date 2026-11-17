@@ -19,7 +19,8 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1" if os.environ.get("RENDER") 
 
 # Módulos del panel con permiso propio. "agenda" la editan todos salvo que se indique otra cosa.
 MODULES = {
-    "ausentismo": "Ausentismo",
+    "ausentismo": "Llegadas tarde",
+    "ausmot": "Ausentismo (por motivo)",
     "vacaciones": "Vacaciones",
     "eventuales": "Eventuales",
     "francos": "Francos",
@@ -33,6 +34,8 @@ MODULES = {
     "agenda": "Agenda y recordatorios",
     "hextras": "Horas extras",
 }
+# Toda sección nueva se agrega acá con su propio permiso: por defecto NADIE la ve (solo el admin)
+# hasta que se le asigna a cada usuario en Configuración → Usuarios y permisos.
 # módulos que todos ven aunque no tengan permiso asignado
 DEFAULT_LEVEL = {"menu": "ver"}
 LEVELS = ("", "consulta", "ver", "editar")   # consulta = ve en pantalla, sin descargar ni modificar

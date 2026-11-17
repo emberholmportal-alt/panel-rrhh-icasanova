@@ -61,6 +61,11 @@ MIGRACIONES = [
         ("cbertetti", {"hextras": "ver"}), ("joliva", {"hextras": "ver"}),
         ("rcampos", {"hextras": "ver"}), ("lmunoz", {"hextras": "ver"}),
     ]),
+    ("2026-11-17-llegadas-tarde", [
+        # Llegadas tarde (antes "Ausentismo"): Cynthia, Joaquín, Rubén y Luis la ven (solo tardanzas y reincidencias)
+        ("cbertetti", {"ausentismo": "min:ver"}), ("joliva", {"ausentismo": "min:ver"}),
+        ("rcampos", {"ausentismo": "min:ver"}), ("lmunoz", {"ausentismo": "min:ver"}),
+    ]),
     ("2026-11-16-rcampos", [
         # Rubén Campos: todas las secciones, solo ver y descargar informes
         ("rcampos", {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}),
