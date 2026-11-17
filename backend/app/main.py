@@ -169,6 +169,7 @@ def user_out(u: User) -> dict:
             "perms": {m: auth.level(u, m) for m in MODULES}, "must_change": u.must_change, "activo": u.activo,
             "aus_parcial": u.rol != "admin" and u.username in auth.AUS_PARCIAL,
             "perms_por": (u.perms or {}).get("_por"),
+            "descargas": u.rol == "admin" or not (u.perms or {}).get("_nodl"),
             "last_login": u.last_login.isoformat() if u.last_login else None}
 
 
@@ -604,6 +605,7 @@ class UserIn(BaseModel):
     rol: str | None = None
     perms: dict | None = None
     activo: bool | None = None
+    descargas: bool | None = None     # False = no puede descargar ni imprimir informes en ninguna sección
 
 
 def clean_perms(p: dict | None) -> dict:
@@ -654,14 +656,20 @@ def update_user(uid: int, body: UserIn, a: User = Depends(require_admin), db: Se
         u.nombre = body.nombre.strip()
     if body.rol is not None:
         u.rol = "admin" if body.rol == "admin" else "usuario"
-    antes = (u.rol, {m: auth.level(u, m) for m in MODULES})
+    antes = (u.rol, {m: auth.level(u, m) for m in MODULES}, bool((u.perms or {}).get("_nodl")))
+    nodl = bool((u.perms or {}).get("_nodl"))
     if body.perms is not None:
         u.perms = clean_perms(body.perms)
+        if nodl:
+            u.perms = {**u.perms, "_nodl": True}
+    if body.descargas is not None:
+        p = {k: v for k, v in (u.perms or {}).items() if k != "_nodl"}
+        u.perms = p if body.descargas else {**p, "_nodl": True}
     if body.activo is not None:
         u.activo = body.activo
         if not body.activo:
             u.token_ver += 1      # cierra sus sesiones
-    if (u.rol, {m: auth.level(u, m) for m in MODULES}) != antes:
+    if (u.rol, {m: auth.level(u, m) for m in MODULES}, bool((u.perms or {}).get("_nodl"))) != antes:
         # queda registrado quién y cuándo, para avisarle al usuario si tiene el panel abierto
         u.perms = {**(u.perms or {}), "_por": {"n": a.nombre, "at": iso(now())}}
     auth.audit(db, a, "editar_usuario", u.username)

@@ -82,11 +82,11 @@ const SRVX=(()=>{
   // el administrador cambió los permisos mientras el usuario tenía el panel abierto
   let permsAviso='';
   function permsCambiaron(nu){
-    const k=JSON.stringify([nu.perms,nu.rol,nu.aus_parcial]); if(k===permsAviso||document.getElementById('srv-perm')) return; permsAviso=k;
+    const k=JSON.stringify([nu.perms,nu.rol,nu.aus_parcial,nu.descargas]); if(k===permsAviso||document.getElementById('srv-perm')) return; permsAviso=k;
     const por=nu.perms_por&&nu.perms_por.n?nu.perms_por.n:'', quien=por?(por.includes(',')?por.split(',').slice(1).join(' ').trim()+' '+por.split(',')[0].trim():por):'';
     const cuando=nu.perms_por&&nu.perms_por.at?fmtAt(nu.perms_por.at):'';
     const L=x=>x==='editar'?'Editar':x==='ver'?'Ver':x==='consulta'?'Consultar':'Sin acceso';
-    const cam=Object.keys(S.modules||{}).filter(m=>(U.perms||{})[m]!==(nu.perms||{})[m]).map(m=>`<li><b>${esc(S.modules[m])}</b>: ${L((U.perms||{})[m])} → <b>${L((nu.perms||{})[m])}</b></li>`).join('');
+    const cam=Object.keys(S.modules||{}).filter(m=>(U.perms||{})[m]!==(nu.perms||{})[m]).map(m=>`<li><b>${esc(S.modules[m])}</b>: ${L((U.perms||{})[m])} → <b>${L((nu.perms||{})[m])}</b></li>`).join('')+(nu.descargas!==U.descargas?`<li><b>Descargas de informes</b>: ${U.descargas===false?'No':'Sí'} → <b>${nu.descargas===false?'No':'Sí'}</b></li>`:'');
     const m=document.createElement('div'); m.className='vs-modal'; m.id='srv-perm';
     m.innerHTML=`<div class="vs-mbox"><h3>🔐 Tus permisos fueron actualizados</h3>
       <p>${quien?`El administrador <b>${esc(quien)}</b> cambió`:'Se cambiaron'} tus permisos del panel${cuando?` (${esc(cuando)})`:''}.</p>
@@ -137,12 +137,15 @@ const SRVX=(()=>{
     run(); if(!sec._nodl){ sec._nodl=new MutationObserver(()=>{ if(sec.classList.contains('nodl')) run(); }); sec._nodl.observe(sec,{childList:true,subtree:true}); } }
   function applyRO(id){
     const m=VIEW_MOD[id], sec=document.getElementById(id); if(!sec||!m) return;
-    const L=lvl(m), ro=L==='ver'||L==='consulta'; sec.classList.toggle('ro',ro); sec.classList.toggle('nodl',L==='consulta'); if(L==='consulta') noDl(sec);
+    const L=lvl(m), dl=L!=='consulta'&&U.descargas!==false, ro=L==='ver'||L==='consulta';
+    sec.classList.toggle('ro',ro); sec.classList.toggle('nodl',!dl); if(!dl) noDl(sec);
     let b=sec.querySelector('.ro-banner');
-    const txt=L==='consulta'?'<b>Solo consulta.</b> Podés ver la información en pantalla, sin descargar ni modificar.':'<b>Solo lectura.</b> Podés ver y descargar informes de este módulo, pero no cargar archivos ni modificar datos.';
-    if(ro&&!b){ b=document.createElement('div'); b.className='ro-banner'; const vh=sec.querySelector('.vhead'); (vh||sec.firstChild).after(b); }
+    const txt=L==='consulta'?'<b>Solo consulta.</b> Podés ver la información en pantalla, sin descargar ni modificar.'
+      :L==='ver'?(dl?'<b>Solo lectura.</b> Podés ver y descargar informes de este módulo, pero no cargar archivos ni modificar datos.':'<b>Solo lectura, sin descargas.</b> Podés ver la información en pantalla, sin descargar informes ni modificar datos.')
+      :'<b>Sin descargas.</b> Podés trabajar en este módulo, pero no descargar ni imprimir informes.';
+    if((ro||!dl)&&!b){ b=document.createElement('div'); b.className='ro-banner'; const vh=sec.querySelector('.vhead'); (vh||sec.firstChild).after(b); }
     if(b) b.innerHTML=txt;
-    if(!ro&&b) b.remove();
+    if(!ro&&dl&&b) b.remove();
   }
   // en el servidor no se borra la base completa; importar una base solo lo hace un administrador
   const rst=$('#btnReset'); if(rst) rst.style.display='none';
@@ -229,7 +232,7 @@ const SRVX=(()=>{
       // versión nueva del panel publicada mientras la pestaña estaba abierta: avisar para recargar
       if(s.build){ if(!S.build) S.build=s.build; else if(s.build!==S.build&&!document.getElementById('srv-upd')){ const b=document.createElement('div'); b.id='srv-upd';
         b.innerHTML='<span>🔄 Hay una versión nueva del panel.</span><button type="button" class="btn primary sm">Recargar ahora</button>'; b.querySelector('button').onclick=()=>location.reload(); document.body.appendChild(b); } }
-      if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol||s.user.aus_parcial!==U.aus_parcial) permsCambiaron(s.user);
+      if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol||s.user.aus_parcial!==U.aus_parcial||s.user.descargas!==U.descargas) permsCambiaron(s.user);
       setSt('Guardado','ok');
     }catch(err){ if(err.status===401) loginScreen(); else setSt('Sin conexión','err'); }
   }
@@ -246,10 +249,11 @@ const SRVX=(()=>{
     const note=card&&card.querySelector('.cf-note'); if(note) note.textContent=isAdm?'Ver: puede mirar y descargar informes. Editar: además carga archivos y modifica datos. Los administradores tienen acceso total y gestionan usuarios y el buzón.':'Tu usuario y tus permisos los administra el responsable del panel.';
     const form=card&&card.querySelector('.filters'); if(form) form.style.display=isAdm?'':'none';
     if(!isAdm){ box.innerHTML=`<div class="us-row"><b>${esc(U.nombre)}</b><span class="tag">${esc(U.username)}</span><button class="btn ghost sm" data-srv-pass>Cambiar contraseña</button></div>`; return; }
-    box.innerHTML=`<div class="tscroll"><table class="us-tab"><thead><tr><th>Usuario</th><th>Rol</th>${Object.entries(MODS).map(([k,v])=>`<th title="${esc(v)}">${esc(v.split(' ')[0])}</th>`).join('')}<th>Estado</th><th></th></tr></thead><tbody>`+
+    box.innerHTML=`<div class="tscroll"><table class="us-tab"><thead><tr><th>Usuario</th><th>Rol</th>${Object.entries(MODS).map(([k,v])=>`<th title="${esc(v)}">${esc(v.split(' ')[0])}</th>`).join('')}<th title="Descargar e imprimir informes (Excel, PDF) en las secciones que ve">Descargas</th><th>Estado</th><th></th></tr></thead><tbody>`+
       USR.map(u=>`<tr data-uid="${u.id}" class="${u.activo?'':'off'}${usSel===u.id?' sel':''}" title="Clic en la fila para marcarla"><td><b>${esc(u.nombre)}</b><div class="us-un">${esc(u.username)}${u.last_login?' · último ingreso '+fmtAt(u.last_login):' · nunca ingresó'}</div></td>
         <td><select data-uf="rol"><option value="usuario"${u.rol==='usuario'?' selected':''}>Usuario</option><option value="admin"${u.rol==='admin'?' selected':''}>Admin</option></select></td>
         ${Object.keys(MODS).map(m=>`<td>${u.rol==='admin'?'<span class="us-all">total</span>':`<select data-up="${m}">${Object.entries(LV).map(([k,v])=>`<option value="${k}"${(u.perms[m]||'')===k?' selected':''}>${v}</option>`).join('')}</select>`}</td>`).join('')}
+        <td>${u.rol==='admin'?'<span class="us-all">total</span>':`<select data-uf="descargas"><option value="si"${u.descargas!==false?' selected':''}>Sí</option><option value="no"${u.descargas===false?' selected':''}>No</option></select>`}</td>
         <td><label class="switch"><input type="checkbox" data-uf="activo"${u.activo?' checked':''}> ${u.activo?'Activo':'Inactivo'}</label></td>
         <td><button class="btn ghost sm" data-ureset>Nueva clave</button></td></tr>`).join('')+'</tbody></table></div>'+
       `<div class="us-audit"><button class="btn ghost sm" id="us-aud-b">Ver registro de actividad</button><div id="us-aud"></div></div>`;
@@ -271,6 +275,7 @@ const SRVX=(()=>{
     if(e.target.dataset.up){ const p=Object.assign({},u.perms); p[e.target.dataset.up]=e.target.value; body.perms=p; }
     if(e.target.dataset.uf==='rol') body.rol=e.target.value;
     if(e.target.dataset.uf==='activo') body.activo=e.target.checked;
+    if(e.target.dataset.uf==='descargas') body.descargas=e.target.value==='si';
     try{ await api('PUT','/api/users/'+id,body); App.toast('Usuario actualizado'); }catch(err){ App.toast(err.message,true); }
     refreshAdmin();
   });
