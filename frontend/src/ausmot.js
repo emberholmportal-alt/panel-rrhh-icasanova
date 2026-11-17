@@ -40,7 +40,7 @@ function amMotivo(raw){
   return t?{n:t.charAt(0)+t.slice(1).toLowerCase(),c:'otro'}:null;
 }
 const AM_CATDE={}; const amCat=n=>AM_CATDE[n]||(AM_CATDE[n]=(amMotivo(n)||{c:'otro'}).c);
-let amState={mes:'',tipo:'',sector:'',turno:'',lic:false};
+let amState={mes:'',dia:'',tipo:'',sector:'',turno:'',lic:false};
 
 async function amCargar(file){
   const st=$('#am-st'); st.innerHTML='Leyendo el archivo… (el anual es grande, puede tardar unos segundos)';
@@ -53,7 +53,7 @@ async function amCargar(file){
     const H=rows[hi].map(x=>x==null?'':String(x)), Hn=H.map(normTxt), ix=rx=>Hn.findIndex(h=>rx.test(h));
     const cL=ix(/CODIGO DE EMPLEADO|LEGAJO/), cU=ix(/CODIGO DE EMPRESA/), cN=ix(/APELLIDO/), cF=ix(/^FECHA$/), cJ=ix(/JORNADA/), cM=ix(/^MOVIMIENTOS$/);
     const cE=Hn.map((h,i)=>/\(EVENTOS\)/.test(h)?i:-1).filter(i=>i>=0);
-    const emps={}, prog={}, ev=[]; let d0='9999', d1='0000';
+    const emps={}, prog={}, progD={}, ev=[]; let d0='9999', d1='0000';
     for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue;
       const leg=nmLeg(r[cL]), f=excelDateToISO(r[cF]); if(!leg||!f) continue;
       if(f<d0) d0=f; if(f>d1) d1=f;
@@ -63,16 +63,18 @@ async function amCargar(file){
         if(!s||/^[.\d]*\s*[ECS]\s+\+?\d/i.test(s)||/SIN INCIDENCIA/i.test(s)) return; const m=amMotivo(s); if(m) mot.add(m.n); });
       cE.forEach(c=>{ if(+r[c]>0){ const m=amMotivo(H[c]); if(m) mot.add(m.n); } });
       const jor=normTxt(r[cJ]||''), trabaja=jor&&!/FRANCO|SIN JORNADA/.test(jor)&&!mot.has('Vacaciones')&&!mot.has('Franco compensatorio');
-      const mes=f.slice(0,7); if(trabaja){ const p=prog[leg]||(prog[leg]={}); p[mes]=(p[mes]||0)+1; }
+      const mes=f.slice(0,7); if(trabaja){ const p=prog[leg]||(prog[leg]={}); p[mes]=(p[mes]||0)+1;
+        const q=progD[leg]||(progD[leg]={}), dd=+f.slice(8,10); q[mes]=((q[mes]||'').padEnd(dd-1,'0')).slice(0,dd-1)+'1'+(q[mes]||'').slice(dd); }
       mot.forEach(m=>ev.push([leg,f,m]));
     }
     if(!ev.length&&!Object.keys(prog).length) throw new Error('El archivo no tiene filas con legajo y fecha.');
     // se combina con lo cargado: los meses que trae el archivo nuevo reemplazan a los anteriores
     const A=DB.ausmot||{emps:{},prog:{},ev:[]}, meses=new Set(); for(let d=d0.slice(0,7); d<=d1.slice(0,7); d=(()=>{ const [y,m]=d.split('-').map(Number); return m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`; })()) meses.add(d);
     const nuevo={file:file.name,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',
-      emps:Object.assign({},A.emps,emps), prog:{}, ev:A.ev.filter(e=>!meses.has(e[1].slice(0,7))).concat(ev)};
+      emps:Object.assign({},A.emps,emps), prog:{}, progD:{}, ev:A.ev.filter(e=>!meses.has(e[1].slice(0,7))).concat(ev)};
     for(const leg of new Set(Object.keys(A.prog).concat(Object.keys(prog)))){ const o={};
-      Object.entries(A.prog[leg]||{}).forEach(([m,n])=>{ if(!meses.has(m)) o[m]=n; }); Object.assign(o,prog[leg]||{}); if(Object.keys(o).length) nuevo.prog[leg]=o; }
+      Object.entries(A.prog[leg]||{}).forEach(([m,n])=>{ if(!meses.has(m)) o[m]=n; }); Object.assign(o,prog[leg]||{}); if(Object.keys(o).length) nuevo.prog[leg]=o;
+      const od={}; Object.entries((A.progD||{})[leg]||{}).forEach(([m,x])=>{ if(!meses.has(m)) od[m]=x; }); Object.assign(od,progD[leg]||{}); if(Object.keys(od).length) nuevo.progD[leg]=od; }
     const todas=nuevo.ev.map(e=>e[1]).concat(Object.values(nuevo.prog).flatMap(p=>Object.keys(p).map(m=>m+'-01'))).sort();
     nuevo.desde=todas[0]||d0; nuevo.hasta=[d1,A.hasta||''].sort().pop();
     DB.ausmot=nuevo;
@@ -135,10 +137,12 @@ function renderAusmot(){
   const s0=s.mes; amState.mes=''; const XA=amDatos(); amState.mes=s0;
   const motsA=Object.entries(XA.E.reduce((o,e)=>(o[e.m]=(o[e.m]||0)+1,o),{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
   const byM={}; XA.meses.forEach(m=>byM[m]={d:0,p:0,mot:{}}); XA.prog.forEach(r=>byM[r.mes].p+=r.n); XA.D.forEach(e=>byM[e.mes].d++); XA.E.forEach(e=>{ const o=byM[e.mes].mot; o[e.m]=(o[e.m]||0)+1; });
-  const mxT=Math.max(.0001,...XA.meses.map(m=>byM[m].p?byM[m].d/byM[m].p:0));
+  const MS=s.mes?[s.mes]:XA.meses, mxT=Math.max(.0001,...XA.meses.map(m=>byM[m].p?byM[m].d/byM[m].p:0));
   $('#am-mesT').innerHTML=`<thead><tr><th>Mes</th>${motsA.map(m=>`<th class="num" title="${esc(m)}">${esc(m.replace(/^Ausencia /,'Aus. ').replace(/^Licencia /,'Lic. '))}</th>`).join('')}<th class="num">Días</th><th class="num">Programados</th><th class="num">Tasa</th><th style="width:14%"></th></tr></thead><tbody>`+
-    XA.meses.map(m=>{ const x=byM[m]; return `<tr class="${m===s.mes?'am-sel':''}" data-amm="${m}"><td><b>${amMesL(m)}</b></td>${motsA.map(k=>`<td class="num">${x.mot[k]||''}</td>`).join('')}<td class="num"><b>${x.d||''}</b></td><td class="num">${x.p||''}</td><td class="num"><b>${amPct(x.d,x.p)}</b></td><td><div class="nm-bar"><i style="width:${x.p?x.d/x.p/mxT*100:0}%;background:#f87171"></i></div></td></tr>`; }).join('')+
-    `<tr class="tot"><td>Total</td>${motsA.map(k=>`<td class="num">${XA.E.filter(e=>e.m===k).length}</td>`).join('')}<td class="num">${XA.D.length}</td><td class="num">${XA.prog.reduce((a,r)=>a+r.n,0)}</td><td class="num">${amPct(XA.D.length,XA.prog.reduce((a,r)=>a+r.n,0))}</td><td></td></tr></tbody>`;
+    MS.map(m=>{ const x=byM[m]; return `<tr class="${m===s.mes?'am-sel':''}" data-amm="${m}"><td><b>${amMesL(m)}</b></td>${motsA.map(k=>`<td class="num">${x.mot[k]||''}</td>`).join('')}<td class="num"><b>${x.d||''}</b></td><td class="num">${x.p||''}</td><td class="num"><b>${amPct(x.d,x.p)}</b></td><td><div class="nm-bar"><i style="width:${x.p?x.d/x.p/mxT*100:0}%;background:#f87171"></i></div></td></tr>`; }).join('')+
+    (s.mes?'':`<tr class="tot"><td>Total</td>${motsA.map(k=>`<td class="num">${XA.E.filter(e=>e.m===k).length}</td>`).join('')}<td class="num">${XA.D.length}</td><td class="num">${XA.prog.reduce((a,r)=>a+r.n,0)}</td><td class="num">${amPct(XA.D.length,XA.prog.reduce((a,r)=>a+r.n,0))}</td><td></td></tr>`)+'</tbody>';
+  $('#am-mesH').textContent=s.mes?`Motivos de ${amMesL(s.mes)}`:'Por mes y motivo'; $('#am-mesM').textContent=s.mes?'clic en el mes para volver a ver todos':'clic en un mes para filtrarlo';
+  renderAmDia(X);
   // por motivo
   const tot=M.reduce((a,x)=>a+x[1],0);
   $('#am-motT').innerHTML=M.length?`<thead><tr><th>Motivo</th><th>Tipo</th><th class="num">Días</th><th class="num">Personas</th><th class="num">% del total</th><th style="width:30%"></th></tr></thead><tbody>`+
@@ -168,6 +172,41 @@ function amExcel(){
   for(const [k,n] of [['sector','Por sector'],['turno','Por turno']]) add([[k==='sector'?'Sector':'Turno','Días de ausencia','Días programados','Tasa (%)'].concat(mots)].concat(amPorGrupo(X,k).map(x=>[x.k,x.dias,x.prog,pct(x.dias,x.prog)].concat(mots.map(m=>x.mot[m]||'')))),n,[24,14,14,9].concat(mots.map(()=>12)));
   add([['Fecha','Legajo','Apellido y nombre','Tipo','Sector','Turno','Motivo']].concat(X.E.slice().sort((a,b)=>a.f.localeCompare(b.f)||a.p.nombre.localeCompare(b.p.nombre,'es')).map(e=>[dmy(e.f),e.p.leg,e.p.nombre,NM_TIPO[e.p.tipo]||'',e.p.sector,e.p.turno,e.m])),'Detalle',[11,9,32,16,20,16,30]);
   XLSX.writeFile(wb,`ausentismo_motivos_${s.mes||'periodo'}.xlsx`); App.toast('Excel de ausentismo descargado');
+}
+
+/* ---------- ausentismo del día, por sector y turno ---------- */
+function renderAmDia(X){
+  const A=X.A, mes=amState.mes||X.meses[X.meses.length-1]; if(!mes){ $('#am-dia-c').style.display='none'; return; } $('#am-dia-c').style.display='';
+  const PD=A.progD||{}, hayPD=Object.values(PD).some(o=>o[mes]);
+  // fechas del mes con jornadas o ausencias
+  const f=new Set(X.E.filter(e=>e.mes===mes).map(e=>e.f));
+  Object.values(PD).forEach(o=>{ const x=o[mes]||''; for(let i=0;i<x.length;i++) if(x[i]==='1') f.add(`${mes}-${String(i+1).padStart(2,'0')}`); });
+  if(!f.size){ const s0=amState.mes; amState.mes=mes; amDatos().E.forEach(e=>f.add(e.f)); amState.mes=s0; }
+  const dias=[...f].sort(); if(!amState.dia||amState.dia.slice(0,7)!==mes||!dias.includes(amState.dia)) amState.dia=dias[dias.length-1]||'';
+  const d=amState.dia;
+  $('#am-dia').innerHTML=dias.slice().reverse().map(x=>`<option value="${x}"${x===d?' selected':''}>${DOWL[dObj(x).getDay()]} ${dmy(x)}</option>`).join('')||'<option>Sin datos</option>';
+  if(!d){ ['#am-dk','#am-dsec','#am-dtur','#am-dlist'].forEach(i=>$(i).innerHTML=''); return; }
+  const s0=amState.mes; amState.mes=mes; const XM=amDatos(); amState.mes=s0;
+  const okP=p=>(!amState.tipo||p.tipo===amState.tipo)&&(!amState.sector||p.sector===amState.sector)&&(!amState.turno||p.turno===amState.turno);
+  const E=XM.E.filter(e=>e.f===d), aus=new Map(); E.forEach(e=>{ const x=aus.get(e.p.leg)||{p:e.p,m:[]}; x.m.push(e.m); aus.set(e.p.leg,x); });
+  // personas programadas ese día (con los mismos filtros)
+  const P=[]; if(hayPD){ const i=+d.slice(8,10)-1, nm={}; try{ nmRows().forEach(x=>nm[x.leg]=x); }catch(e){}
+    Object.entries(PD).forEach(([leg,o])=>{ if((o[mes]||'')[i]!=='1') return; const n=nm[leg]||{}, em=A.emps[leg]||{};
+      const p=XM.P[leg]||{leg,nombre:n.nombre||em.n||leg,tipo:n.tipo||em.t||'',sector:n.sector||'NO ESTÁ EN NÓMINA',turno:n.turno||'NO ESTÁ EN NÓMINA'}; if(okP(p)) P.push(p); }); }
+  const grp=k=>{ const g={}; const G=v=>g[v]||(g[v]={k:v,a:0,p:0,m:{}}); P.forEach(p=>G(p[k]).p++); aus.forEach(x=>{ const y=G(x.p[k]); y.a++; x.m.forEach(m=>y.m[m]=(y.m[m]||0)+1); });
+    return Object.values(g).filter(x=>x.a||x.p).sort((a,b)=>b.a-a.a||(b.p?b.a/b.p:0)-(a.p?a.a/a.p:0)||String(a.k).localeCompare(String(b.k),'es')); };
+  const tab=(G,lab)=>G.length?`<thead><tr><th>${lab}</th><th class="num">Ausentes</th>${hayPD?'<th class="num">Con jornada</th><th class="num">Tasa</th>':''}<th>Motivos</th></tr></thead><tbody>`+
+    G.map(x=>`<tr><td><b>${esc(x.k)}</b></td><td class="num"><b>${x.a||''}</b></td>${hayPD?`<td class="num">${x.p||''}</td><td class="num">${x.p?amPct(x.a,x.p):'—'}</td>`:''}<td>${Object.entries(x.m).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`${esc(m)} ${n}`).join(' · ')}</td></tr>`).join('')+
+    `<tr class="tot"><td>Total</td><td class="num">${aus.size}</td>${hayPD?`<td class="num">${P.length}</td><td class="num">${amPct(aus.size,P.length)}</td>`:''}<td></td></tr></tbody>`:'<tbody><tr><td><div class="empty">Nadie ausente ese día con este filtro.</div></td></tr></tbody>';
+  const mot={}; aus.forEach(x=>x.m.forEach(m=>mot[m]=(mot[m]||0)+1)); const M=Object.entries(mot).sort((a,b)=>b[1]-a[1]);
+  $('#am-dk').innerHTML=`<div><span>Ausentes</span><b>${aus.size}</b></div>${hayPD?`<div><span>Con jornada ese día</span><b>${P.length}</b></div><div><span>Tasa del día</span><b>${amPct(aus.size,P.length)}</b></div>`:''}<div><span>Motivos</span><b class="sm">${M.map(([m,n])=>`${esc(m)} ${n}`).join(' · ')||'—'}</b></div>`+
+    (hayPD?'':'<div class="am-dw">Para ver la tasa del día (ausentes sobre los que tenían jornada) volvé a subir el export de Movimientos: la carga anterior no guardaba las jornadas día por día.</div>');
+  $('#am-dsec').innerHTML=tab(grp('sector'),'Sector'); $('#am-dtur').innerHTML=tab(grp('turno'),'Turno');
+  const L=[...aus.values()].sort((a,b)=>a.p.sector.localeCompare(b.p.sector,'es')||a.p.turno.localeCompare(b.p.turno,'es')||a.p.nombre.localeCompare(b.p.nombre,'es'));
+  $('#am-dn').textContent=`${L.length} persona(s)`;
+  $('#am-dlist').innerHTML=L.length?`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th>Sector</th><th>Turno</th><th>Motivo</th></tr></thead><tbody>`+
+    L.map(x=>`<tr><td class="mono">${esc(x.p.leg)}</td><td><b>${esc(x.p.nombre)}</b></td><td>${esc(NM_TIPO[x.p.tipo]||'')}</td><td>${esc(x.p.sector)}</td><td>${esc(x.p.turno)}</td><td>${esc(x.m.join(' · '))}</td></tr>`).join('')+'</tbody>'
+    :'<tbody><tr><td><div class="empty">Nadie ausente ese día con este filtro.</div></td></tr></tbody>';
 }
 
 /* ---------- informe mensual (HTML para imprimir o guardar como PDF) ---------- */
@@ -237,6 +276,7 @@ function amInforme(){
   $('#am-sec').onchange=e=>{ amState.sector=e.target.value; renderAusmot(); };
   $('#am-tur').onchange=e=>{ amState.turno=e.target.value; renderAusmot(); };
   $('#am-lic').onchange=e=>{ amState.lic=e.target.checked; renderAusmot(); };
+  $('#am-dia').onchange=e=>{ amState.dia=e.target.value; renderAusmot(); };
   $('#am-xls').onclick=amExcel; $('#am-rep').onclick=amInforme;
   document.addEventListener('click',e=>{
     const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); } });
