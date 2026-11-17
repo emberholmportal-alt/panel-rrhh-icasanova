@@ -87,3 +87,9 @@ body.srv-imp{padding-top:40px}
 .am-h4{margin:0 0 6px;font-size:13px;color:var(--text2)}
 .am-dsel select{min-width:220px}
 .am-dia-c .card-h{gap:12px;flex-wrap:wrap}
+.am-upd{display:flex;gap:10px;align-items:flex-start;line-height:1.55}
+.am-upd .dot,.fr-upd .dot{width:9px;height:9px;border-radius:50%;background:#22c55e;margin-top:6px;flex:0 0 auto;box-shadow:0 0 0 4px rgba(34,197,94,.15)}
+.am-hist{margin-top:8px} .am-hist summary{cursor:pointer;color:var(--acc);font-size:12.5px}
+.am-hist table{margin-top:6px;font-size:12.5px;width:100%} .am-hist th,.am-hist td{padding:4px 8px;text-align:left} .am-hist .num{text-align:right}
+.fr-upd{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.025);font-size:13px;line-height:1.55}
+.fr-upd.w{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)} .fr-upd.w .dot{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.15)}

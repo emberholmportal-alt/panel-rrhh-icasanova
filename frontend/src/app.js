@@ -1320,6 +1320,15 @@ function renderFrancos(){
   if(!$('#v-francos')) return;
   renderUpd();
   const F=DB.francos, E=FRE(), C=frCruce(), cfg=cxCfg();
+  // última actualización de las fichadas que usa Francos
+  { const el=$('#fr-upd'), mv=F&&F.mov, fs=(DB.files||[]).filter(x=>x&&x.at).sort((a,b)=>String(a.at).localeCompare(String(b.at))), uf=fs[fs.length-1];
+    const recMax=Object.values(DB.records||{}).reduce((a,r)=>r.fecha>a?r.fecha:a,'');
+    if(el){ const vieja=C&&C.M&&C.M.d1<addD(hoy(),-2);
+      el.className='fr-upd'+(!C||!C.M||vieja?' w':'');
+      el.innerHTML=`<span class="dot"></span><div>${C&&C.M?`<b>Fichadas cruzadas hasta el ${DOWL[dObj(C.M.d1).getDay()]} ${dmy(C.M.d1)}</b>`:'<b>Sin fichadas del período</b>: los francos se calculan solo con el plan'}`+
+        (mv?`<br>Export de Movimientos: <b>${fmtAt(mv.at)}</b>${mv.por?' · '+esc(mv.por):''} · ${esc(mv.file||'')}${mv.desdeAus?' (cargado en Ausentismo)':''} · fichadas hasta el ${dmy(mv.d1)}`:'')+
+        (recMax?`<br>Reporte diario del reloj (Llegadas tarde): último día ${dmy(recMax)}${uf?` · cargado ${fmtAt(uf.at)}`:''}`:'')+
+        (vieja?`<br>⚠ Faltan fichadas desde el ${dmy(addD(C.M.d1,1))}: subí un export de Movimientos en <b>Ausentismo</b> o el reporte diario en <b>Llegadas tarde</b>.`:'')+'</div>'; } }
   // pasos de carga
   const P=cxPeriodo(), M=F&&F.mov;
   { const H=hoy(), n=frDeFranco(H).length, nf=(frState.sectors.length||frState.turnos.length)?frDeFranco(H).filter(frFlt).length:null;

@@ -68,26 +68,42 @@ async function amCargar(file){
       mot.forEach(m=>ev.push([leg,f,m]));
     }
     if(!ev.length&&!Object.keys(prog).length) throw new Error('El archivo no tiene filas con legajo y fecha.');
-    // se combina con lo cargado: los meses que trae el archivo nuevo reemplazan a los anteriores
-    const A=DB.ausmot||{emps:{},prog:{},ev:[]}, meses=new Set(); for(let d=d0.slice(0,7); d<=d1.slice(0,7); d=(()=>{ const [y,m]=d.split('-').map(Number); return m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`; })()) meses.add(d);
+    // se SUMA a lo cargado: para las personas y los días que trae el archivo nuevo se actualiza todo
+    // (ausencias nuevas, motivos corregidos, faltas que ya no están); el resto de los días queda como estaba
+    const A=DB.ausmot||{emps:{},prog:{},progD:{},ev:[]}, LN=new Set(Object.keys(emps)), enR=d=>d>=d0&&d<=d1;
+    const kOf=e=>e[0]+'|'+e[1]+'|'+e[2], viejos=new Set(A.ev.filter(e=>LN.has(e[0])&&enR(e[1])).map(kOf)), nuevosK=new Set(ev.map(kOf));
+    const agregadas=[...nuevosK].filter(k=>!viejos.has(k)).length, quitadas=[...viejos].filter(k=>!nuevosK.has(k)).length;
+    const mesesR=[]; for(let m=d0.slice(0,7); m<=d1.slice(0,7); m=(()=>{ const [y,mm]=m.split('-').map(Number); return mm===12?`${y+1}-01`:`${y}-${String(mm+1).padStart(2,'0')}`; })()) mesesR.push(m);
+    const progDN={}, progN={};
+    for(const leg of new Set(Object.keys(A.progD||{}).concat(Object.keys(A.prog||{}),Object.keys(progD),[...LN]))){
+      const od=Object.assign({},(A.progD||{})[leg]||{}), op=Object.assign({},(A.prog||{})[leg]||{});
+      if(LN.has(leg)) for(const m of mesesR){
+        const dim=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate(), viejo=(od[m]||'').padEnd(dim,'0').split(''), nv=((progD[leg]||{})[m]||'');
+        for(let dd=1; dd<=dim; dd++){ const f=`${m}-${String(dd).padStart(2,'0')}`; if(enR(f)) viejo[dd-1]=nv[dd-1]==='1'?'1':'0'; }
+        const str=viejo.join('').replace(/0+$/,''); if(str) od[m]=str; else delete od[m];
+        const n=(str.match(/1/g)||[]).length; if(n) op[m]=n; else delete op[m]; }
+      if(Object.keys(od).length) progDN[leg]=od; if(Object.keys(op).length) progN[leg]=op; }
+    const cargas=(A.cargas||[]).concat([{file:file.name,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',d0,d1,n:LN.size,agregadas,quitadas}]).slice(-30);
     const nuevo={file:file.name,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',
-      emps:Object.assign({},A.emps,emps), prog:{}, progD:{}, ev:A.ev.filter(e=>!meses.has(e[1].slice(0,7))).concat(ev)};
-    for(const leg of new Set(Object.keys(A.prog).concat(Object.keys(prog)))){ const o={};
-      Object.entries(A.prog[leg]||{}).forEach(([m,n])=>{ if(!meses.has(m)) o[m]=n; }); Object.assign(o,prog[leg]||{}); if(Object.keys(o).length) nuevo.prog[leg]=o;
-      const od={}; Object.entries((A.progD||{})[leg]||{}).forEach(([m,x])=>{ if(!meses.has(m)) od[m]=x; }); Object.assign(od,progD[leg]||{}); if(Object.keys(od).length) nuevo.progD[leg]=od; }
-    const todas=nuevo.ev.map(e=>e[1]).concat(Object.values(nuevo.prog).flatMap(p=>Object.keys(p).map(m=>m+'-01'))).sort();
-    nuevo.desde=todas[0]||d0; nuevo.hasta=[d1,A.hasta||''].sort().pop();
+      emps:Object.assign({},A.emps,emps), prog:progN, progD:progDN, ev:A.ev.filter(e=>!(LN.has(e[0])&&enR(e[1]))).concat(ev), cargas,
+      desde:[A.desde||d0,d0].sort()[0], hasta:[A.hasta||d1,d1].sort().pop()};
     DB.ausmot=nuevo;
-    // el mismo export alimenta a Francos (fichadas de los últimos ~2 meses) si quien lo sube puede editar Francos
+    // el mismo export actualiza las fichadas de Francos (últimos ~2 meses), también sumando días
     let frMsg='';
     try{ if(canEditMod('francos')&&typeof parseMovimientos==='function'){ const M=parseMovimientos(rows,hi), desde=addD(hoy(),-70), cur=DB.francos&&DB.francos.mov;
-      Object.values(M.emps).forEach(e=>{ Object.keys(e.d).forEach(d=>{ if(d<desde){ delete e.d[d]; delete e.o[d]; } }); });
-      const d0=M.d0<desde?desde:M.d0;
-      if(M.d1>=d0&&(!cur||M.d1>=cur.d1)){ DB.francos=DB.francos||{emps:{},files:[]}; DB.francos.mov={at:new Date().toISOString(),file:file.name,d0,d1:M.d1,emps:M.emps};
-        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas para Francos desde Ausentismo: ${file.name} (${dmy(d0)} al ${dmy(M.d1)})`); frMsg=' · también actualizó las fichadas de Francos'; } } }catch(e){ console.warn('francos',e); }
+      const md0=M.d0<desde?desde:M.d0;
+      if(M.d1>=md0){ const emp=JSON.parse(JSON.stringify((cur&&cur.emps)||{}));
+        Object.values(emp).forEach(e=>{ Object.keys(e.d).forEach(d=>{ if(d<desde){ delete e.d[d]; if(e.o) delete e.o[d]; } }); });
+        Object.entries(M.emps).forEach(([leg,v])=>{ const x=emp[leg]||(emp[leg]={n:v.n,c:v.c,d:{},o:{}}); x.n=v.n||x.n; x.c=v.c||x.c; x.o=x.o||{};
+          Object.keys(x.d).forEach(d=>{ if(d>=md0&&d<=M.d1){ delete x.d[d]; delete x.o[d]; } });
+          Object.entries(v.d).forEach(([d,k])=>{ if(d>=md0){ x.d[d]=k; if(v.o[d]) x.o[d]=v.o[d]; } }); });
+        DB.francos=DB.francos||{emps:{},files:[]};
+        DB.francos.mov={at:new Date().toISOString(),file:file.name,por:window.SRV&&SRV.user?SRV.user.nombre:'',desdeAus:true,
+          d0:cur&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp};
+        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas actualizadas desde Ausentismo: ${file.name} (${dmy(md0)} al ${dmy(M.d1)})`); frMsg=' · Francos actualizado'; } } }catch(e){ console.warn('francos',e); }
     if(window.SRV&&SRV.nota) SRV.nota('ausmot',`Motivos de ausencia: ${file.name} (${dmy(d0)} al ${dmy(d1)}, ${ev.length} días con motivo)`);
     await persist(); amState.mes=''; renderAusmot();
-    App.toast(`Cargado: ${Object.keys(emps).length} personas, del ${dmy(d0)} al ${dmy(d1)}${frMsg}`);
+    App.toast(`Actualizado del ${dmy(d0)} al ${dmy(d1)}: ${agregadas} ausencia(s) nueva(s), ${quitadas} corregida(s) o quitada(s)${frMsg}`);
   }catch(e){ console.error(e); st.innerHTML=`<span style="color:#fca5a5">${esc(e.message||String(e))}</span>`; App.toast(e.message||'No se pudo leer el archivo',true); }
 }
 
@@ -129,7 +145,9 @@ function renderAusmot(){
   const X=amDatos(), s=amState;
   if(!X){ $('#am-st').innerHTML='Todavía no se cargó el export de Movimientos.'; $('#am-body').style.display='none'; return; }
   $('#am-body').style.display='';
-  $('#am-st').innerHTML=`<b>${Object.keys(X.A.emps).length} personas</b> · del ${dmy(X.A.desde)} al ${dmy(X.A.hasta)} · ${esc(X.A.file)} · ${fmtAt(X.A.at)}${X.A.por?' · '+esc(X.A.por):''}`;
+  const CG=(X.A.cargas||[]).slice().reverse();
+  $('#am-st').innerHTML=`<div class="am-upd"><span class="dot"></span><div><b>Última actualización: ${fmtAt(X.A.at)}</b>${X.A.por?' · '+esc(X.A.por):''} · ${esc(X.A.file)}<br>Datos acumulados del <b>${dmy(X.A.desde)}</b> al <b>${dmy(X.A.hasta)}</b> · ${Object.keys(X.A.emps).length} personas</div></div>`+
+    (CG.length?`<details class="am-hist"><summary>Historial de cargas (${CG.length})</summary><table><thead><tr><th>Cargado</th><th>Por</th><th>Archivo</th><th>Días que trajo</th><th class="num">Ausencias nuevas</th><th class="num">Corregidas / quitadas</th></tr></thead><tbody>${CG.map(c=>`<tr><td>${fmtAt(c.at)}</td><td>${esc(c.por||'')}</td><td>${esc(c.file)}</td><td>${dmy(c.d0)} al ${dmy(c.d1)}</td><td class="num">${c.agregadas}</td><td class="num">${c.quitadas}</td></tr>`).join('')}</tbody></table></details>`:'');
   $('#am-mes').innerHTML='<option value="">Todo el período</option>'+X.meses.slice().reverse().map(m=>`<option value="${m}"${m===s.mes?' selected':''}>${amMesL(m)}</option>`).join('');
   const all=Object.values(X.P);
   const opt=(id,k,lab,fmt)=>{ $(id).innerHTML=`<option value="">${lab}</option>`+uniq(all.map(p=>p[k]).filter(Boolean)).sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>`<option value="${esc(v)}"${s[k]===v?' selected':''}>${esc(fmt?fmt(v):v)}</option>`).join(''); };
