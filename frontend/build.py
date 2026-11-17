@@ -27,7 +27,7 @@ def card(id_,title,meta=''):
 # ---------- AUSENTISMO ----------
 aus=section(iso,'v-ausentismo')
 aus=one(aus,'<input type="file" id="fileDB" accept=".json" hidden>','')
-aus=one(aus,'<section class="view" id="v-ausentismo">','<section class="view" id="v-ausentismo">\n  '+vhead('01','Gestión diaria','Ausentismo','Llegadas tarde, reincidencias, sin fichada y escalada disciplinaria automática: pedido de explicación → apercibimiento → suspensión.'))
+aus=one(aus,'<section class="view" id="v-ausentismo">','<section class="view" id="v-ausentismo">\n  '+vhead('01','Gestión diaria','Llegadas tarde','Reporte diario del reloj: llegadas tarde, reincidencias, presentes, sin fichada y escalada disciplinaria automática: pedido de explicación → apercibimiento → suspensión.'))
 aus=one(aus,'<div class="drop" id="drop">','<div class="updbar" id="upd-aus"></div>\n  <div class="drop" id="drop">')
 aus=one(aus,'<div class="kpis" id="kpis"></div>','<div class="kpis" id="kpis"></div>\n  <div class="cgrid">'+card('x-aus-dist','Distribución del atraso','minutos sobre la hora de ingreso')+card('x-aus-dow','Tardanzas por día de la semana','acumulado')+'</div>')
 

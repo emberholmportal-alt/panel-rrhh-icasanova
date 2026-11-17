@@ -182,6 +182,7 @@ function amExcel(){
   $('#am-tur').onchange=e=>{ amState.turno=e.target.value; renderAusmot(); };
   $('#am-lic').onchange=e=>{ amState.lic=e.target.checked; renderAusmot(); };
   $('#am-xls').onclick=amExcel;
-  document.addEventListener('click',e=>{ if(e.target.closest('#v-ausentismo [data-p="p-mot"]')) setTimeout(renderAusmot,0);
+  document.addEventListener('click',e=>{
     const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); } });
 })();
+const _ovAm=App.onView; App.onView=(id,f)=>{ _ovAm(id,f); if(id==='v-ausmot') renderAusmot(); };

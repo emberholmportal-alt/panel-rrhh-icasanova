@@ -2673,7 +2673,7 @@ const INTRO={
       <path d="M72 82 Q52 70 34 84 M72 82 Q90 66 110 78 M72 82 Q66 60 48 58 M72 82 Q84 58 100 56 M72 82 Q74 98 92 104" stroke="#16a34a" stroke-width="5" fill="none" stroke-linecap="round"/></g>
     </g></svg>`}; },
   'v-ausentismo':()=>{ const L=LATE().length;
-    return {t:'Ausentismo',p:safe(allRecs).length?`${L} tardanzas acumuladas · tolerancia ${DB.tolerancia} min`:'Cargá el reporte del reloj',svg:`
+    return {t:'Llegadas tarde',p:safe(allRecs).length?`${L} tardanzas acumuladas · tolerancia ${DB.tolerancia} min`:'Cargá el reporte del reloj',svg:`
     <svg viewBox="0 0 320 190"><rect width="320" height="190" rx="20" fill="#0b1324" stroke="rgba(120,160,210,.2)"/>
     <circle cx="160" cy="95" r="66" fill="#101a2e" stroke="#22d3ee" stroke-width="2" opacity=".9"/>
     <circle cx="160" cy="95" r="74" fill="none" stroke="#22d3ee" stroke-opacity=".15" stroke-width="6"/>
@@ -2814,7 +2814,7 @@ const BG=(()=>{
 
 const Orb=(()=>{
   let r,sc,cam,root,orbit,core,shell,sats=[],run=false,ok=false,hover=null,drag=null,last=0,spin=1,status={};
-  const MODS=[{m:'aus',n:'Ausentismo',v:'v-ausentismo'},{m:'vac',n:'Vacaciones',v:'v-vacaciones'},{m:'ant',n:'Eventuales',v:'v-bajas'},{m:'f3',n:'Novedades F3',v:'v-f3'},{m:'an',n:'Anticipos',v:'v-anticipos'}];
+  const MODS=[{m:'aus',n:'Llegadas tarde',v:'v-ausentismo'},{m:'vac',n:'Vacaciones',v:'v-vacaciones'},{m:'ant',n:'Eventuales',v:'v-bajas'},{m:'f3',n:'Novedades F3',v:'v-f3'},{m:'an',n:'Anticipos',v:'v-anticipos'}];
   const SC={crit:0xef4444,warn:0xf59e0b,ok:0x22c55e,none:0x64748b};
   const ray=window.THREE?new THREE.Raycaster():null, v2=window.THREE?new THREE.Vector2():null, tmp=window.THREE?new THREE.Vector3():null;
   function glowTex(){ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');

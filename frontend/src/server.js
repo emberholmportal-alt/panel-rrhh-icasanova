@@ -102,7 +102,7 @@ const SRVX=(()=>{
   S.api=api;
   // nota para el registro de cambios: se manda junto con el próximo guardado de ese módulo
   S.notas={}; S.nota=(m,t)=>{ (S.notas[m]||(S.notas[m]=[])).push(t); };
-  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos','v-hextras':'hextras'};
+  const VIEW_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-agenda':'agenda','v-nomina':'nomina','v-menu':'menu','v-cumple':'cumpleanos','v-hextras':'hextras','v-ausmot':'ausentismo'};
   const lvl0=m=>isAdm?'editar':(U.perms&&U.perms[m])||'';
   // solicitudes de vacaciones: las ven quienes las cargan y quienes ven o aprueban Vacaciones
   const lvl=m=>m==='vacsol'?(lvl0('vacsol')||(lvl0('vacaciones')?'ver':'')):lvl0(m);
@@ -110,7 +110,7 @@ const SRVX=(()=>{
   for(const v in VIEW_MOD){ if(!lvl(VIEW_MOD[v])){ const n=document.querySelector(`.nav-item[data-v="${v}"]`); if(n) n.style.display='none'; } }
   const _gv=window.goView;
   window.goView=function(id){
-    const m=VIEW_MOD[id]; if(m&&!lvl(m)){ App.toast('No tenés acceso a ese módulo.',true); id='v-home'; }
+    const m=VIEW_MOD[id]; if((m&&!lvl(m))||(U.aus_parcial&&id==='v-ausmot')){ App.toast('No tenés acceso a ese módulo.',true); id='v-home'; }
     _gv(id); applyRO(id);
   };
   // modo consulta: sin botones de descarga, impresión ni exportación (se vuelve a aplicar cada vez que la vista se redibuja)
@@ -288,7 +288,7 @@ const SRVX=(()=>{
   // sin avisos de "subí tal archivo" para quien no administra la carga
   if(!isAdm){ const _caS=computeAvisos; computeAvisos=function(){ return _caS().filter(x=>!/^Actualización/.test(x.t||'')); }; App.refresh(); }
   // Ausentismo parcial: solo Llegadas tarde y Reincidencias
-  if(U.aus_parcial){ const keep=new Set(['p-tarde','p-rank']);
+  if(U.aus_parcial){ const keep=new Set(['p-tarde','p-rank']); { const n=document.querySelector('.nav-item[data-v="v-ausmot"]'); if(n) n.style.display='none'; }
     document.querySelectorAll('#v-ausentismo #tabs .tab').forEach(t=>{ if(!keep.has(t.dataset.p)){ t.style.display='none'; const p=document.getElementById(t.dataset.p); if(p){ p.classList.remove('on'); p.style.display='none'; } } });
     const t0=document.querySelector('#v-ausentismo #tabs .tab[data-p="p-tarde"]'); if(t0&&!t0.classList.contains('on')) t0.click(); }
   if(U.must_change&&!S.imp) passScreen(true);

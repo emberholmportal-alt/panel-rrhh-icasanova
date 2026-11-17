@@ -41,7 +41,8 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <button class="nav-item mod" data-v="v-agenda"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/></svg>Agenda<span class="nb" id="nb-ag"></span></button>
     <div class="nav-lab">Gestión diaria</div>
     <button class="nav-item mod" data-v="v-hextras"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M17 3l3 3M7 3L4 6"/></svg>Horas extras</button>
-    <button class="nav-item mod" data-v="v-ausentismo"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>Ausentismo<span class="nb" id="nb-aus"></span></button>
+    <button class="nav-item mod" data-v="v-ausentismo"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>Llegadas tarde<span class="nb" id="nb-aus"></span></button>
+    <button class="nav-item mod" data-v="v-ausmot"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15v-3M12 15V9M16 15v-5"/></svg>Ausentismo</button>
     <button class="nav-item mod" data-v="v-vacaciones"><svg viewBox="0 0 24 24"><circle cx="17" cy="6" r="3"/><path d="M2 20c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M7 17V8M7 8c-3 0-4 2-4 2M7 8c3 0 4 2 4 2M7 8c-1-3 1-4 1-4"/></svg>Vacaciones<span class="nb" id="nb-vac"></span><span class="nb nb-sol" id="nb-vacsol" title="Pedidos de vacaciones pendientes" style="display:none"></span></button>
     <button class="nav-item mod" data-v="v-bajas"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.5-3.5 3.2-5.5 6.5-5.5s6 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.8.8 2.8 2.6 3 5.2"/></svg>Eventuales<span class="nb" id="nb-ant"></span></button>
     <button class="nav-item mod" data-v="v-nomina"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M14.5 14.6c.8-.4 1.6-.6 2.5-.6 2.8 0 5 2.2 5 5"/></svg>Nómina</button>
@@ -190,6 +191,41 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
   </div>
   <div class="card"><div class="card-h"><h3>Sector × turno</h3></div><div class="card-b flush"><div class="tscroll"><table id="nm-mx" class="nm-t"></table></div></div></div>
   <div class="card"><div class="card-h"><h3>Detalle</h3><span class="meta" id="nm-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:520px"><table id="nm-det"></table></div></div></div>
+</section>
+
+<section class="view" id="v-ausmot">
+  <div class="vhead"><div><div class="eyebrow">Módulo · Gestión diaria</div><h2>Ausentismo</h2>
+    <p>Informe de ausencias por motivo (enfermedad, ART, con y sin aviso, paro…), por mes, sector, turno y persona, con la tasa sobre los días programados.</p></div></div>
+  <div id="p-mot">
+    <div class="drop am-drop" id="am-load">
+      <h2>Cargar export de Movimientos</h2>
+      <p>Arrastrá acá el <b>export de Movimientos</b> del reloj (anual o de un período), o elegí el archivo.</p>
+      <button class="btn primary" id="am-pick">Elegir archivo…</button>
+      <input type="file" id="am-file" accept=".xlsx,.xls" hidden>
+      <div class="hint">Trae, por persona y día, la jornada y el motivo de cada ausencia. Los meses que vengan en el archivo nuevo reemplazan a los cargados antes. El anual tarda cerca de un minuto en leerse.</div>
+    </div>
+    <div class="cx-st am-st" id="am-st"></div>
+    <div id="am-body">
+      <div class="card"><div class="card-b"><div class="filters">
+        <div class="field"><label>Mes</label><select id="am-mes"></select></div>
+        <div class="field"><label>Tipo</label><select id="am-tip"></select></div>
+        <div class="field"><label>Sector</label><select id="am-sec"></select></div>
+        <div class="field"><label>Turno</label><select id="am-tur"></select></div>
+        <label class="am-chk"><input type="checkbox" id="am-lic"> Sumar licencias (gremial, estudio, casamiento, etc.)</label>
+        <div class="field" style="align-self:flex-end;margin-left:auto"><button class="btn primary sm" id="am-xls">Descargar Excel</button></div>
+      </div>
+      <div class="am-nota">Tasa = días de ausencia ÷ días programados (jornadas de trabajo, sin francos ni vacaciones). Vacaciones, franco compensatorio, home office y capacitación no cuentan como ausentismo.</div></div></div>
+      <div class="kpis" id="am-kpis"></div>
+      <div class="card"><div class="card-h"><h3>Por mes y motivo</h3><span class="meta">clic en un mes para filtrarlo</span></div><div class="card-b flush"><div class="tscroll"><table id="am-mesT" class="nm-t am-t"></table></div></div></div>
+      <div class="card"><div class="card-h"><h3>Por motivo</h3></div><div class="card-b flush"><div class="tscroll"><table id="am-motT" class="nm-t"></table></div></div></div>
+      <div class="cgrid" style="grid-template-columns:1fr 1fr">
+        <div class="card"><div class="card-h"><h3>Por sector</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="am-secT" class="nm-t"></table></div></div></div>
+        <div class="card"><div class="card-h"><h3>Por turno</h3></div><div class="card-b flush"><div class="tscroll" style="max-height:460px"><table id="am-turT" class="nm-t"></table></div></div></div>
+      </div>
+      <div class="card"><div class="card-h"><h3>Por persona</h3><span class="meta" id="am-n"></span></div><div class="card-b flush"><div class="tscroll" style="max-height:560px"><table id="am-perT"></table></div></div></div>
+    </div>
+  </div>
+
 </section>
 
 <section class="view" id="v-hextras">
