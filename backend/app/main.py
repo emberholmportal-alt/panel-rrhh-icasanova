@@ -107,6 +107,12 @@ def startup():
                     uu.perms = nuevos
                     auth.audit(db, "sistema", "permisos", f"{username}: {perms}")
             nuevas.append(clave)
+        if "2026-11-17-nombre-admin" not in hechas:
+            # nombre completo del administrador (aparece en los avisos de cambio de permisos)
+            ua = db.scalar(select(User).where(User.username == "ariel"))
+            if ua and (ua.nombre or "").strip().lower() == "ariel":
+                ua.nombre = "Flores, Ariel"
+            nuevas.append("2026-11-17-nombre-admin")
         for clave, extra in seed.NOMINA_EXTRA:
             if clave in hechas:
                 continue
@@ -162,6 +168,7 @@ def user_out(u: User) -> dict:
     return {"id": u.id, "username": u.username, "nombre": u.nombre, "rol": u.rol,
             "perms": {m: auth.level(u, m) for m in MODULES}, "must_change": u.must_change, "activo": u.activo,
             "aus_parcial": u.rol != "admin" and u.username in auth.AUS_PARCIAL,
+            "perms_por": (u.perms or {}).get("_por"),
             "last_login": u.last_login.isoformat() if u.last_login else None}
 
 
@@ -647,12 +654,16 @@ def update_user(uid: int, body: UserIn, a: User = Depends(require_admin), db: Se
         u.nombre = body.nombre.strip()
     if body.rol is not None:
         u.rol = "admin" if body.rol == "admin" else "usuario"
+    antes = (u.rol, {m: auth.level(u, m) for m in MODULES})
     if body.perms is not None:
         u.perms = clean_perms(body.perms)
     if body.activo is not None:
         u.activo = body.activo
         if not body.activo:
             u.token_ver += 1      # cierra sus sesiones
+    if (u.rol, {m: auth.level(u, m) for m in MODULES}) != antes:
+        # queda registrado quién y cuándo, para avisarle al usuario si tiene el panel abierto
+        u.perms = {**(u.perms or {}), "_por": {"n": a.nombre, "at": iso(now())}}
     auth.audit(db, a, "editar_usuario", u.username)
     db.commit()
     return user_out(u)

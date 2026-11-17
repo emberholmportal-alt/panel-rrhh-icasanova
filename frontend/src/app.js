@@ -482,6 +482,7 @@ function renderHome(){
   const A=homeA=computeAvisos(), H=hoy(), now=new Date();
   const hr=now.getHours();
   $('#h-greet').textContent= hr<6?'Buenas noches':hr<13?'Buen día':hr<20?'Buenas tardes':'Buenas noches';
+  document.querySelectorAll('#v-home h2 .grad').forEach(e=>e.textContent=NOMBRE());
   const wk=Math.ceil((((now-new Date(now.getFullYear(),0,1))/864e5)+new Date(now.getFullYear(),0,1).getDay()+1)/7);
   $('#h-date').textContent=`${DOWL[now.getDay()]} ${now.getDate()} de ${MESL[now.getMonth()]} ${now.getFullYear()} · semana ${wk}`;
   const alta=A.filter(a=>a.p==='alta').length, media=A.filter(a=>a.p==='media').length;
@@ -2260,6 +2261,7 @@ function lockNow(why){
   if(lkOnline()){ const n=(SRV.imp&&SRV.imp.nombre)||SRV.user.nombre||SRV.user.username||''; const pila=(n.split(',')[1]||n).trim().split(' ')[0]||n;
     L.querySelector('.lk-user span').textContent=(pila[0]||'?').toUpperCase(); L.querySelector('.lk-user b').textContent=pila;
     $('#lk-pass').placeholder='Tu contraseña del panel'; }
+  if(!lkOnline()){ L.querySelector('.lk-user span').textContent=NOMBRE()[0]||''; L.querySelector('.lk-user b').textContent=NOMBRE(); }
   $('#lk-pass').value=''; $('#lk-err').textContent=''; L.classList.remove('ask');
   L.classList.add('on'); document.body.classList.add('is-locked');
   BG.stop(); Orb.active(false);

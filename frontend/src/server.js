@@ -79,6 +79,24 @@ const SRVX=(()=>{
       catch(err){ $('#sp-e').textContent=err.message; } };
   }
   // "ver como": el admin elige un usuario y el panel se recarga mostrando exactamente lo que ve esa persona
+  // el administrador cambió los permisos mientras el usuario tenía el panel abierto
+  let permsAviso='';
+  function permsCambiaron(nu){
+    const k=JSON.stringify([nu.perms,nu.rol,nu.aus_parcial]); if(k===permsAviso||document.getElementById('srv-perm')) return; permsAviso=k;
+    const por=nu.perms_por&&nu.perms_por.n?nu.perms_por.n:'', quien=por?(por.includes(',')?por.split(',').slice(1).join(' ').trim()+' '+por.split(',')[0].trim():por):'';
+    const cuando=nu.perms_por&&nu.perms_por.at?fmtAt(nu.perms_por.at):'';
+    const L=x=>x==='editar'?'Editar':x==='ver'?'Ver':x==='consulta'?'Consultar':'Sin acceso';
+    const cam=Object.keys(S.modules||{}).filter(m=>(U.perms||{})[m]!==(nu.perms||{})[m]).map(m=>`<li><b>${esc(S.modules[m])}</b>: ${L((U.perms||{})[m])} → <b>${L((nu.perms||{})[m])}</b></li>`).join('');
+    const m=document.createElement('div'); m.className='vs-modal'; m.id='srv-perm';
+    m.innerHTML=`<div class="vs-mbox"><h3>🔐 Tus permisos fueron actualizados</h3>
+      <p>${quien?`El administrador <b>${esc(quien)}</b> cambió`:'Se cambiaron'} tus permisos del panel${cuando?` (${esc(cuando)})`:''}.</p>
+      ${cam?`<ul class="srv-perm-l">${cam}</ul>`:''}
+      <p><b>Qué hacer:</b> tocá <b>Recargar ahora</b> para ver las secciones con los permisos nuevos. Si estabas cargando algo, terminalo primero: lo que ya se guardó no se pierde.</p>
+      <div class="vs-mb"><button type="button" class="btn ghost" data-pm="x">Más tarde</button><button type="button" class="btn primary" data-pm="ok">Recargar ahora</button></div></div>`;
+    m.onclick=e=>{ const b=e.target.closest('[data-pm]'); if(!b) return; if(b.dataset.pm==='ok'){ location.reload(); return; } m.remove();
+      App.toast('Tus permisos cambiaron: recargá la página cuando puedas para aplicarlos.',true); };
+    document.body.appendChild(m);
+  }
   async function verComo(){
     let L=[]; try{ L=(await api('GET','/api/users')).users.filter(u=>u.activo&&u.id!==S.user.id); }catch(e){ App.toast(e.message,true); return; }
     const m=document.createElement('div'); m.className='vs-modal';
@@ -211,7 +229,7 @@ const SRVX=(()=>{
       // versión nueva del panel publicada mientras la pestaña estaba abierta: avisar para recargar
       if(s.build){ if(!S.build) S.build=s.build; else if(s.build!==S.build&&!document.getElementById('srv-upd')){ const b=document.createElement('div'); b.id='srv-upd';
         b.innerHTML='<span>🔄 Hay una versión nueva del panel.</span><button type="button" class="btn primary sm">Recargar ahora</button>'; b.querySelector('button').onclick=()=>location.reload(); document.body.appendChild(b); } }
-      if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol) App.toast('Tus permisos cambiaron: recargá la página para aplicarlos.',true);
+      if(JSON.stringify(s.user.perms)!==JSON.stringify(U.perms)||s.user.rol!==U.rol||s.user.aus_parcial!==U.aus_parcial) permsCambiaron(s.user);
       setSt('Guardado','ok');
     }catch(err){ if(err.status===401) loginScreen(); else setSt('Sin conexión','err'); }
   }

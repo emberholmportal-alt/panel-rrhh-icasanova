@@ -78,3 +78,4 @@ body.srv-imp{padding-top:40px}
 .am-t tbody tr[data-amm]:hover td{background:rgba(248,113,113,.06)}
 .am-t tbody tr.am-sel td{background:rgba(248,113,113,.12)}
 .am-t th{white-space:nowrap}
+.srv-perm-l{margin:6px 0 10px 18px;padding:0;font-size:13.5px;line-height:1.6}
