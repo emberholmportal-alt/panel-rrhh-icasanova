@@ -42,13 +42,9 @@ function amMotivo(raw){
 const AM_CATDE={}; const amCat=n=>AM_CATDE[n]||(AM_CATDE[n]=(amMotivo(n)||{c:'otro'}).c);
 let amState={mes:'',dia:'',tipo:'',sector:'',turno:'',lic:false};
 
-async function amCargar(file){
-  const st=$('#am-st'); st.innerHTML='Leyendo el archivo… (el anual es grande, puede tardar unos segundos)';
-  await new Promise(r=>setTimeout(r,30));
-  try{
-    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false,dense:true});
-    const ws=wb.Sheets[wb.SheetNames[0]], rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-    let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/^FECHA$/.test(x))&&H.some(x=>/CODIGO DE EMPLEADO|LEGAJO/.test(x))){ hi=i; break; } }
+// ---- Ausentismo por motivo: suma un export de Movimientos (no guarda; lo hace quien llama) ----
+function amMerge(rows,fname){
+  let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/^FECHA$/.test(x))&&H.some(x=>/CODIGO DE EMPLEADO|LEGAJO/.test(x))){ hi=i; break; } }
     if(hi<0) throw new Error('No reconozco el archivo: tiene que ser el export de Movimientos del reloj (columnas Código de empleado, Fecha, Jornada efectiva, Movimientos).');
     const H=rows[hi].map(x=>x==null?'':String(x)), Hn=H.map(normTxt), ix=rx=>Hn.findIndex(h=>rx.test(h));
     const cL=ix(/CODIGO DE EMPLEADO|LEGAJO/), cU=ix(/CODIGO DE EMPRESA/), cN=ix(/APELLIDO/), cF=ix(/^FECHA$/), cJ=ix(/JORNADA/), cM=ix(/^MOVIMIENTOS$/);
@@ -83,13 +79,19 @@ async function amCargar(file){
         const str=viejo.join('').replace(/0+$/,''); if(str) od[m]=str; else delete od[m];
         const n=(str.match(/1/g)||[]).length; if(n) op[m]=n; else delete op[m]; }
       if(Object.keys(od).length) progDN[leg]=od; if(Object.keys(op).length) progN[leg]=op; }
-    const cargas=(A.cargas||[]).concat([{file:file.name,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',d0,d1,n:LN.size,agregadas,quitadas}]).slice(-30);
-    const nuevo={file:file.name,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',
+    const cargas=(A.cargas||[]).concat([{file:fname,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',d0,d1,n:LN.size,agregadas,quitadas}]).slice(-30);
+    const nuevo={file:fname,at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:'',
       emps:Object.assign({},A.emps,emps), prog:progN, progD:progDN, ev:A.ev.filter(e=>!(LN.has(e[0])&&enR(e[1]))).concat(ev), cargas,
       desde:[A.desde||d0,d0].sort()[0], hasta:[A.hasta||d1,d1].sort().pop()};
     DB.ausmot=nuevo;
+    if(window.SRV&&SRV.nota) SRV.nota('ausmot',`Motivos de ausencia: ${fname} (${dmy(d0)} al ${dmy(d1)}, ${ev.length} días con motivo)`);
+    return {d0,d1,agregadas,quitadas,n:Object.keys(emps).length};
+}
+// ---- Francos: suma las fichadas del export (últimos ~2 meses) ----
+function frMerge(rows,fname){
+  let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/^FECHA$/.test(x))&&H.some(x=>/CODIGO DE EMPLEADO|LEGAJO/.test(x))){ hi=i; break; } }
+  if(hi<0||typeof parseMovimientos!=='function') return null; let frMsg='';
     // el mismo export actualiza las fichadas de Francos (últimos ~2 meses), también sumando días
-    let frMsg='';
     try{ if(canEditMod('francos')&&typeof parseMovimientos==='function'){ const M=parseMovimientos(rows,hi), desde=addD(hoy(),-70), cur=DB.francos&&DB.francos.mov;
       const md0=M.d0<desde?desde:M.d0;
       if(M.d1>=md0){ const emp=JSON.parse(JSON.stringify((cur&&cur.emps)||{}));
@@ -98,12 +100,52 @@ async function amCargar(file){
           Object.keys(x.d).forEach(d=>{ if(d>=md0&&d<=M.d1){ delete x.d[d]; delete x.o[d]; } });
           Object.entries(v.d).forEach(([d,k])=>{ if(d>=md0){ x.d[d]=k; if(v.o[d]) x.o[d]=v.o[d]; } }); });
         DB.francos=DB.francos||{emps:{},files:[]};
-        DB.francos.mov={at:new Date().toISOString(),file:file.name,por:window.SRV&&SRV.user?SRV.user.nombre:'',desdeAus:true,
+        DB.francos.mov={at:new Date().toISOString(),file:fname,por:window.SRV&&SRV.user?SRV.user.nombre:'',desdeAus:true,
           d0:cur&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp};
-        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas actualizadas desde Ausentismo: ${file.name} (${dmy(md0)} al ${dmy(M.d1)})`); frMsg=' · Francos actualizado'; } } }catch(e){ console.warn('francos',e); }
-    if(window.SRV&&SRV.nota) SRV.nota('ausmot',`Motivos de ausencia: ${file.name} (${dmy(d0)} al ${dmy(d1)}, ${ev.length} días con motivo)`);
+        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas actualizadas (carga única): ${fname} (${dmy(md0)} al ${dmy(M.d1)})`); frMsg=' · Francos actualizado'; } } }catch(e){ console.warn('francos',e); }
+  return frMsg?true:null;
+}
+// legajos vacíos en el export (pasa con algunos eventuales): se completan por CUIL o por apellido y nombre
+function movLegajos(rows){
+  let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/CODIGO DE EMPLEADO|LEGAJO/.test(x))){ hi=i; break; } }
+  if(hi<0) return {ok:0,sin:[]};
+  const Hn=rows[hi].map(normTxt), cL=Hn.findIndex(h=>/CODIGO DE EMPLEADO|LEGAJO/.test(h)), cN=Hn.findIndex(h=>/APELLIDO/.test(h)), cC=Hn.findIndex(h=>/^CLAVE$|CUIL/.test(h));
+  const porN={}, porC={}, nk=x=>sinTilde(x).replace(/\s+/g,' ').trim();
+  const add=(leg,n)=>{ leg=nmLeg(leg); if(leg&&n) porN[nk(n)]=leg; };
+  try{ nmRows().forEach(x=>add(x.leg,x.nombre)); }catch(e){}
+  Object.entries((DB.ausmot&&DB.ausmot.emps)||{}).forEach(([l,e])=>add(l,e.n));
+  Object.values(DB.records||{}).forEach(r=>add(r.legajo,r.nombre));
+  try{ FRE().forEach(e=>add(e.legajo,e.nombre)); }catch(e){}
+  Object.entries(DB.people||{}).forEach(([l,p])=>{ if(p&&p.cuil) porC[String(p.cuil).replace(/\D/g,'')]=l; });
+  let ok=0; const sin=new Set();
+  for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r||!r[cN]) continue; if(r[cL]!=null&&String(r[cL]).trim()) continue;
+    const c=cC>=0?String(r[cC]||'').replace(/\D/g,''):'', leg=(c&&porC[c])||porN[nk(r[cN])];
+    if(leg){ r[cL]=leg; ok++; } else sin.add(String(r[cN]).trim()); }
+  return {ok,sin:[...sin]};
+}
+// ===== CARGA ÚNICA: un export de Movimientos actualiza Llegadas tarde, Ausentismo y Francos =====
+window.movTodo=function(rows,fname){
+  const L=movLegajos(rows), partes=[]; let rec=null;
+  if(canEditMod('ausentismo')&&typeof importRows==='function'){
+    // Llegadas tarde guarda los últimos 120 días (el anual entero haría la base muy pesada)
+    let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/^FECHA$/.test(x))){ hi=i; break; } }
+    const cF=hi>=0?rows[hi].map(normTxt).findIndex(h=>/^FECHA$/.test(h)):-1, corte=addD(hoy(),-120);
+    const rr=hi>=0&&cF>=0?rows.slice(0,hi+1).concat(rows.slice(hi+1).filter(r=>r&&excelDateToISO(r[cF])>=corte)):rows;
+    rec=importRows(rr,fname); if(typeof recompute==='function') recompute(); partes.push(`Llegadas tarde: ${rec.added} registros`); }
+  let am=null; if(canEditMod('ausmot')){ am=amMerge(rows,fname); partes.push(`Ausentismo: ${am.agregadas} ausencia(s) nueva(s), ${am.quitadas} corregida(s)`); }
+  if(canEditMod('francos')&&frMerge(rows,fname)) partes.push('Francos actualizado');
+  if(L.ok) partes.push(`${L.ok} fila(s) sin legajo reconocidas por CUIL o nombre`);
+  return {rec,am,L,msg:partes.join(' · ')};
+};
+async function amCargar(file){
+  const st=$('#am-st'); st.innerHTML='Leyendo el archivo… (el anual es grande, puede tardar unos segundos)';
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false,dense:true});
+    const ws=wb.Sheets[wb.SheetNames[0]], rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const R=movTodo(rows,file.name);
     await persist(); amState.mes=''; renderAusmot();
-    App.toast(`Actualizado del ${dmy(d0)} al ${dmy(d1)}: ${agregadas} ausencia(s) nueva(s), ${quitadas} corregida(s) o quitada(s)${frMsg}`);
+    App.toast(`${R.am?`Actualizado del ${dmy(R.am.d0)} al ${dmy(R.am.d1)} · `:''}${R.msg}${R.L.sin.length?` · ⚠ ${R.L.sin.length} sin legajo en el reloj y sin coincidencia en Eventuales/Nómina (no se cargaron): ${R.L.sin.join(', ')}`:''}`);
   }catch(e){ console.error(e); st.innerHTML=`<span style="color:#fca5a5">${esc(e.message||String(e))}</span>`; App.toast(e.message||'No se pudo leer el archivo',true); }
 }
 

@@ -198,12 +198,12 @@ if(window.opener&&window.opener!==window&&/[#&?](code|error)=/.test(location.has
     <p>Informe de ausencias por motivo (enfermedad, ART, con y sin aviso, paro…), por mes, sector, turno y persona, con la tasa sobre los días programados.</p></div></div>
   <div id="p-mot">
     <div class="drop am-drop" id="am-load">
-      <h2>Actualizar con un export de Movimientos</h2>
+      <h2>Carga única de fichadas</h2>
       <p>Arrastrá acá el <b>export de Movimientos</b> del reloj (de unos días, un mes o el año), o elegí el archivo.</p>
       <button class="btn primary" id="am-pick">Elegir archivo…</button>
       <input type="file" id="am-file" accept=".xlsx,.xls" hidden>
       <div class="hint"><b>Cada carga se suma a lo anterior, no lo reemplaza:</b> agrega los días nuevos y, para los días que trae el archivo, actualiza las ausencias (corrige motivos y quita faltas que ya no figuran). Los días que no trae quedan como estaban.
-        También actualiza las fichadas de <b>Francos</b>. El anual tarda cerca de un minuto en leerse.</div>
+        Con este mismo archivo se actualizan también <b>Llegadas tarde</b> y <b>Francos</b> (es la misma carga que la de Llegadas tarde). El anual tarda cerca de un minuto en leerse.</div>
     </div>
     <div class="cx-st am-st" id="am-st"></div>
     <div id="am-body">
