@@ -29,6 +29,7 @@ function nmParse(rows,name){
   const ix=re=>H.findIndex(x=>re.test(x));
   const cL=ix(/^LEGAJO|^LEG\b|NRO\.? DE LEGAJO|CODIGO DE EMPLEADO/), cN=ix(/APELLIDO|NOMBRE/), cS=ix(/^SECTOR|^AREA|^TAREA|PUESTO/), cT=ix(/^TURNO/),
     cTp=ix(/^TIPO|CONVENIO|CONDICION|MODALIDAD/), cU=ix(/U\.?O\.?|CODIGO DE EMPRESA|EMPRESA/), cI=ix(/INGRESO/), cE=ix(/EGRESO/);
+  const cEst=H.map((x,i)=>/^ESTADO/.test(x)?i:-1).filter(i=>i>=0);   // planilla de eventuales: "Estado" ACTIVO / BAJA
   const out={};
   for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const leg=nmLeg(r[cL]); if(!leg||!/^\d+$/.test(leg)) continue;
     const e=out[leg]||(out[leg]={leg,src:name});
@@ -37,8 +38,12 @@ function nmParse(rows,name){
     if(cT>=0&&r[cT]!=null&&String(r[cT]).trim()) e.turno=normTxt(r[cT]);
     const tp=nmTipo(cTp>=0?r[cTp]:'')||nmTipo(cU>=0?r[cU]:''); if(tp){ e.tipo=tp; e.tipoF=tp; }
     if(cI>=0&&r[cI]) e.ingreso=excelDateToISO(r[cI])||e.ingreso;
-    if(cE>=0&&r[cE]) { const x=excelDateToISO(r[cE]); if(x) e.egreso=x; } }
-  return Object.keys(out).length?{emps:out,roster:false,desc:`${Object.keys(out).length} legajo(s)`}:null;
+    if(cE>=0&&r[cE]) { const x=excelDateToISO(r[cE]); if(x) e.egreso=x; }
+    if(cEst.length){ e.tipo='EV'; delete e.tipoF;   // sin tipo fijo: el reloj puede corregirlo (ej. coordinadores FC)
+        // todo lo de la planilla de eventuales es eventual
+      const v=cEst.map(c=>normTxt(r[c]||'')).filter(Boolean); if(v.some(x=>/BAJA/.test(x))) e.baja=true; else if(v.some(x=>/ACTIVO/.test(x))) e.baja=false; } }
+  const nAct=Object.values(out).filter(e=>!e.baja).length;
+  return Object.keys(out).length?{emps:out,roster:false,ev:cEst.length>0,desc:cEst.length?`planilla de eventuales: ${nAct} activo(s)`:`${Object.keys(out).length} legajo(s)`}:null;
 }
 async function loadNomina(files){
   if(typeof XLSX==='undefined'){ App.toast('No cargó la librería de Excel.',true); return; }
@@ -52,7 +57,12 @@ async function loadNomina(files){
         for(const [leg,e] of Object.entries(got.emps)){ const p=prev[leg]||{}; N.emps[leg]=Object.assign({},p,e,{sector:p.sector,turno:p.turno,ingreso:p.ingreso,tipoF:p.tipoF}); }
         N.roster={file:f.name,at:new Date().toISOString(),desc:got.desc}; }
       else for(const [leg,e] of Object.entries(got.emps)){ const p=N.emps[leg]; if(!p&&N.roster) continue;   // con reloj cargado, solo completa a los que están
-        N.emps[leg]=Object.assign(p||{leg},Object.fromEntries(Object.entries(e).filter(([k,v])=>v!=null&&v!==''))); }
+        const propio=p&&got.ev&&/ANTIG/i.test(p.src||'');   // vino de una carga anterior de esta misma planilla
+        if(e.baja){ if(p&&(propio||(p.tipoF||p.tipo||'EV')==='EV')) delete N.emps[leg]; continue; }   // de baja como eventual: sale (y no entra si no estaba); si ya es efectivo/FC por otro lado, queda
+        const x=Object.fromEntries(Object.entries(e).filter(([k,v])=>v!=null&&v!==''&&k!=='baja'));
+        if(got.ev&&p&&!propio&&(p.tipoF||p.tipo)){ delete x.tipo; delete x.tipoF; delete x.src; }   // la planilla de eventuales no cambia el tipo de quien ya está (ej. coordinadores FC)
+        if(propio) delete p.tipoF;   // limpia el tipo fijado por la carga anterior: al recargar el reloj vuelve el real
+        N.emps[leg]=Object.assign(p||{leg},x); }
       N.files=(N.files||[]).filter(x=>x.file!==f.name).concat({file:f.name,at:new Date().toISOString(),desc:got.desc,roster:got.roster}).slice(-12);
       ok++; }
     catch(e){ console.error(e); err.push(f.name); } }
