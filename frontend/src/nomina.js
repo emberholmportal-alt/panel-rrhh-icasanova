@@ -48,11 +48,12 @@ function nmParse(rows,name){
 }
 async function loadNomina(files){
   if(typeof XLSX==='undefined'){ App.toast('No cargó la librería de Excel.',true); return; }
-  DB.nomina=DB.nomina||{emps:{},files:[]}; const N=DB.nomina; let ok=0, err=[];
+  DB.nomina=DB.nomina||{emps:{},files:[]}; const N=DB.nomina; let ok=0, err=[], evFiles=[];
   for(const f of files){
     try{ const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}); let got=null;
       for(const sn of wb.SheetNames){ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:false}); const p=nmParse(rows,f.name); if(p&&(!got||Object.keys(p.emps).length>Object.keys(got.emps).length)) got=p; }
       if(!got){ err.push(f.name); continue; }
+      if(got.ev) evFiles.push(f);
       if(got.roster){   // el reloj define quién está: se conservan sector y turno ya cargados
         const prev=N.emps; N.emps={};
         for(const [leg,e] of Object.entries(got.emps)){ const p=prev[leg]||{}; N.emps[leg]=Object.assign({},p,e,{sector:p.sector,turno:p.turno,ingreso:p.ingreso,tipoF:p.tipoF}); }
@@ -68,6 +69,8 @@ async function loadNomina(files){
       ok++; }
     catch(e){ console.error(e); err.push(f.name); } }
   N.at=new Date().toISOString(); await persist(); renderNomina(); App.refresh();
+  // si se subió la planilla de eventuales, también se actualiza la sección Eventuales (y con ella Francos y Cumpleaños)
+  for(const f of evFiles){ if(canEditMod('eventuales')&&typeof loadAntFile==='function') { await loadAntFile(f); renderNomina(); } else App.toast('La planilla de eventuales actualizó la nómina; para que Francos la tome tiene que subirla alguien con permiso de Eventuales.',true); }
   if(ok) App.toast(`Nómina actualizada: ${Object.keys(N.emps).length} persona(s)`);
   if(err.length) App.toast(`No reconocí: ${err.join(', ')}. Necesita columnas Legajo y Apellido/Nombre, o el export de Movimientos.`,true);
 }
