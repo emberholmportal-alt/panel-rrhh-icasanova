@@ -63,6 +63,7 @@ function renderVacsol(){
   if(!VS.ok){ $('#vs-body').innerHTML='<div class="empty">Cargando solicitudes…</div>'; vsLoad(); return; }
   $('#vs-form').hidden=!VS.pide; $('#vs-xls').style.display=VS.aprueba?'':'none';
   $('#vs-tit').textContent=VS.aprueba?'Cargar vacaciones y pedidos':VS.pide?'Pedir vacaciones':'Pedidos de vacaciones';
+  { const m=$('#vs-mail'); if(m) m.hidden=!!VS.aprueba; }   // aviso del correo: para quienes piden, no para RRHH
   $('#vs-sub').textContent=VS.aprueba?'Lo que cargás acá queda aprobado. Los pedidos de coordinadores esperan tu aprobación.':VS.pide?`Empiezan un lunes (o martes si el lunes es feriado), con al menos ${VS_ANT} días de anticipación (desde el ${dmy(vsMin())}). RRHH lo aprueba o lo rechaza.`:'Vacaciones aprobadas por RRHH.';
   $('#vs-go').textContent=VS.aprueba?'Cargar vacaciones':'Enviar a RRHH';
   $('#vs-d').min=''; $('#vs-h').min='';
@@ -114,7 +115,7 @@ async function vsEnviar(forzar){
   const P=vsProblemas(desde); if(P.length&&!(VS.aprueba&&forzar)){ vsCartel(P); return; }
   const b=$('#vs-go'); b.disabled=true;
   try{ await SRV.api('POST','/api/vacsol',{legajo:e.leg,nombre:e.nombre,sector:e.sector,turno:e.turno,desde,hasta,obs:$('#vs-obs').value.trim(),forzar:!!forzar});
-    App.toast(VS.aprueba?`Vacaciones cargadas: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`:`Pedido enviado: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}. Queda pendiente hasta que RRHH lo apruebe.`);
+    App.toast(VS.aprueba?`Vacaciones cargadas: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}`:`Pedido enviado: ${shortName(e.nombre)} · ${dmy(desde)} al ${dmy(hasta)}. Queda pendiente hasta que RRHH lo apruebe. Recordá pedirlas también por el correo habitual.`);
     $('#vs-emp').value=''; $('#vs-d').value=''; $('#vs-h').value=''; $('#vs-obs').value=''; VS.f=VS.aprueba?'aprobada':'pend'; await vsLoad(); }
   catch(err){ App.toast(err.message,true); }
   finally{ b.disabled=false; }
