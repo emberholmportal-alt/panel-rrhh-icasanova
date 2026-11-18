@@ -68,8 +68,11 @@ const vdCom=k=>(VD_GR.find(v=>v.k===k)||{}).c;
 function vdDia(V){
   const H=hoy(); if(V.fecha===H) return Object.assign({},V,{modo:'hoy'});
   const P=V.proy&&V.proy[dObj(H).getDay()]; if(!P||!P.n) return Object.assign({},V,{modo:'viejo'});
-  const grupos=VD_GR.filter(v=>P.g[v.k]).map(v=>({k:v.k,ped:v.ped,com:v.c,est:P.g[v.k],proy:true}));
-  const sectores=Object.entries(P.s).map(([s,o])=>{ const t={}; let tot=0; for(const k in o){ t[k]={n:o[k]}; tot+=o[k]; } return {s,t,tot}; }).sort((a,b)=>b.tot-a.tot||a.s.localeCompare(b.s,'es'));
+  // los eventuales con franco asignado hoy se descuentan del promedio (por turno y por sector)
+  const FE=vdFrancosHoy(V)||[], dg={}, ds={};
+  FE.forEach(x=>{ const g=vdGrTurno(x.t); if(!g) return; dg[g]=(dg[g]||0)+1; const k=x.s||'SIN SECTOR'; (ds[k]||(ds[k]={}))[g]=((ds[k]||{})[g]||0)+1; });
+  const grupos=VD_GR.filter(v=>P.g[v.k]).map(v=>({k:v.k,ped:v.ped,com:v.c,base:P.g[v.k],est:Math.max(0,P.g[v.k]-(dg[v.k]||0)),proy:true}));
+  const sectores=Object.entries(P.s).map(([s,o])=>{ const t={}; let tot=0; for(const k in o){ const n=Math.max(0,o[k]-((ds[s]||{})[k]||0)); t[k]={n}; tot+=n; } return {s,t,tot}; }).sort((a,b)=>b.tot-a.tot||a.s.localeCompare(b.s,'es'));
   return {modo:'proy',fecha:H,n:P.n,grupos,sectores,total:grupos.reduce((a,g)=>a+g.est,0),
     comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>vdCom(g.k)===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>vdCom(g.k)===c).map(g=>g.k)})).filter(x=>x.g.length)};
 }
@@ -96,10 +99,10 @@ function vdHtml(V,compacto){
   ].filter(Boolean);
   const aviso=`<div class="vd-aviso">${lin.map((t,i)=>i?`<span class="vd-fr">${t}</span>`:t).join('')}</div>`;
   const com=(D.comidas||[]).map(c=>`<div class="vd-com"><span>${esc(c.c)}</span><b>${c.n}</b><small>${esc(c.g.join(' + '))}${c.c==='Cena'?' · pedido ~15:30':' · pedidos ~08:30 / ~10:30'}</small></div>`).join('');
-  const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${D.modo==='viejo'?`${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}`:dia}</div><div class="vd-tot">${D.total}</div>${frTot?`<div class="vd-frt">Ya descontados: <b>${frTot}</b> de franco${D.modo==='hoy'?'':' (eventuales asignados hoy)'} · ${['Mañana','Intermedio','Tarde','Noche','Sin turno'].filter(g=>FG[g]&&(FG[g].r+FG[g].e)).map(g=>`${g} ${FG[g].r+FG[g].e}`).join(' · ')}</div>`:''}</div>${com?`<div class="vd-coms">${com}</div>`:''}</div>`;
+  const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${D.modo==='viejo'?`${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}`:dia}</div><div class="vd-tot">${D.total}</div>${frTot?`<div class="vd-frt">Ya descontados: <b>${frTot}</b> de franco${D.modo==='hoy'?'':' (eventuales asignados hoy)'} · ${['Mañana','Intermedio','Tarde','Noche','Sin turno'].filter(g=>FG[g]&&(FG[g].r+FG[g].e)).map(g=>`${g} ${FG[g].r+FG[g].e}`).join(' · ')}${D.modo!=='hoy'&&FG['Sin turno']?` <small>(los ${FG['Sin turno'].e} sin turno no se pueden ubicar en un turno: revisá su turno en Francos)</small>`:''}</div>`:''}</div>${com?`<div class="vd-coms">${com}</div>`:''}</div>`;
   const cards=`<div class="vd-g">${D.grupos.map(g=>`<div class="vd-c${g.ini?' ok':''}"><div class="vd-ct"><b>${esc(g.k)}</b><span>${esc(g.com||'')}${g.ped?` · pedido ~${g.ped}`:''}</span></div>
     <div class="vd-n">${g.est}</div>
-    <div class="vd-d">${g.proy?`Sin fichadas de hoy · promedio de los últimos ${D.n} ${DOWL[dObj(H).getDay()]}`:g.ini?`Ya ingresó · ficharon <b>${g.f}</b> de ${g.e} con jornada · ${g.e?Math.round(g.f/g.e*100):0}%`:`Todavía no figura en el archivo · ${g.e} con jornada × ${g.tasa}% habitual`}</div>
+    <div class="vd-d">${g.proy?`Sin fichadas de hoy · promedio de los últimos ${D.n} ${DOWL[dObj(H).getDay()]}: ${g.base}${g.base!==g.est?` − ${g.base-g.est} de franco = <b>${g.est}</b>`:''}`:g.ini?`Ya ingresó · ficharon <b>${g.f}</b> de ${g.e} con jornada · ${g.e?Math.round(g.f/g.e*100):0}%`:`Todavía no figura en el archivo · ${g.e} con jornada × ${g.tasa}% habitual`}</div>
     ${frTxt(g.k)}
     ${g.proy?'':`<div class="vd-bar"><i style="width:${g.e?Math.min(100,g.f/g.e*100):0}%"></i></div>`}</div>`).join('')}</div>`;
   if(compacto) return head+cards;
