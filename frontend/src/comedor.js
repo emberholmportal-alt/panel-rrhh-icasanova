@@ -115,7 +115,12 @@ function cuEmps(){
 // ---- carteles para la cartelera: Word (.docx) con dos personas por hoja (solo Milagros Marchioro y admin) ----
 const cuCartelOk=()=>!(window.SRV&&SRV.mode==='online')||(!!SRV.user&&!SRV.imp&&(SRV.user.username==='mmarchioro'||SRV.user.rol==='admin'));
 async function cuCarteles(){
-  if(typeof JSZip==='undefined'){ App.toast('No cargó la librería para armar el Word. Recargá la página.',true); return; }
+  if(typeof JSZip==='undefined'){
+    // la librería para armar el .docx se baja recién cuando hace falta
+    App.toast('Preparando el Word…');
+    try{ await new Promise((ok,mal)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload=ok; sc.onerror=mal; document.head.appendChild(sc); }); }catch(e){}
+    if(typeof JSZip==='undefined'){ App.toast('No se pudo descargar la librería para armar el Word. Revisá la conexión a internet y probá de nuevo.',true); return; }
+  }
   const R=cuRows(cuState.mes); if(!R.length){ App.toast('No hay cumpleaños en ese mes.',true); return; }
   const x=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const cap=t=>t.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
