@@ -381,6 +381,11 @@ function hookAnticipos(){
    AVISOS, AGENDA Y ESTADO DE MÓDULOS
    ================================================================ */
 const REC = () => (DB.recs||(DB.recs=[]));
+// permisos por módulo (en el servidor): cada usuario ve en Inicio solo lo de las secciones a las que accede
+const PV_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-nomina':'nomina','v-cumple':'cumpleanos','v-menu':'menu','v-hextras':'hextras','v-ausmot':'ausmot','v-viandas':'viandas'};
+const AV_MOD={ant:'eventuales',vac:'vacaciones',aus:'ausentismo',f3:'f3',an:'anticipos'};
+const puedeMod=m=>!m||!(window.SRV&&SRV.mode==='online')||!SRV.user||SRV.user.rol==='admin'||!!(SRV.user.perms||{})[m];
+const puedeAviso=a=>puedeMod(AV_MOD[a.m])&&puedeMod(PV_MOD[a.go]);
 function computeAvisos(){
   const A=[], H=hoy(), en=d=>addD(H,d);
   // --- eventuales
@@ -445,7 +450,7 @@ function computeAvisos(){
   if(venc.length) A.push({p:'alta',m:'rec',t:'Recordatorios · vencidos',v:`${venc.length} recordatorio(s) vencido(s)`,d:names(venc.map(r=>r.txt),2),go:'h-rec'});
   rh.forEach(r=>A.push({p:'media',m:'rec',t:'Recordatorio · hoy',v:r.txt,d:'Vence hoy',go:'h-rec'}));
   const rank={alta:0,media:1,baja:2};
-  return A.sort((a,b)=>rank[a.p]-rank[b.p]);
+  return A.filter(puedeAviso).sort((a,b)=>rank[a.p]-rank[b.p]);
 }
 function computeRange(A0,B0,o={}){
   const H=hoy(), E={};
@@ -490,16 +495,16 @@ function renderHome(){
   const fuera=fueraEn(H), salenHoy=(eh.vs?eh.vs.names.length:0), bajHoy=(eh.bj?eh.bj.names.length:0);
   const any=safe(allRecs).length||VAC().length||ANT().length||AN().length;
   $('#h-sum').innerHTML= any
-    ? `${alta?`<b style="color:#fca5a5">${alta} tema(s) urgente(s)</b>`:'<b style="color:#86efac">Nada urgente</b>'} y ${media} para revisar. `+
-      `Hoy ${fuera.length} persona(s) están de vacaciones${salenHoy?`, ${salenHoy} arrancan hoy`:''}${bajHoy?` y ${bajHoy} eventual(es) tienen su último día`:''}.`
+    ? `${alta?`<b style="color:#fca5a5">${alta} tema(s) urgente(s)</b>`:'<b style="color:#86efac">Nada urgente</b>'} y ${media} para revisar.`+
+      (puedeMod('vacaciones')?` Hoy ${fuera.length} persona(s) están de vacaciones${salenHoy?`, ${salenHoy} arrancan hoy`:''}${bajHoy&&puedeMod('eventuales')?` y ${bajHoy} eventual(es) tienen su último día`:''}.`:'')
     : 'Empezá cargando los archivos de cada módulo: el reloj, el plan de vacaciones, el control de eventuales, el F3 y los anticipos. Desde ahí el panel arma los avisos solo.';
   const st=modStatus(A);
   const chip=(c,txt,go)=>`<button class="chip" data-v="${go}"><i style="background:${c};box-shadow:0 0 8px ${c}"></i>${txt}</button>`;
   $('#h-chips').innerHTML=[
     chip(alta?COL.crit:COL.ok,`<b>${alta}</b> urgentes`,'v-home'),
     chip(COL.c1,`<b>${Object.values(eh).reduce((a,x)=>a+x.names.length,0)}</b> eventos hoy`,'v-home'),
-    chip(COL.c3,`<b>${fuera.length}</b> de vacaciones`,'v-vacaciones'),
-    chip(COL.c2,`<b>${ACT().length}</b> eventuales`,'v-bajas')
+    puedeMod('vacaciones')?chip(COL.c3,`<b>${fuera.length}</b> de vacaciones`,'v-vacaciones'):'',
+    puedeMod('eventuales')?chip(COL.c2,`<b>${ACT().length}</b> eventuales`,'v-bajas'):''
   ].join('');
   // KPIs
   const bd=safe(byDate), last=bd[bd.length-1];
@@ -2917,8 +2922,10 @@ const Orb=(()=>{
       orbit=new THREE.Group(); orbit.rotation.set(.38,0,-.12); root.add(orbit);
       const R=3.15, ring=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(new THREE.EllipseCurve(0,0,R,R).getPoints(160).map(p=>new THREE.Vector3(p.x,0,p.y))),
         new THREE.LineBasicMaterial({color:0x22d3ee,transparent:true,opacity:.22})); orbit.add(ring);
-      MODS.forEach((M,i)=>{
-        const a=i/MODS.length*Math.PI*2, pos=new THREE.Vector3(Math.cos(a)*R,0,Math.sin(a)*R);
+      const VIS=MODS.filter(M=>puedeMod(PV_MOD[M.v]));
+      if(!VIS.length){ const w=$('#h-orbwrap'); if(w) w.style.display='none'; }
+      VIS.forEach((M,i)=>{
+        const a=i/VIS.length*Math.PI*2, pos=new THREE.Vector3(Math.cos(a)*R,0,Math.sin(a)*R);
         const g=new THREE.Group(); g.position.copy(pos); orbit.add(g);
         const mat=new THREE.MeshBasicMaterial({color:SC.none});
         const s=new THREE.Mesh(new THREE.SphereGeometry(.19,24,24),mat); g.add(s);
