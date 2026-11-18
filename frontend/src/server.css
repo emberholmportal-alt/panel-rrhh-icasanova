@@ -188,3 +188,5 @@ body.chat-zumb{animation:chatZumb .8s ease-in-out}
 
 body.no-ticker #ticker{display:none!important}
 body.sin-agenda .bell,body.sin-agenda #h-sum,body.sin-agenda #h-chips,body.sin-agenda #h-orbwrap,body.sin-agenda #h-kpis,body.sin-agenda #v-home .hgrid,body.sin-agenda [data-v="v-agenda"],body.sin-agenda #nb-home{display:none!important}
+
+.cm-k{width:80px;text-align:right;padding:5px 8px;border-radius:7px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;font:inherit} .cm-neg{color:#f87171} #cm-dia{padding:6px 10px;border-radius:8px;background:transparent;color:inherit;border:1px solid rgba(127,127,127,.35)}
