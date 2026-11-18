@@ -1525,30 +1525,30 @@ async function cxCoordExcel(soloPend){ soloPend=soloPend===true;
   const thin={style:'thin',color:{argb:'FF94A3B8'}}, B={top:thin,left:thin,bottom:thin,right:thin};
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
   const ctl=[]; const used=new Set();
-  const FC=6;   // primera columna de días (F)
+  const FC=7;   // primera columna de días (G)
   for(const p of pages){
     let nm=p.sk.replace(/[\[\]:*?\/\\]/g,' ').slice(0,28).trim()||'SECTOR', k=nm, i=2; while(used.has(k)) k=nm.slice(0,26)+' '+(i++); used.add(k);
     const ws=wb.addWorksheet(k,{views:[{state:'frozen',xSplit:FC-1,ySplit:6}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
     const last=FC+fut.length+1;   // columnas: días + Asignados + Faltan
-    ws.columns=[{width:10},{width:34},{width:13},{width:10},{width:10}].concat(fut.map(()=>({width:6.5}))).concat([{width:11},{width:10}]);
+    ws.columns=[{width:10},{width:34},{width:22},{width:13},{width:10},{width:10}].concat(fut.map(()=>({width:6.5}))).concat([{width:11},{width:10}]);
     ws.mergeCells(1,1,1,last); ws.getCell(1,1).value=`FRANCOS A ASIGNAR · ${p.sk}`; ws.getCell(1,1).font={bold:true,size:15};
     ws.mergeCells(2,1,2,last); ws.getCell(2,1).value=`Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · objetivo ${cfg.obj} jornadas · ${C.M?'fichadas hasta el '+dmy(C.corte):'según el plan'} · emitido ${dmy(hoy())}`; ws.getCell(2,1).font={color:{argb:'FF475569'}};
     ws.mergeCells(3,1,3,last); ws.getCell(3,1).value='Escribí F en el día de franco de cada empleado (solo en los casilleros blancos). La columna FALTAN tiene que quedar en 0. Guardá el archivo y mandalo por correo a RRHH. No agregues ni borres filas o columnas.'; ws.getCell(3,1).font={bold:true,color:{argb:'FF0F172A'}}; ws.getCell(3,1).alignment={wrapText:true,vertical:'middle'}; ws.getRow(3).height=32; ws.getCell(3,1).fill=fill('FFFEF3C7');
     ws.mergeCells(4,1,4,last); ws.getCell(4,1).value='Coordinador/a: ______________________________     Fecha: ____/____/______'; ws.getCell(4,1).font={color:{argb:'FF334155'}};
     // fila 5 oculta con las fechas ISO (la usa el panel al volver a cargar)
     const r5=ws.getRow(5); r5.getCell(1).value='#FRANCOS'; r5.getCell(2).value=C.P.d0+'|'+C.P.d1; fut.forEach((d,j)=>r5.getCell(FC+j).value=d); r5.hidden=true;
-    const h=ws.getRow(6); ['Legajo','Empleado','Turno','Jornadas','A asignar'].concat(fut.map(d=>`${DOW[dObj(d).getDay()].slice(0,2)} ${dObj(d).getDate()}/${dObj(d).getMonth()+1}`)).concat(['Asignados','Faltan']).forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,size:9.5}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(j===4?'FFFDE68A':cxFer(fut[j-FC+1])?'FFCBD5E1':'FFF1F5F9'); c.border=B; });
+    const h=ws.getRow(6); ['Legajo','Empleado','Sector','Turno','Jornadas','A asignar'].concat(fut.map(d=>`${DOW[dObj(d).getDay()].slice(0,2)} ${dObj(d).getDate()}/${dObj(d).getMonth()+1}`)).concat(['Asignados','Faltan']).forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,size:9.5}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(j===5?'FFFDE68A':cxFer(fut[j-FC+1])?'FFCBD5E1':'FFF1F5F9'); c.border=B; });
     h.height=30;
     const L=p.R;
     L.forEach((r,i)=>{ const row=ws.getRow(7+i), n=7+i;
-      [r.e.legajo,r.e.nombre,r.e.turno||'',r.comp,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j===1||j===2?'left':'center',vertical:'middle'}; if(j===4){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
+      [r.e.legajo,r.e.nombre,secKey(r.e.sector),r.e.turno||'',r.comp,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j>=1&&j<=3?'left':'center',vertical:'middle'}; if(j===5){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
       fut.forEach((d,j)=>{ const c=row.getCell(FC+j), st=r.cal[d]; c.border=B; c.alignment={horizontal:'center',vertical:'middle'};
         if(st==='-'||st==='FER'||st==='FT'){ c.value=st==='-'?'–':'Fe'; c.fill=fill('FFE2E8F0'); c.font={color:{argb:'FF64748B'}}; }
         else if(st==='P'||st==='PF'){ c.value=st==='PF'?'F':null; c.protection={locked:false}; c.font={bold:true,color:{argb:'FF0E7490'},size:12};
           c.dataValidation={type:'list',allowBlank:true,formulae:['"F"'],showErrorMessage:true,errorTitle:'Solo F',error:'Escribí F para asignar franco, o dejalo vacío.'}; }
         else { c.value=CX_TXT[st]||''; c.fill=fill('FFF8FAFC'); c.font={color:{argb:'FF94A3B8'}}; } });
       const a=ws.getCell(n,FC+fut.length), f=ws.getCell(n,FC+fut.length+1), rg=`${ws.getColumn(FC).letter}${n}:${ws.getColumn(FC+fut.length-1).letter}${n}`;
-      a.value={formula:`COUNTIF(${rg},"F")`}; f.value={formula:`MAX(0,E${n}-${a.address})`};
+      a.value={formula:`COUNTIF(${rg},"F")`}; f.value={formula:`MAX(0,F${n}-${a.address})`};
       [a,f].forEach(c=>{ c.border=B; c.alignment={horizontal:'center'}; c.font={bold:true}; });
       if(r.sup){ ws.getCell(n,2).note=`Ya superó ${cfg.obj} jornadas: avisar a RRHH`; ws.getCell(n,2).font={color:{argb:'FFB91C1C'}}; }
       else if(r.e.egreso&&r.e.egreso<=C.P.d1) ws.getCell(n,2).note='Egresa el '+dmy(r.e.egreso);
