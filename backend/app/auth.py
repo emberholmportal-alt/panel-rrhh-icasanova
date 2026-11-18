@@ -134,9 +134,17 @@ MENU_EDITORES = {"mmarchioro"}
 AUS_PARCIAL = {"cbertetti", "joliva", "rcampos", "lmunoz"}
 
 
+def sin_agenda(u: User) -> bool:
+    """Coordinadores, Luis y Milagros: no ven la agenda ni los pendientes del panel."""
+    from . import seed
+    return u.rol != "admin" and (u.username in seed.COORDINADORES or u.username in ("lmunoz", "mmarchioro"))
+
+
 def level(u: User, modulo: str) -> str:
     if u.rol == "admin":
         return "editar"
+    if modulo == "agenda" and sin_agenda(u):
+        return ""
     lv = (u.perms or {}).get(modulo, "") or DEFAULT_LEVEL.get(modulo, "")
     if modulo == "menu" and lv == "editar" and u.username not in MENU_EDITORES:
         return "ver"

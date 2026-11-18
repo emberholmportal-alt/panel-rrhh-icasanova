@@ -320,6 +320,9 @@ const SRVX=(()=>{
   if(S.imp){ document.body.classList.add('srv-imp'); const b=document.createElement('div'); b.id='srv-imp';
     b.innerHTML=`<span>👁 Estás viendo el panel como <b>${esc(U.nombre)}</b> · solo lectura, no se guarda ningún cambio</span><button type="button" class="btn primary sm" data-imp-out>Volver a ${esc(S.imp.nombre.split(',')[1]?S.imp.nombre.split(',')[1].trim():S.imp.nombre)}</button>`;
     document.body.prepend(b); }
+  // la barra de avisos (ticker) es solo del administrador; a los usuarios sin agenda tampoco se les muestran pendientes en Inicio
+  if(!isAdm) document.body.classList.add('no-ticker');
+  if(U.sinagenda) document.body.classList.add('sin-agenda');
   // coordinadores: sin las fechas de baja de eventuales (el servidor tampoco se las manda)
   if(U.nobajas){ setTimeout(()=>{ const t=document.querySelector('#tabsAnt [data-p="pa-prox"]'), p=document.getElementById('pa-prox');
     if(t){ t.style.display='none'; } if(p) p.style.display='none';

@@ -208,6 +208,7 @@ def user_out(u: User) -> dict:
             "perms_por": (u.perms or {}).get("_por"),
             "descargas": u.rol == "admin" or not (u.perms or {}).get("_nodl"),
             "nobajas": sin_bajas(u),
+            "sinagenda": auth.sin_agenda(u),
             "last_login": u.last_login.isoformat() if u.last_login else None}
 
 

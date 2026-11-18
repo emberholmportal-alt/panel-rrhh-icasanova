@@ -130,8 +130,8 @@ function renderViandas(){
   el.innerHTML=V?vdHtml(V,false):'<div class="empty">Todavía no hay datos: las comidas aparecen cuando se sube el export de Movimientos.</div>';
 }
 function renderViandasHome(){
-  const el=$('#h-viandas'); if(!el) return; const ok=!(window.SRV&&SRV.mode==='online')||(SRV.can&&SRV.can('viandas'));
-  const V=DB.viandas; if(!ok||!V){ el.style.display='none'; return; }
+  const el=$('#h-viandas'); if(!el) return;
+  el.style.display='none'; return;   // Comidas no se muestra en Inicio: solo en su sección
   el.style.display=''; el.innerHTML=`<div class="card vd-home"><div class="card-b">${vdHtml(V,true)}<div style="margin-top:8px"><button class="btn ghost sm" data-go="v-viandas">Ver detalle →</button></div></div></div>`;
 }
 const _ovVd=App.onView; App.onView=(id,f)=>{ _ovVd(id,f); if(id==='v-viandas') renderViandas(); if(id==='v-home') renderViandasHome(); };
