@@ -92,17 +92,8 @@ function frMerge(rows,fname){
   let hi=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const H=(rows[i]||[]).map(normTxt); if(H.includes('MOVIMIENTOS')&&H.some(x=>/^FECHA$/.test(x))&&H.some(x=>/CODIGO DE EMPLEADO|LEGAJO/.test(x))){ hi=i; break; } }
   if(hi<0||typeof parseMovimientos!=='function') return null; let frMsg='';
     // el mismo export actualiza las fichadas de Francos (últimos ~2 meses), también sumando días
-    try{ if(canEditMod('francos')&&typeof parseMovimientos==='function'){ const M=parseMovimientos(rows,hi), desde=addD(hoy(),-70), cur=DB.francos&&DB.francos.mov;
-      const md0=M.d0<desde?desde:M.d0;
-      if(M.d1>=md0){ const emp=JSON.parse(JSON.stringify((cur&&cur.emps)||{}));
-        Object.values(emp).forEach(e=>{ Object.keys(e.d).forEach(d=>{ if(d<desde){ delete e.d[d]; if(e.o) delete e.o[d]; } }); });
-        Object.entries(M.emps).forEach(([leg,v])=>{ const x=emp[leg]||(emp[leg]={n:v.n,c:v.c,d:{},o:{}}); x.n=v.n||x.n; x.c=v.c||x.c; x.o=x.o||{};
-          Object.keys(x.d).forEach(d=>{ if(d>=md0&&d<=M.d1){ delete x.d[d]; delete x.o[d]; } });
-          Object.entries(v.d).forEach(([d,k])=>{ if(d>=md0){ x.d[d]=k; if(v.o[d]) x.o[d]=v.o[d]; } }); });
-        DB.francos=DB.francos||{emps:{},files:[]};
-        DB.francos.mov={at:new Date().toISOString(),file:fname,por:window.SRV&&SRV.user?SRV.user.nombre:'',desdeAus:true,
-          d0:cur&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp};
-        if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas actualizadas (carga única): ${fname} (${dmy(md0)} al ${dmy(M.d1)})`); frMsg=' · Francos actualizado'; } } }catch(e){ console.warn('francos',e); }
+    try{ if(canEditMod('francos')&&typeof parseMovimientos==='function'){ const r=frMovMerge(parseMovimientos(rows,hi),fname,{desdeAus:true});
+      if(r){ if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas actualizadas (carga única): ${fname} (${dmy(r.d0)} al ${dmy(r.d1)})`); frMsg=' · Francos actualizado'; } } }catch(e){ console.warn('francos',e); }
   return frMsg?true:null;
 }
 // legajos vacíos en el export (pasa con algunos eventuales): se completan por CUIL o por apellido y nombre

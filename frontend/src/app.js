@@ -1256,11 +1256,24 @@ function parseMovimientos(rows,hi){
     if(!d0||f<d0) d0=f; if(!d1||f>d1) d1=f; }
   return {emps,d0,d1};
 }
+// suma las fichadas de un export de Movimientos a las que ya había: los días que trae el export se reemplazan,
+// los demás quedan (nunca se pierden días anteriores). No toca los francos asignados por los coordinadores.
+function frMovMerge(M,fname,extra){
+  const desde=addD(hoy(),-100), cur=DB.francos&&DB.francos.mov, md0=M.d0<desde?desde:M.d0;
+  if(!(M.d1>=md0)) return null;
+  const emp=JSON.parse(JSON.stringify((cur&&cur.emps)||{}));
+  Object.values(emp).forEach(e=>{ e.o=e.o||{}; Object.keys(e.d).forEach(d=>{ if(d<desde){ delete e.d[d]; delete e.o[d]; } }); });
+  Object.entries(M.emps).forEach(([leg,v])=>{ const x=emp[leg]||(emp[leg]={n:v.n,c:v.c,d:{},o:{}}); x.n=v.n||x.n; x.c=v.c||x.c; x.o=x.o||{};
+    Object.keys(x.d).forEach(d=>{ if(d>=md0&&d<=M.d1){ delete x.d[d]; delete x.o[d]; } });
+    Object.entries(v.d).forEach(([d,k])=>{ if(d>=md0){ x.d[d]=k; if(v.o&&v.o[d]) x.o[d]=v.o[d]; } }); });
+  DB.francos=DB.francos||{emps:{},files:[]};
+  DB.francos.mov=Object.assign({at:new Date().toISOString(),file:fname,por:window.SRV&&SRV.user?SRV.user.nombre:'',
+    d0:cur&&cur.d0&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp},extra||{});
+  return {d0:md0,d1:M.d1};
+}
 async function loadMovFrancos(rows,hi,name){
   const M=parseMovimientos(rows,hi); if(!Object.keys(M.emps).length) throw new Error('El export de Movimientos no trae filas.');
-  DB.francos=DB.francos||{emps:{},files:[]};
-  DB.francos.mov={at:new Date().toISOString(),file:name,d0:M.d0,d1:M.d1,emps:M.emps};
-  await persist(); return Object.keys(M.emps).length;
+  frMovMerge(M,name); await persist(); return Object.keys(M.emps).length;
 }
 const CX_DEF={obj:20,art:true};
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
