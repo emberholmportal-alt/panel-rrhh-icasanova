@@ -7,6 +7,8 @@
    ================================================================ */
 const VD_GR=[{k:'Mañana',ped:'08:30',c:'Almuerzo'},{k:'Intermedio',ped:'10:30',c:'Almuerzo'},{k:'Tarde',ped:'15:30',c:'Cena'},{k:'Noche',ped:'15:30',c:'Cena'}];
 const vdGrupo=min=>min==null?null:min<9*60?'Mañana':min<12*60?'Intermedio':min<19*60?'Tarde':'Noche';
+// grupo de horario a partir del turno de la nómina o de Francos (para ubicar a quien está de franco y no tiene horario ese día)
+const vdGrTurno=t=>{ t=normTxt(t||''); return /MA.ANA/.test(t)?'Mañana':/INTERMED/.test(t)?'Intermedio':/TARDE/.test(t)?'Tarde':/NOCHE/.test(t)?'Noche':null; };
 const vdStart=j=>{ const s=DB.shifts&&DB.shifts[j]; if(s&&s.start!=null) return s.start; return typeof guessStart==='function'?guessStart(j):null; };
 
 function vdCalc(fname){
@@ -27,7 +29,8 @@ function vdCalc(fname){
     h.e++; if(x.M.length) h.f++; if(mismo){ h.em++; if(x.M.length) h.fm++; h.d.add(r.fecha); } }
   // promedio de los que ficharon por grupo y sector, por día de la semana (últimas 4 semanas): sirve para estimar el día en curso
   // cuando todavía no se cargó el export de ese día
-  const PD={};
+  const PD={}, lastG={};   // lastG: grupo de horario más reciente de cada persona (para ubicar a los que hoy están de franco)
+  for(const r of R){ if(r.fecha>=fecha||r.fecha<desde) continue; const x=info(r); if(!x.g||x.st==null) continue; const l=nmLeg(r.legajo); if(!lastG[l]||lastG[l].f<r.fecha) lastG[l]={f:r.fecha,g:x.g}; }
   for(const r of R){ if(r.fecha>=fecha||r.fecha<desde||r.status==='no_cubierto'||!(r.marcas||[]).length) continue; const x=info(r); if(!x.g||!incluye(x.tipo)) continue;
     const d=PD[r.fecha]||(PD[r.fecha]={g:{},s:{}}); d.g[x.g]=(d.g[x.g]||0)+1; const ss=d.s[x.sector]||(d.s[x.sector]={}); ss[x.g]=(ss[x.g]||0)+1; }
   const proy={};
@@ -40,11 +43,12 @@ function vdCalc(fname){
   { const fich=new Set(R.filter(r=>r.fecha===fecha&&(r.marcas||[]).length).map(r=>nmLeg(r.legajo))); frEv.forEach(x=>{ if(fich.has(x.l)) x.f=1; delete x.l; }); }   // los que igual ficharon se cuentan en las viandas
   frEv.sort((a,b)=>a.s.localeCompare(b.s,'es')||a.t.localeCompare(b.t,'es')||a.n.localeCompare(b.n,'es'));
   let nFr=0, nFrR=0;
-  const G={}, S={};
+  const G={}, S={}, FG={};   // FG: francos por grupo {r: según el reloj, e: eventuales asignados en Francos}
+  const fg=(g,k)=>{ g=g||'Sin turno'; const o=FG[g]||(FG[g]={r:0,e:0}); o[k]++; };
   for(const r of R){ if(r.fecha!==fecha) continue; const x=info(r); if(!incluye(x.tipo)) continue;
-    const franco=x.st==null&&!x.M.length; if(franco){ nFrR++; continue; }
+    const franco=x.st==null&&!x.M.length; if(franco){ nFrR++; fg(vdGrTurno(x.n.turno)||(lastG[nmLeg(r.legajo)]||{}).g,'r'); continue; }
     if(!x.g) continue;
-    if(!x.M.length&&frHoy.has(nmLeg(r.legajo))){ nFr++; continue; }   // franco asignado en Francos
+    if(!x.M.length&&frHoy.has(nmLeg(r.legajo))){ nFr++; fg(x.g,'e'); continue; }   // franco asignado en Francos
     const nov=r.status==='novedad'&&!x.M.length; if(nov) continue;           // vacaciones, licencia, enfermedad: no viene
     const g=G[x.g]||(G[x.g]={e:0,f:0,st:x.st}); g.e++; if(x.M.length) g.f++; if(x.st!=null&&(g.st==null||x.st<g.st)) g.st=x.st;
     const s=S[x.sector]||(S[x.sector]={}); const sg=s[x.g]||(s[x.g]={e:0,f:0}); sg.e++; if(x.M.length) sg.f++; }
@@ -53,7 +57,7 @@ function vdCalc(fname){
   const est={}; grupos.forEach(g=>est[g.k]=g);
   const sectores=Object.entries(S).map(([s,o])=>{ const fila={s,tot:0,t:{}}; Object.entries(o).forEach(([k,v])=>{ const g=est[k]; const n=g&&g.ini?v.f:Math.round(v.e*(g?g.tasa/100:.92)); fila.t[k]={e:v.e,f:v.f,n}; fila.tot+=n; }); return fila; })
     .sort((a,b)=>b.tot-a.tot||a.s.localeCompare(b.s,'es'));
-  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,nFrR,frEv,proy,comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).map(g=>g.k)})).filter(x=>x.g.length),total:grupos.reduce((a,g)=>a+g.est,0)};
+  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,nFrR,frEv,proy,FG,comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).map(g=>g.k)})).filter(x=>x.g.length),total:grupos.reduce((a,g)=>a+g.est,0)};
 }
 // se recalcula en cada carga única (si quien carga puede editar Viandas)
 window.vdActualizar=function(fname){ try{ if(!canEditMod('viandas')) return false; const v=vdCalc(fname); if(!v) return false; DB.viandas=v; return true; }catch(e){ console.warn('viandas',e); return false; } };
@@ -77,6 +81,10 @@ function vdFrancosHoy(V){
 function vdHtml(V,compacto){
   const D=vdDia(V), H=hoy(), dia=`${DOWL[dObj(H).getDay()]} ${dmy(H)}`, FE=vdFrancosHoy(V);
   const pend=D.modo==='hoy'?D.grupos.filter(g=>!g.ini).map(g=>g.k):[];
+  // francos por grupo: con el export de hoy, los del reloj + eventuales asignados que no ficharon; sin export de hoy, los eventuales asignados hoy en Francos
+  const FG=D.modo==='hoy'&&V.FG?V.FG:(()=>{ const o={}; (FE||[]).forEach(x=>{ const g=vdGrTurno(x.t)||'Sin turno'; (o[g]||(o[g]={r:0,e:0})).e++; }); return o; })();
+  const frTot=Object.values(FG).reduce((a,o)=>a+o.r+o.e,0);
+  const frTxt=g=>{ const o=FG[g]; if(!o||!(o.r+o.e)) return ''; return `<div class="vd-frg">🏖 <b>${o.r+o.e}</b> de franco, no suman${o.r&&o.e?` <small>(${o.r} reloj · ${o.e} eventuales asignados)</small>`:o.e?` <small>(eventuales asignados en Francos)</small>`:` <small>(según el reloj)</small>`}</div>`; };
   const lin=[
     `📊 <b>Números estimativos según las fichadas del reloj.</b> Se analiza el personal <b>GLD</b>: efectivos, fuera de convenio y eventuales.`,
     `🕒 Último export de Movimientos: subido el <b>${fmtAt(V.at)}</b>${V.por?' por '+esc(V.por):''} · trae fichadas del <b>${dmy(V.fecha)}</b>${V.hora?` hasta las <b>${V.hora}</b>`:''}.`,
@@ -88,10 +96,11 @@ function vdHtml(V,compacto){
   ].filter(Boolean);
   const aviso=`<div class="vd-aviso">${lin.map((t,i)=>i?`<span class="vd-fr">${t}</span>`:t).join('')}</div>`;
   const com=(D.comidas||[]).map(c=>`<div class="vd-com"><span>${esc(c.c)}</span><b>${c.n}</b><small>${esc(c.g.join(' + '))}${c.c==='Cena'?' · pedido ~15:30':' · pedidos ~08:30 / ~10:30'}</small></div>`).join('');
-  const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${D.modo==='viejo'?`${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}`:dia}</div><div class="vd-tot">${D.total}</div></div>${com?`<div class="vd-coms">${com}</div>`:''}</div>`;
+  const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${D.modo==='viejo'?`${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}`:dia}</div><div class="vd-tot">${D.total}</div>${frTot?`<div class="vd-frt">Ya descontados: <b>${frTot}</b> de franco${D.modo==='hoy'?'':' (eventuales asignados hoy)'} · ${['Mañana','Intermedio','Tarde','Noche','Sin turno'].filter(g=>FG[g]&&(FG[g].r+FG[g].e)).map(g=>`${g} ${FG[g].r+FG[g].e}`).join(' · ')}</div>`:''}</div>${com?`<div class="vd-coms">${com}</div>`:''}</div>`;
   const cards=`<div class="vd-g">${D.grupos.map(g=>`<div class="vd-c${g.ini?' ok':''}"><div class="vd-ct"><b>${esc(g.k)}</b><span>${esc(g.com||'')}${g.ped?` · pedido ~${g.ped}`:''}</span></div>
     <div class="vd-n">${g.est}</div>
     <div class="vd-d">${g.proy?`Sin fichadas de hoy · promedio de los últimos ${D.n} ${DOWL[dObj(H).getDay()]}`:g.ini?`Ya ingresó · ficharon <b>${g.f}</b> de ${g.e} con jornada · ${g.e?Math.round(g.f/g.e*100):0}%`:`Todavía no figura en el archivo · ${g.e} con jornada × ${g.tasa}% habitual`}</div>
+    ${frTxt(g.k)}
     ${g.proy?'':`<div class="vd-bar"><i style="width:${g.e?Math.min(100,g.f/g.e*100):0}%"></i></div>`}</div>`).join('')}</div>`;
   if(compacto) return head+cards;
   const gs=D.grupos.map(g=>g.k);

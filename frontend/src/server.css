@@ -171,3 +171,5 @@ body.chat-zumb{animation:chatZumb .8s ease-in-out}
 .vs-mail{margin:0 0 12px;padding:10px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.12);font-size:13.5px;line-height:1.45}
 
 .vd-fre{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;font-size:13px;line-height:1.5}
+
+.vd-frg{margin-top:6px;font-size:12.5px;color:#fbbf24} .vd-frg small{color:var(--text3)} .vd-frt{font-size:12.5px;color:var(--text3);margin-top:2px} .vd-frt b{color:#fbbf24}
