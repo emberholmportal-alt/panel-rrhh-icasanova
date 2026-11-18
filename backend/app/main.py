@@ -171,12 +171,43 @@ def startup():
                 print(f"Clave del administrador {username} restablecida desde ADMIN_RESET_PASSWORD: borrá la variable.")
 
 
+def sin_bajas(u: User) -> bool:
+    """Coordinadores: ven Eventuales y Nómina, pero no las fechas de baja (último día / egreso)."""
+    return u.rol != "admin" and u.username in seed.COORDINADORES
+
+
+def doc_para(u: User, d: Doc) -> dict:
+    """El documento como lo recibe ese usuario: a los coordinadores se les quitan las fechas de baja de eventuales."""
+    o = doc_out(d)
+    if d.key == "eventuales" and sin_bajas(u) and not can_write(u, "eventuales"):
+        data = copy.deepcopy(o["data"])
+        quitar = ("ultimo", "egreso")
+        ant = data.get("ant") or {}
+        for r in ant.get("rows") or []:
+            for k in quitar:
+                r.pop(k, None)
+        for r in (data.get("antAdd") or {}).values():
+            for k in quitar:
+                if isinstance(r, dict):
+                    r.pop(k, None)
+        for o2 in (data.get("antOv") or {}).values():
+            if isinstance(o2, dict):
+                for sub in ("est", "ed"):
+                    if isinstance(o2.get(sub), dict):
+                        for k in quitar:
+                            o2[sub].pop(k, None)
+        data.pop("antLog", None)
+        o = {**o, "data": data}
+    return o
+
+
 def user_out(u: User) -> dict:
     return {"id": u.id, "username": u.username, "nombre": u.nombre, "rol": u.rol,
             "perms": {m: auth.level(u, m) for m in MODULES}, "must_change": u.must_change, "activo": u.activo,
             "aus_parcial": u.rol != "admin" and u.username in auth.AUS_PARCIAL,
             "perms_por": (u.perms or {}).get("_por"),
             "descargas": u.rol == "admin" or not (u.perms or {}).get("_nodl"),
+            "nobajas": sin_bajas(u),
             "last_login": u.last_login.isoformat() if u.last_login else None}
 
 
@@ -312,7 +343,7 @@ def imp_out(request: Request) -> dict | None:
 
 @app.get("/api/bootstrap")
 def bootstrap(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    docs = {d.key: doc_out(d) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
+    docs = {d.key: doc_para(u, d) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
     mine = {d.key: d.data for d in db.scalars(select(UserDoc).where(UserDoc.user_id == u.id))}
     return {"user": user_out(u), "modules": MODULES, "docs": docs, "user_docs": mine,
             "server_time": iso(now()), "build": BUILD, "imp": imp_out(request)}
@@ -499,7 +530,7 @@ def get_doc(key: str, u: User = Depends(current_user), db: Session = Depends(get
     if key not in DOC_KEYS or not readable(u, key):
         raise HTTPException(403, "No tenés acceso a este módulo")
     d = db.get(Doc, key)
-    return doc_out(d) if d else {"data": {}, "version": 0, "updated_at": None, "updated_by": None}
+    return doc_para(u, d) if d else {"data": {}, "version": 0, "updated_at": None, "updated_by": None}
 
 
 @app.put("/api/docs/{key}")

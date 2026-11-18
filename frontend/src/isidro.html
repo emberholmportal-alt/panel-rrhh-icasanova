@@ -1752,8 +1752,8 @@ function renderAnt(){
   const vencidos=act.filter(r=>r.ultimo&&r.ultimo<hoy).length;
   $('#kpisAnt').innerHTML=[
     {l:'Eventuales activos',v:act.length,s:`${all.length} en el archivo`},
-    {l:'Bajan esta semana',v:en7,s:'próximos 7 días',c:en7?'acc-alert':'acc-lime'},
-    {l:'Ya vencidos',v:vencidos,s:'último día pasado',c:vencidos?'acc-ochre':''},
+    ...(window.NOBAJAS?[]:[{l:'Bajan esta semana',v:en7,s:'próximos 7 días',c:en7?'acc-alert':'acc-lime'},
+    {l:'Ya vencidos',v:vencidos,s:'último día pasado',c:vencidos?'acc-ochre':''}]),
     {l:'Turnos',v:new Set(act.map(r=>r.turno)).size,s:'con gente activa'},
     {l:'Tareas',v:new Set(act.map(r=>r.tarea)).size,s:'distintas'}
   ].map(k=>`<div class="kpi ${k.c||''}"><div class="lab">${k.l}</div><div class="val">${k.v}</div><div class="sub">${k.s}</div></div>`).join('');
@@ -1786,10 +1786,10 @@ function renderAnt(){
   const pl=act.filter(r=>!q2||r.nombre.toLowerCase().includes(q2)||r.legajo.includes(q2))
     .sort((a,b)=>(a.ultimo||'9')<(b.ultimo||'9')?-1:1);
   $('#tPlantel').innerHTML=`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>F. Ingreso</th><th>Antigüedad</th>
-    <th>Último día</th><th>Tarea</th><th>Turno</th><th>U.O.</th></tr></thead>`+
+    ${window.NOBAJAS?'':'<th>Último día</th>'}<th>Tarea</th><th>Turno</th><th>U.O.</th></tr></thead>`+
     (pl.length?'<tbody>'+pl.map(r=>`<tr><td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td>
       <td class="mono">${dmy(r.ingreso)}</td><td class="mono">${r.antig} d</td>
-      <td class="mono ${r.ultimo&&r.ultimo<hoy?'late-min':''}">${dmy(r.ultimo)}</td>
+      ${window.NOBAJAS?'':`<td class="mono ${r.ultimo&&r.ultimo<hoy?'late-min':''}">${dmy(r.ultimo)}</td>`}
       <td style="font-size:12.5px">${esc(cap(r.tarea))}</td><td style="font-size:12.5px">${esc(cap(r.turno))}</td>
       <td style="font-size:11.5px;color:var(--mute)">${esc(r.uo)}</td></tr>`).join('')+'</tbody>'
     :'<tbody><tr><td colspan="8"><div class="empty">Sin plantel activo cargado.</div></td></tr></tbody>');
