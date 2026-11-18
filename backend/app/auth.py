@@ -35,6 +35,7 @@ MODULES = {
     "hextras": "Horas extras",
     "viandas": "Viandas (estimativo)",
     "chat": "Chat interno",
+    "wagrupo": "Celulares de eventuales",
 }
 # Toda sección nueva se agrega acá con su propio permiso: por defecto NADIE la ve (solo el admin)
 # hasta que se le asigna a cada usuario en Configuración → Usuarios y permisos.

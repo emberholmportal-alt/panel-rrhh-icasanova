@@ -163,3 +163,7 @@ body.srv-imp .chat{top:40px}
 body.chat-zumb{animation:chatZumb .8s ease-in-out}
 @media(max-width:700px){.chat{width:100vw}}
 .ag-res{max-width:620px;max-height:84vh;overflow:auto} .ag-res h4{margin:12px 0 4px} .ag-res ul{margin:0 0 4px 18px;padding:0;font-size:13px;line-height:1.55} .ag-res .nota{font-size:12.5px;opacity:.8}
+
+.wa-card{margin:14px 0} .wa-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.wa-bar input{flex:1;min-width:200px;max-width:340px;padding:7px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;font:inherit}
+.wa-t{max-height:420px;overflow:auto} .wa-t td.mono{white-space:nowrap} .wa-sin{font-size:12.5px;color:#f59e0b}
