@@ -1303,7 +1303,7 @@ function frCruce(){
       }
       cal[d]=c; g[c]++;
     }
-    const comp=g.T+g.DT+g.FT+g.ENF+(cfg.art?g.ART:0), proy=comp+g.P;
+    const comp=g.T+g.DT+g.ENF+(cfg.art?g.ART:0), proy=comp+g.P;   // el feriado (aun trabajado) no suma para el tope
     out.push({e,mv:!M||!!mv,g,cal,comp,proy,pend:Math.max(0,proy-cfg.obj),falt:Math.max(0,cfg.obj-proy),sup:comp>cfg.obj,
       ftom:g.F+g.PF, feriados:dias.filter(d=>cxFer(d)&&cal[d]!=='-').length});
   }
@@ -1311,7 +1311,7 @@ function frCruce(){
   const sinPl=M?Object.entries(M.emps).filter(([k,v])=>!enPl.has(k)&&/jornaliz/i.test(v.c)&&dias.some(d=>v.d[d]==='T')).map(([k,v])=>({legajo:k,nombre:v.n})):[];
   return {P,corte,M,dias,cfg,rows:out,sinPl,by:Object.fromEntries(out.map(r=>[r.e.legajo||r.e.nombre,r]))};
 }
-const CX_LAB={T:'Trabajó',DT:'Domingo trabajado',FT:'Feriado trabajado',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
+const CX_LAB={T:'Trabajó',DT:'Domingo trabajado',FT:'Feriado trabajado (no suma al tope)',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
 const CX_TXT={T:'✓',DT:'D',FT:'Fe',ENF:'E',ART:'A',AUS:'X',VAC:'V',LIC:'L',OTRO:'N',F:'F',DOM:'·',FER:'Fe',P:'·',PF:'F','-':'–'};
 const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',AUS:'#fee2e2',VAC:'#e0f2fe',LIC:'#ede9fe',OTRO:'#f1f5f9',F:'#cffafe',DOM:'#f1f5f9',FER:'#fef3c7',P:'#fff',PF:'#ecfeff','-':'#fff'};
 const cxKey=e=>e.legajo||e.nombre;
@@ -1624,7 +1624,7 @@ function cxInforme(){
   <h2 class="pb">Calendario día por día</h2>
   <div class="ley" id="ley"></div>
   <table class="cal"><thead id="ch"></thead><tbody id="cb"></tbody></table>
-  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos y feriados trabajados). Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Día sin fichada o con ausencia (con o sin aviso) = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
+  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos trabajados). Los feriados, aunque se trabajen, no suman al tope. Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Día sin fichada o con ausencia (con o sin aviso) = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
   <script>
   const D=${JSON.stringify(data).replace(/</g,'\\u003c')}, PRE=${JSON.stringify(pre)};
   const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1662,7 +1662,7 @@ function cxExcel(){
   const CODE={T:'T',DT:'DT',FT:'FT',ENF:'ENF',ART:'ART',AUS:'AUS',VAC:'VAC',LIC:'LIC',OTRO:'NOV',F:'F',DOM:'DOM',FER:'FER',P:'P',PF:'PF','-':''};
   const cal=[['Legajo','Apellido y nombre'].concat(C.dias.map(d=>DOW[dObj(d).getDay()].slice(0,2)+' '+dm(d))).concat(['Faltan tomar'])].concat(R.map(r=>[r.e.legajo,r.e.nombre].concat(C.dias.map(d=>CODE[r.cal[d]])).concat([r.sup?'Superó':r.pend])));
   const w2=XLSX.utils.aoa_to_sheet(cal); w2['!cols']=[{wch:9},{wch:34}].concat(C.dias.map(()=>({wch:7}))); XLSX.utils.book_append_sheet(wb,w2,'Calendario');
-  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','Sí'],['FT','Feriado trabajado','Sí'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['F (ausencia)','Ausencia con o sin aviso: cuenta como franco tomado','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
+  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','Sí'],['FT','Feriado trabajado','No (los feriados no suman al tope)'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['F (ausencia)','Ausencia con o sin aviso: cuenta como franco tomado','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
     ['Período',`${dmy(C.P.d0)} al ${dmy(C.P.d1)}`],['Fichadas hasta',C.M?dmy(C.corte)+' (el último día solo cuenta si tiene fichada)':'sin movimientos'],['Objetivo de jornadas',cfg.obj],['Feriados del período',C.dias.filter(cxFer).map(d=>dmy(d)+' '+cxFer(d).n).join(' · ')||'ninguno'],
     ['Francos que faltan tomar','Total al cierre − objetivo (si da negativo, 0)'],[],['Fichan y no están en el plan',C.sinPl.map(x=>x.legajo+' '+x.nombre).join(' · ')||'ninguno']];
   const w3=XLSX.utils.aoa_to_sheet(ref); w3['!cols']=[{wch:30},{wch:70},{wch:16}]; XLSX.utils.book_append_sheet(wb,w3,'Criterios');
