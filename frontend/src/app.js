@@ -1515,9 +1515,12 @@ function cxCoordData(){
   if(!pages.length) return {err:frState.sel.length?'Los elegidos ya no tienen días para asignar en este período.':'No hay empleados en esos sectores.'};
   return {C,desde,fut,pages};
 }
-async function cxCoordExcel(){
+async function cxCoordExcel(soloPend){ soloPend=soloPend===true;
   if(typeof ExcelJS==='undefined'){ App.toast('No cargó la librería de Excel.',true); return; }
   const X=cxCoordData(); if(X.err){ App.toast(X.err,true); return; }
+  // versión para el coordinador: solo quienes tienen francos por asignar, ordenados por turno y apellido
+  if(soloPend){ X.pages=X.pages.map(p=>Object.assign({},p,{R:p.pend.slice().sort((a,b)=>turKey(a.e.turno).localeCompare(turKey(b.e.turno),'es')||a.e.nombre.localeCompare(b.e.nombre,'es'))})).filter(p=>p.R.length);
+    if(!X.pages.length){ App.toast('Nadie tiene francos pendientes de asignar con este filtro.'); return; } }
   const {C,fut,pages}=X, cfg=C.cfg, wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
   const thin={style:'thin',color:{argb:'FF94A3B8'}}, B={top:thin,left:thin,bottom:thin,right:thin};
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
@@ -1534,11 +1537,11 @@ async function cxCoordExcel(){
     ws.mergeCells(4,1,4,last); ws.getCell(4,1).value='Coordinador/a: ______________________________     Fecha: ____/____/______'; ws.getCell(4,1).font={color:{argb:'FF334155'}};
     // fila 5 oculta con las fechas ISO (la usa el panel al volver a cargar)
     const r5=ws.getRow(5); r5.getCell(1).value='#FRANCOS'; r5.getCell(2).value=C.P.d0+'|'+C.P.d1; fut.forEach((d,j)=>r5.getCell(FC+j).value=d); r5.hidden=true;
-    const h=ws.getRow(6); ['Legajo','Empleado','Turno','Fichadas','A asignar'].concat(fut.map(d=>`${DOW[dObj(d).getDay()].slice(0,2)} ${dObj(d).getDate()}/${dObj(d).getMonth()+1}`)).concat(['Asignados','Faltan']).forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,size:9.5}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(j===4?'FFFDE68A':cxFer(fut[j-FC+1])?'FFCBD5E1':'FFF1F5F9'); c.border=B; });
+    const h=ws.getRow(6); ['Legajo','Empleado','Turno','Jornadas','A asignar'].concat(fut.map(d=>`${DOW[dObj(d).getDay()].slice(0,2)} ${dObj(d).getDate()}/${dObj(d).getMonth()+1}`)).concat(['Asignados','Faltan']).forEach((t,j)=>{ const c=h.getCell(j+1); c.value=t; c.font={bold:true,size:9.5}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.fill=fill(j===4?'FFFDE68A':cxFer(fut[j-FC+1])?'FFCBD5E1':'FFF1F5F9'); c.border=B; });
     h.height=30;
     const L=p.R;
     L.forEach((r,i)=>{ const row=ws.getRow(7+i), n=7+i;
-      [r.e.legajo,r.e.nombre,r.e.turno||'',r.g.T+r.g.DT+r.g.FT,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j===1||j===2?'left':'center',vertical:'middle'}; if(j===4){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
+      [r.e.legajo,r.e.nombre,r.e.turno||'',r.comp,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j===1||j===2?'left':'center',vertical:'middle'}; if(j===4){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
       fut.forEach((d,j)=>{ const c=row.getCell(FC+j), st=r.cal[d]; c.border=B; c.alignment={horizontal:'center',vertical:'middle'};
         if(st==='-'||st==='FER'||st==='FT'){ c.value=st==='-'?'–':'Fe'; c.fill=fill('FFE2E8F0'); c.font={color:{argb:'FF64748B'}}; }
         else if(st==='P'||st==='PF'){ c.value=st==='PF'?'F':null; c.protection={locked:false}; c.font={bold:true,color:{argb:'FF0E7490'},size:12};
@@ -1561,8 +1564,8 @@ async function cxCoordExcel(){
   const cs=wb.addWorksheet('_control',{state:'veryHidden'});
   cs.addRow(['ASIGNACION_FRANCOS_PANEL_RRHH',1]); cs.addRow(['periodo',C.P.d0,C.P.d1]); cs.addRow(['emitido',new Date().toISOString()]); cs.addRow(['hojas']); ctl.forEach(x=>cs.addRow(x));
   const buf=await wb.xlsx.writeBuffer();
-  download(buf,`asignar_francos_${pages.length===1?pages[0].sk.replace(/[^A-Z0-9Ñ]+/g,'_'):pages.length+'_sectores'}_${hoy()}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  App.toast(`Excel para completar: ${pages.reduce((a,p)=>a+p.R.length,0)} eventual(es) en ${pages.length} hoja(s), una por sector${frState.sel.length?' · solo los elegidos':''}`);
+  download(buf,`${soloPend?'francos_pendientes':'asignar_francos'}_${pages.length===1?pages[0].sk.replace(/[^A-Z0-9Ñ]+/g,'_'):pages.length+'_sectores'}_${hoy()}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  App.toast(`${soloPend?'Francos pendientes':'Excel para completar'}: ${pages.reduce((a,p)=>a+p.R.length,0)} eventual(es) en ${pages.length} hoja(s), una por sector${frState.sel.length?' · solo los elegidos':''}. El coordinador marca F y lo devuelve a RRHH.`);
 }
 // vuelta: el coordinador manda el Excel completo → actualiza el plan de francos
 function esAsignacion(wb){ return wb.SheetNames.some(sn=>{ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:true}); return rows.slice(0,8).some(r=>r&&r[0]==='#FRANCOS'); }); }
@@ -1828,7 +1831,7 @@ function hookFrancos(){
   $('#fr-emp-x').onclick=()=>{ frState.emp=''; renderFrancos(); };
   $('#fr-date').onchange=e=>{ if(e.target.value){ frState.date=e.target.value; renderFrancos(); } };
   $('#fr-coord').onclick=cxCoord;
-  $('#fr-coord-x').onclick=cxCoordExcel;
+  $('#fr-coord-x').onclick=()=>cxCoordExcel(false); { const b=$('#fr-dl-pendx'); if(b) b.onclick=()=>cxCoordExcel(true); }
   $('#fr-asig-pick').onclick=()=>$('#fr-afile').click();
   $('#fr-afile').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadFrancos(f); e.target.value=''; };
   document.addEventListener('change',e=>{
