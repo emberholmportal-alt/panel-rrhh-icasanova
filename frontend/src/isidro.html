@@ -1967,10 +1967,31 @@ hookDrop('#dropVac','#fileVac','#btnPickVac',async f=>{
 hookDrop('#dropAnt','#fileAnt','#btnPickAnt',async f=>{
   if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.');return}
   try{
-    const rows=await readSheet(f,/antig/i);
-    DB.ant={rows:parseAnt(rows),file:f.name,at:new Date().toISOString()};
+    const rows=await readSheet(f,/antig/i), nuevos=parseAnt(rows);
+    // se ACTUALIZA: los legajos del archivo toman sus datos y su estado; los que no vienen quedan como estaban
+    const antes=new Map(antRows().map(r=>[r.legajo,r])), base=new Map(((DB.ant&&DB.ant.rows)||[]).map(r=>[r.legajo,r]));
+    nuevos.forEach(r=>base.set(r.legajo,r));
+    const ov=Object.assign({},DB.antOv||{}), add=Object.assign({},DB.antAdd||{});
+    nuevos.forEach(r=>{ if(ov[r.legajo]&&ov[r.legajo].est){ const o=Object.assign({},ov[r.legajo]); delete o.est; if(o.ed||o.motivo!=null||o.detalle!=null) ov[r.legajo]=o; else delete ov[r.legajo]; } delete add[r.legajo]; });
+    DB.antOv=ov; DB.antAdd=add; DB.ant={rows:[...base.values()],file:f.name,at:new Date().toISOString()};
+    const despues=antRows(), alt=[], baj=[], cam=[];
+    for(const r of despues){ const p=antes.get(r.legajo);
+      if(r.activo&&(!p||!p.activo)) alt.push(r); else if(!r.activo&&p&&p.activo) baj.push(r);
+      else if(r.activo&&p&&(p.tarea!==r.tarea||p.turno!==r.turno)) cam.push([r,p]); }
+    const by=(window.SRV&&SRV.user&&SRV.user.nombre)||'Este equipo', at=new Date().toISOString(), L=DB.antLog||(DB.antLog=[]);
+    alt.forEach(r=>L.push({acc:'alta',l:r.legajo,n:r.nombre,det:`por planilla ${f.name}`,by,at}));
+    baj.forEach(r=>L.push({acc:'baja',l:r.legajo,n:r.nombre,det:`por planilla ${f.name}`,by,at}));
+    cam.forEach(([r,p])=>L.push({acc:'corrección',l:r.legajo,n:r.nombre,det:`${p.tarea} · ${p.turno} → ${r.tarea} · ${r.turno} (planilla)`,by,at}));
+    DB.antLog=L.slice(-1000);
+    if(window.SRV&&SRV.nota) SRV.nota('eventuales',`Planilla ${f.name}: ${alt.length} alta(s), ${baj.length} baja(s), ${cam.length} cambio(s) de tarea/turno`);
     antManual=false; await persist(); renderAnt(); avisos();
-    toast(`${DB.ant.rows.length} legajos cargados · ${antAct().length} activos`);
+    const li=(t,X,fmt)=>X.length?`<h4>${t} (${X.length})</h4><ul>${X.slice(0,60).map(fmt).join('')}${X.length>60?`<li>y ${X.length-60} más…</li>`:''}</ul>`:'';
+    const m=document.createElement('div'); m.className='vs-modal';
+    m.innerHTML=`<div class="vs-mbox ag-res"><h3>Planilla de eventuales actualizada</h3><p>${esc(f.name)} · <b>${antAct().length} activos</b>. Se actualizaron los legajos que trae el archivo; los que no vienen quedaron como estaban. Las asignaciones de francos no se tocaron.</p>
+      ${li('✅ Altas',alt,r=>`<li>${esc(r.nombre)} · ${esc(r.legajo)} · ${esc(r.tarea)} · ${esc(r.turno)}</li>`)}${li('⛔ Bajas',baj,r=>`<li>${esc(r.nombre)} · ${esc(r.legajo)}</li>`)}${li('🔁 Cambios de tarea o turno',cam,([r,p])=>`<li>${esc(r.nombre)}: ${esc(p.tarea)} · ${esc(p.turno)} → <b>${esc(r.tarea)} · ${esc(r.turno)}</b></li>`)}
+      ${alt.length||baj.length||cam.length?'<p class="nota">La nómina, francos y cumpleaños toman estos cambios. Queda todo en el registro de cambios de Eventuales.</p>':'<p>No hubo altas, bajas ni cambios de tarea o turno.</p>'}
+      <div class="vs-mb"><button type="button" class="btn primary">Listo</button></div></div>`;
+    m.onclick=e=>{ if(e.target===m||e.target.closest('button')) m.remove(); }; document.body.appendChild(m);
   }catch(err){ toast('No pude leer el control: '+err.message) }
 });
 
