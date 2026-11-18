@@ -113,7 +113,7 @@ function cuEmps(){
   return base.concat(C.evs.filter(e=>!ya.has(e.leg)&&!yaN.has(sinTilde(e.nombre))));
 }
 // ---- carteles para la cartelera: Word (.docx) con cuatro personas por hoja (A4 vertical) (solo Milagros Marchioro y admin) ----
-const cuCartelOk=()=>!(window.SRV&&SRV.mode==='online')||(!!SRV.user&&!SRV.imp&&(SRV.user.username==='mmarchioro'||SRV.user.rol==='admin'));
+const cuCartelOk=()=>!(window.SRV&&SRV.mode==='online')||(!!SRV.user&&!SRV.imp&&(SRV.user.rol==='admin'||['ver','editar'].includes((SRV.user.perms||{}).cumpleanos)));   // quien tiene Ver o Editar en Cumpleaños (los de Consultar, no)
 async function cuCarteles(){
   if(typeof JSZip==='undefined'){
     // la librería para armar el .docx se baja recién cuando hace falta

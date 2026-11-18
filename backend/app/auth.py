@@ -33,7 +33,7 @@ MODULES = {
     "vacsol": "Solicitudes de vacaciones",
     "agenda": "Agenda y recordatorios",
     "hextras": "Horas extras",
-    "viandas": "Viandas (estimativo)",
+    "viandas": "Comidas (estimativo)",
     "chat": "Chat interno",
     "wagrupo": "Celulares de eventuales",
 }
