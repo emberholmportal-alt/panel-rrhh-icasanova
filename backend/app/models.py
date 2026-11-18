@@ -81,3 +81,28 @@ class Audit(Base):
 
 Index("ix_pizarra_created", PizarraItem.created_at)
 Index("ix_buzon_autor", BuzonItem.autor_id)
+
+
+class ChatConv(Base):
+    """Conversación del chat interno: directa entre dos ('d:3-7') o grupo ('g:…')."""
+    __tablename__ = "chat_conv"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(10))                             # directa | grupo
+    nombre: Mapped[str] = mapped_column(String(120), default="")
+    miembros: Mapped[list] = mapped_column(JSON, default=list)                # ids de usuario
+    leido: Mapped[dict] = mapped_column(JSON, default=dict)                   # {uid: último id leído}
+    creado_por: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_id: Mapped[int] = mapped_column(Integer, default=0)
+    last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ChatMsg(Base):
+    __tablename__ = "chat_msg"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conv: Mapped[str] = mapped_column(String(40), index=True)
+    de: Mapped[int] = mapped_column(Integer)
+    de_nombre: Mapped[str] = mapped_column(String(120))
+    tipo: Mapped[str] = mapped_column(String(12), default="msg")              # msg | zumbido | sistema
+    texto: Mapped[str] = mapped_column(Text, default="")
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)

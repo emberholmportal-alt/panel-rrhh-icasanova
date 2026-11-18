@@ -226,7 +226,7 @@ const SRVX=(()=>{
   let pzLast=null, bzLast=null;
   async function poll(){
     if(document.hidden||saving) return;
-    try{ const s=await api('GET','/api/sync');
+    try{ const s=await api('GET','/api/sync'+(window.chatSt?'?st='+chatSt():''));
       for(const m in s.docs){ if(s.docs[m].version>(ver[m]||0)&&(m==='f3'||S.MAP[m]||m==='otros')) await pullDoc(m); }
       if(s.vacsol&&typeof VS!=='undefined'){ if(s.vacsol.v!==VS.ver){ const nuevo=VS.ok&&VS.aprueba&&s.vacsol.pend>VS.items.filter(x=>x.estado==='pendiente').length; await vsLoad(); if(nuevo) App.toast('Llegó una solicitud de vacaciones para revisar.'); } else vsBadge(s.vacsol.pend); }
       if(pzLast!==null&&(s.pizarra.last!==pzLast.last||s.pizarra.n!==pzLast.n||s.buzon!==bzLast)) SOC.refresh(); pzLast=s.pizarra; bzLast=s.buzon;

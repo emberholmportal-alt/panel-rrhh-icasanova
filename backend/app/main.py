@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func, inspect, text
 from sqlalchemy.orm import Session
 
-from . import auth, seed
+from . import auth, seed, chat
 from .feriados import FERIADOS
 from .auth import current_user, require_admin, can_read, can_write, MODULES, LEVELS, DEFAULT_PERMS
 from .db import Base, engine, get_db, SessionLocal
@@ -51,6 +51,7 @@ MAX_DOC = 15 * 1024 * 1024       # 15 MB por módulo
 MAX_ITEM = 4 * 1024 * 1024       # 4 MB por nota o sugerencia (imágenes incluidas)
 
 app = FastAPI(title="Panel RRHH I.Casanova", docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(chat.router)
 app.add_middleware(GZipMiddleware, minimum_size=2000)
 
 
@@ -107,6 +108,12 @@ def startup():
                     uu.perms = nuevos
                     auth.audit(db, "sistema", "permisos", f"{username}: {perms}")
             nuevas.append(clave)
+        if "2026-11-18-chat-todos" not in hechas:
+            # chat interno: lo pueden usar todos los usuarios que existen hoy (los nuevos, cuando se les asigne)
+            for uu in db.scalars(select(User)).all():
+                if uu.rol != "admin" and not (uu.perms or {}).get("chat"):
+                    uu.perms = {**(uu.perms or {}), "chat": "editar"}
+            nuevas.append("2026-11-18-chat-todos")
         if "2026-11-17-nombre-admin" not in hechas:
             # nombre completo del administrador (aparece en los avisos de cambio de permisos)
             ua = db.scalar(select(User).where(User.username == "ariel"))
@@ -312,8 +319,9 @@ def bootstrap(request: Request, u: User = Depends(current_user), db: Session = D
 
 
 @app.get("/api/sync")
-def sync(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def sync(request: Request, st: str | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Versiones actuales, para que cada navegador sepa si otro usuario cambió algo."""
+    chat.presencia(request, u, st)          # quién está usando el panel ahora (lista del chat)
     docs = {d.key: {"version": d.version, "updated_by": d.updated_by, "updated_at": iso(d.updated_at)}
             for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
     pz = db.scalar(select(func.max(func.coalesce(PizarraItem.updated_at, PizarraItem.created_at))))
