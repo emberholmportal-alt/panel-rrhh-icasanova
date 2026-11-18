@@ -5,7 +5,7 @@
    · Turno ya ingresado: los que ficharon. Turno por entrar: con jornada × % de asistencia habitual.
    Se guarda solo el resumen (documento "viandas"): quien lo ve no recibe fichadas ni tardanzas.
    ================================================================ */
-const VD_GR=[{k:'Mañana',ped:'08:30'},{k:'Intermedio',ped:'10:30'},{k:'Tarde',ped:'15:30'},{k:'Noche',ped:''}];
+const VD_GR=[{k:'Mañana',ped:'08:30',c:'Almuerzo'},{k:'Intermedio',ped:'10:30',c:'Almuerzo'},{k:'Tarde',ped:'15:30',c:'Cena'},{k:'Noche',ped:'15:30',c:'Cena'}];
 const vdGrupo=min=>min==null?null:min<9*60?'Mañana':min<12*60?'Intermedio':min<19*60?'Tarde':'Noche';
 const vdStart=j=>{ const s=DB.shifts&&DB.shifts[j]; if(s&&s.start!=null) return s.start; return typeof guessStart==='function'?guessStart(j):null; };
 
@@ -28,29 +28,34 @@ function vdCalc(fname){
   const tasa=g=>{ const h=hist[g]; if(!h) return .92; if(h.d.size>=2&&h.em) return h.fm/h.em; return h.e?h.f/h.e:.92; };
   // francos planificados de eventuales para ese día (sección Francos): no comen salvo que igual fichen
   const frHoy=new Set(); try{ FRE().forEach(e=>{ if(e.d&&e.d[fecha]==='F') frHoy.add(nmLeg(e.legajo)); }); }catch(e){}
-  let nFr=0;
+  let nFr=0, nFrR=0;
   const G={}, S={};
-  for(const r of R){ if(r.fecha!==fecha) continue; const x=info(r); if(!x.g||!incluye(x.tipo)) continue;
-    const franco=x.st==null&&!x.M.length; if(franco) continue;
+  for(const r of R){ if(r.fecha!==fecha) continue; const x=info(r); if(!incluye(x.tipo)) continue;
+    const franco=x.st==null&&!x.M.length; if(franco){ nFrR++; continue; }
+    if(!x.g) continue;
     if(!x.M.length&&frHoy.has(nmLeg(r.legajo))){ nFr++; continue; }   // franco asignado en Francos
     const nov=r.status==='novedad'&&!x.M.length; if(nov) continue;           // vacaciones, licencia, enfermedad: no viene
     const g=G[x.g]||(G[x.g]={e:0,f:0,st:x.st}); g.e++; if(x.M.length) g.f++; if(x.st!=null&&(g.st==null||x.st<g.st)) g.st=x.st;
     const s=S[x.sector]||(S[x.sector]={}); const sg=s[x.g]||(s[x.g]={e:0,f:0}); sg.e++; if(x.M.length) sg.f++; }
   const grupos=VD_GR.filter(v=>G[v.k]).map(v=>{ const g=G[v.k], ini=g.st!=null&&horaMin>=g.st+20, t=tasa(v.k);
-    return {k:v.k,ped:v.ped,e:g.e,f:g.f,ini,tasa:Math.round(t*100),est:ini?g.f:Math.round(g.e*t)}; });
+    return {k:v.k,ped:v.ped,com:v.c,e:g.e,f:g.f,ini,tasa:Math.round(t*100),est:ini?g.f:Math.round(g.e*t)}; });
   const est={}; grupos.forEach(g=>est[g.k]=g);
   const sectores=Object.entries(S).map(([s,o])=>{ const fila={s,tot:0,t:{}}; Object.entries(o).forEach(([k,v])=>{ const g=est[k]; const n=g&&g.ini?v.f:Math.round(v.e*(g?g.tasa/100:.92)); fila.t[k]={e:v.e,f:v.f,n}; fila.tot+=n; }); return fila; })
     .sort((a,b)=>b.tot-a.tot||a.s.localeCompare(b.s,'es'));
-  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,total:grupos.reduce((a,g)=>a+g.est,0)};
+  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,nFrR,comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).map(g=>g.k)})).filter(x=>x.g.length),total:grupos.reduce((a,g)=>a+g.est,0)};
 }
 // se recalcula en cada carga única (si quien carga puede editar Viandas)
 window.vdActualizar=function(fname){ try{ if(!canEditMod('viandas')) return false; const v=vdCalc(fname); if(!v) return false; DB.viandas=v; return true; }catch(e){ console.warn('viandas',e); return false; } };
 
 function vdHtml(V,compacto){
   const viejo=V.fecha!==hoy();
-  const head=`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}</div><div class="vd-tot">${V.total}</div></div>
+  const frT=(V.nFrR||0)+(V.nFr||0);
+  const aviso=`<div class="vd-aviso">📊 <b>Número estimativo según fichadas.</b> Se analiza el personal <b>GLD</b>: efectivos, fuera de convenio y eventuales.
+    <span class="vd-fr">🏖 Francos programados para hoy: <b>${frT}</b>${V.nFr?` <small>(${V.nFrR||0} según el reloj + ${V.nFr} de eventuales asignados en Francos)</small>`:''}</span></div>`;
+  const com=(V.comidas||[]).map(c=>`<div class="vd-com"><span>${esc(c.c)}</span><b>${c.n}</b><small>${esc(c.g.join(' + '))}${c.c==='Cena'?' · pedido ~15:30':' · pedidos ~08:30 / ~10:30'}</small></div>`).join('');
+  const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}</div><div class="vd-tot">${V.total}</div></div>${com?`<div class="vd-coms">${com}</div>`:''}
     <div class="vd-src${viejo?' w':''}">${viejo?`⚠ Son datos del ${dmy(V.fecha)}: falta cargar el export de hoy.<br>`:''}Fichadas del export${V.hora?` de las <b>${V.hora}</b>`:''} · actualizado ${fmtAt(V.at)}${V.por?' · '+esc(V.por):''}</div></div>`;
-  const cards=`<div class="vd-g">${V.grupos.map(g=>`<div class="vd-c${g.ini?' ok':''}"><div class="vd-ct"><b>${esc(g.k)}</b>${g.ped?`<span>pedido ~${g.ped}</span>`:''}</div>
+  const cards=`<div class="vd-g">${V.grupos.map(g=>`<div class="vd-c${g.ini?' ok':''}"><div class="vd-ct"><b>${esc(g.k)}</b><span>${esc(g.com||'')}${g.ped?` · pedido ~${g.ped}`:''}</span></div>
     <div class="vd-n">${g.est}</div>
     <div class="vd-d">${g.ini?`Ficharon <b>${g.f}</b> de ${g.e} con jornada · ${g.e?Math.round(g.f/g.e*100):0}%`:`Todavía no ingresó · ${g.e} con jornada × ${g.tasa}% habitual`}</div>
     <div class="vd-bar"><i style="width:${g.e?Math.min(100,g.f/g.e*100):0}%"></i></div></div>`).join('')}</div>`;

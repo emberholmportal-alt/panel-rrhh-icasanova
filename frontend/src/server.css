@@ -107,3 +107,8 @@ body.srv-imp{padding-top:40px}
 .vd-bar{height:6px;border-radius:4px;background:rgba(148,163,184,.18);margin-top:8px;overflow:hidden} .vd-bar i{display:block;height:100%;background:#22c55e}
 .vd-nota{font-size:12px;color:var(--text3);margin-top:10px}
 #h-viandas{margin:0 0 16px}
+.vd-aviso{margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.07);font-size:13px;line-height:1.6}
+.vd-fr{display:block} .vd-fr small{color:var(--text3)}
+.vd-coms{display:flex;gap:10px;flex-wrap:wrap}
+.vd-com{border:1px solid var(--stroke);border-radius:12px;padding:8px 16px;min-width:150px;background:rgba(255,255,255,.03)}
+.vd-com span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)} .vd-com b{font-size:28px} .vd-com small{display:block;font-size:11.5px;color:var(--text2)}
