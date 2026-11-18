@@ -27,7 +27,9 @@ function vdCalc(fname){
     h.e++; if(x.M.length) h.f++; if(mismo){ h.em++; if(x.M.length) h.fm++; h.d.add(r.fecha); } }
   const tasa=g=>{ const h=hist[g]; if(!h) return .92; if(h.d.size>=2&&h.em) return h.fm/h.em; return h.e?h.f/h.e:.92; };
   // francos planificados de eventuales para ese día (sección Francos): no comen salvo que igual fichen
-  const frHoy=new Set(); try{ FRE().forEach(e=>{ if(e.d&&e.d[fecha]==='F') frHoy.add(nmLeg(e.legajo)); }); }catch(e){}
+  const frHoy=new Set(), frEv=[]; try{ FRE().forEach(e=>{ if(e.d&&e.d[fecha]==='F'&&!(e.ingreso&&fecha<e.ingreso)&&!(e.egreso&&fecha>e.egreso)){ frHoy.add(nmLeg(e.legajo)); frEv.push({n:e.nombre,s:normTxt(e.sector||''),t:normTxt(e.turno||''),l:nmLeg(e.legajo)}); } }); }catch(e){}
+  { const fich=new Set(R.filter(r=>r.fecha===fecha&&(r.marcas||[]).length).map(r=>nmLeg(r.legajo))); frEv.forEach(x=>{ if(fich.has(x.l)) x.f=1; delete x.l; }); }   // los que igual ficharon se cuentan en las viandas
+  frEv.sort((a,b)=>a.s.localeCompare(b.s,'es')||a.t.localeCompare(b.t,'es')||a.n.localeCompare(b.n,'es'));
   let nFr=0, nFrR=0;
   const G={}, S={};
   for(const r of R){ if(r.fecha!==fecha) continue; const x=info(r); if(!incluye(x.tipo)) continue;
@@ -42,16 +44,17 @@ function vdCalc(fname){
   const est={}; grupos.forEach(g=>est[g.k]=g);
   const sectores=Object.entries(S).map(([s,o])=>{ const fila={s,tot:0,t:{}}; Object.entries(o).forEach(([k,v])=>{ const g=est[k]; const n=g&&g.ini?v.f:Math.round(v.e*(g?g.tasa/100:.92)); fila.t[k]={e:v.e,f:v.f,n}; fila.tot+=n; }); return fila; })
     .sort((a,b)=>b.tot-a.tot||a.s.localeCompare(b.s,'es'));
-  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,nFrR,comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).map(g=>g.k)})).filter(x=>x.g.length),total:grupos.reduce((a,g)=>a+g.est,0)};
+  return {fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',grupos,sectores,nFr,nFrR,frEv,comidas:['Almuerzo','Cena'].map(c=>({c,n:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).reduce((a,g)=>a+g.est,0),g:grupos.filter(g=>(VD_GR.find(v=>v.k===g.k)||{}).c===c).map(g=>g.k)})).filter(x=>x.g.length),total:grupos.reduce((a,g)=>a+g.est,0)};
 }
 // se recalcula en cada carga única (si quien carga puede editar Viandas)
 window.vdActualizar=function(fname){ try{ if(!canEditMod('viandas')) return false; const v=vdCalc(fname); if(!v) return false; DB.viandas=v; return true; }catch(e){ console.warn('viandas',e); return false; } };
 
 function vdHtml(V,compacto){
   const viejo=V.fecha!==hoy();
-  const frT=(V.nFrR||0)+(V.nFr||0);
   const aviso=`<div class="vd-aviso">📊 <b>Número estimativo según fichadas.</b> Se analiza el personal <b>GLD</b>: efectivos, fuera de convenio y eventuales.
-    <span class="vd-fr">🏖 Francos programados para hoy: <b>${frT}</b>${V.nFr?` <small>(${V.nFrR||0} según el reloj + ${V.nFr} de eventuales asignados en Francos)</small>`:''}</span></div>`;
+    <span class="vd-fr">🏖 Con franco según el reloj: <b>${V.nFrR||0}</b></span>
+    ${V.frEv?(()=>{ const f=V.frEv.filter(x=>x.f).length; return `<span class="vd-fr">👷 Eventuales con franco asignado en Francos (${dmy(V.fecha)}): <b>${V.frEv.length}</b> <small>${f?`· no se cuentan en las viandas, salvo ${f} que igual fich${f===1?"ó":"aron"}`:'· no se cuentan en las viandas'}</small></span>`; })()
+      :(V.nFr?`<span class="vd-fr">👷 Eventuales con franco asignado en Francos: <b>${V.nFr}</b></span>`:'')}</div>`;
   const com=(V.comidas||[]).map(c=>`<div class="vd-com"><span>${esc(c.c)}</span><b>${c.n}</b><small>${esc(c.g.join(' + '))}${c.c==='Cena'?' · pedido ~15:30':' · pedidos ~08:30 / ~10:30'}</small></div>`).join('');
   const head=aviso+`<div class="vd-top"><div><div class="vd-lab">Viandas estimadas · ${DOWL[dObj(V.fecha).getDay()]} ${dmy(V.fecha)}</div><div class="vd-tot">${V.total}</div></div>${com?`<div class="vd-coms">${com}</div>`:''}
     <div class="vd-src${viejo?' w':''}">${viejo?`⚠ Son datos del ${dmy(V.fecha)}: falta cargar el export de hoy.<br>`:''}Fichadas del export${V.hora?` de las <b>${V.hora}</b>`:''} · actualizado ${fmtAt(V.at)}${V.por?' · '+esc(V.por):''}</div></div>`;
@@ -65,7 +68,8 @@ function vdHtml(V,compacto){
     <thead><tr><th>Sector</th>${gs.map(k=>`<th class="num">${esc(k)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>`+
     V.sectores.map(s=>`<tr><td><b>${esc(s.s)}</b></td>${gs.map(k=>{ const c=s.t[k]; return `<td class="num">${c?`<b>${c.n}</b> <span class="meta">(${c.f}/${c.e})</span>`:''}</td>`; }).join('')}<td class="num"><b>${s.tot}</b></td></tr>`).join('')+
     `<tr class="tot"><td>Total</td>${V.grupos.map(g=>`<td class="num">${g.est}</td>`).join('')}<td class="num">${V.total}</td></tr></tbody></table></div></div></div>`;
-  return head+cards+tabla+`<p class="vd-nota">Incluye efectivos, fuera de convenio y eventuales con jornada hoy; no cuenta francos (los del reloj y los asignados a eventuales en Francos${V.nFr?`: hoy ${V.nFr}`:''}), vacaciones ni licencias. El turno que ya ingresó cuenta a los que ficharon; el que todavía no ingresó se estima con su % de asistencia habitual (mismo día de la semana de las últimas 4 semanas). Se actualiza cada vez que se carga un export de Movimientos.</p>`;
+  const fe=V.frEv&&V.frEv.length?`<div class="card" style="margin-top:14px"><div class="card-h"><h3>Eventuales con franco asignado · ${dmy(V.fecha)}</h3><span class="meta">${V.frEv.length} persona(s), según la sección Francos</span></div><div class="card-b"><div class="vd-fre">${(()=>{ const G={}; V.frEv.forEach(x=>{ const k=(x.s||'SIN SECTOR')+(x.t?' · '+x.t:''); (G[k]||(G[k]=[])).push(x); }); return Object.keys(G).map(k=>`<div><b>${esc(k)}</b> <span class="meta">(${G[k].length})</span><div>${G[k].map(x=>esc(x.n)+(x.f?' <small>(fichó)</small>':'')).join(' · ')}</div></div>`).join(''); })()}</div></div></div>`:'';
+  return head+cards+tabla+fe+`<p class="vd-nota">Incluye efectivos, fuera de convenio y eventuales con jornada hoy; no cuenta francos (los del reloj y los asignados a eventuales en Francos${V.nFr?`: hoy ${V.nFr}`:''}), vacaciones ni licencias. El turno que ya ingresó cuenta a los que ficharon; el que todavía no ingresó se estima con su % de asistencia habitual (mismo día de la semana de las últimas 4 semanas). Se actualiza cada vez que se carga un export de Movimientos.</p>`;
 }
 function renderViandas(){
   const el=$('#vd-body'); if(!el) return; const V=DB.viandas;
