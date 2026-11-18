@@ -1136,11 +1136,14 @@ const normTxt=s=>String(s||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim()
 // La lista de eventuales manda en sector (tarea), turno, ingreso y egreso; los eventuales activos
 // que no están en el plan aparecen igual, con jornadas planificadas hasta que se les asigne franco.
 const ANTOF=new Map(), FR_VIRT=new Map();
+// fuera de Francos: coordinadores (aunque figuren como eventuales) y legajos puntuales
+const FR_EXCL=new Set(['285485']);   // Falcón Franco Javier: es coordinador
+const frExcl=e=>FR_EXCL.has(String(e.legajo||''))||/COORDINAD/i.test(e.sector||'');
 const antOK=v=>v&&v!=='SIN DATO';
 const FRE = () => {
   const L=DB.francos?Object.values(DB.francos.emps||{}):[];
   L.forEach(e=>{ if(!e._n){ e.turno=normTxt(e.turno); e.sector=normTxt(e.sector); e._n=1; } });
-  const A=typeof antRows==='function'?antRows():[]; ANTOF.clear(); if(!A.length) return L;
+  const A=typeof antRows==='function'?antRows():[]; ANTOF.clear(); if(!A.length) return L.filter(e=>!frExcl(e));
   const lim=addD(hoy(),-75), by={}; L.forEach(e=>{ if(e.legajo) by[e.legajo]=e; });
   const out=L.slice();
   for(const a of A){
@@ -1153,7 +1156,7 @@ const FRE = () => {
     if(!v||v._a!==a){ v={legajo:a.legajo,nombre:a.nombre,turno:antOK(a.turno)?normTxt(a.turno):'',sector:antOK(a.tarea)?normTxt(a.tarea):'',ingreso:a.ingreso||'',egreso:a.activo?'':(a.egreso||''),d:{},_n:1};
       Object.defineProperty(v,'_a',{value:a,enumerable:false}); FR_VIRT.set(a.legajo,v); }
     out.push(v); }
-  return out; };
+  return out.filter(e=>!frExcl(e)); };
 // un empleado de la lista de eventuales que todavía no está en el plan pasa al plan cuando se le asigna algo
 function frMaterial(e){
   DB.francos=DB.francos||{emps:{},files:[]}; const k=frKey(e);

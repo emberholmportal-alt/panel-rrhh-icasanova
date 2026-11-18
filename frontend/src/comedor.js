@@ -124,15 +124,22 @@ async function cuCarteles(){
   const R=cuRows(cuState.mes); if(!R.length){ App.toast('No hay cumpleaños en ese mes.',true); return; }
   const x=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const cap=t=>t.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
-  const partes=n=>{ const [ap,...no]=String(n).split(','); return {ap:ap.trim().toUpperCase(),no:no.join(',').trim().toUpperCase()}; };
+  // apellido y nombre: si el nombre viene sin coma se busca en la nómina por legajo; si no está, la primera palabra es el apellido
+  const nmL={}; try{ nmRows().forEach(x=>{ if(String(x.nombre).includes(',')) nmL[x.leg]=x.nombre; }); }catch(e){}
+  const partes=(n,leg)=>{ let t=String(n).replace(/\s+/g,' ').trim(); if(!t.includes(',')&&leg&&nmL[nmLeg(leg)]) t=nmL[nmLeg(leg)];
+    if(!t.includes(',')){ const w=t.split(' '); t=w[0]+', '+w.slice(1).join(' '); }
+    const [ap,...no]=t.split(','); return {ap:ap.trim().toUpperCase(),no:no.join(',').trim().toUpperCase()}; };
   const run=(t,sz,b)=>`<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b?'<w:b/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${x(t)}</w:t></w:r>`;
   const par=(t,sz,b)=>`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="120"/></w:pPr>${run(t,sz,b)}</w:p>`;
   // el tamaño baja si el apellido es largo, para que entre en una línea
-  const tam=s=>s.length<=10?120:s.length<=14?96:s.length<=18?76:s.length<=24?60:48;
+  // tamaño (en medios puntos) para que el texto entre en una línea: ancho útil ~495 pt, Arial negrita en mayúscula ≈ 0,7 del tamaño por letra
+  const tam=t=>Math.max(36,Math.min(130,Math.floor(495/(Math.max(6,t.length)*0.7))*2));
   const celda=(p,borde)=>`<w:tr><w:trPr><w:trHeight w:val="7500" w:hRule="exact"/><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9900" w:type="dxa"/><w:vAlign w:val="center"/>
     <w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:bottom w:val="${borde?'dashed':'nil'}" w:sz="8" w:color="999999"/></w:tcBorders></w:tcPr>
-    ${p?(()=>{ const t=tam(p.ap.length>p.no.length?p.ap:p.no); return par(p.ap,t,true)+par(p.no,t,true); })():'<w:p/>'}</w:tc></w:tr>`;
-  let body=''; for(let i=0;i<R.length;i+=2){ const a=partes(R[i].nombre), b=R[i+1]?partes(R[i+1].nombre):null;
+    ${p?par(p.ap,T,true)+par(p.no,T,true):'<w:p/>'}</w:tc></w:tr>`;
+  // un solo tamaño para todo el documento: el que hace entrar en una línea al apellido o nombre más largo del mes
+  const T=tam(R.map(r=>partes(r.nombre,r.leg)).flatMap(p=>[p.ap,p.no]).reduce((a,b)=>b.length>a.length?b:a,''));
+  let body=''; for(let i=0;i<R.length;i+=2){ const a=partes(R[i].nombre,R[i].leg), b=R[i+1]?partes(R[i+1].nombre,R[i+1].leg):null;
     body+=`<w:tbl><w:tblPr><w:tblW w:w="9900" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="9900"/></w:tblGrid>${celda(a,true)}${celda(b,false)}</w:tbl>`+
       (i+2<R.length?'<w:p><w:r><w:br w:type="page"/></w:r></w:p>':''); }
   const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}
