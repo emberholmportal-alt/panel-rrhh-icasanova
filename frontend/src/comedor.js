@@ -112,7 +112,7 @@ function cuEmps(){
   const ya=new Set(base.map(e=>e.leg).filter(Boolean)), yaN=new Set(base.map(e=>sinTilde(e.nombre)));
   return base.concat(C.evs.filter(e=>!ya.has(e.leg)&&!yaN.has(sinTilde(e.nombre))));
 }
-// ---- carteles para la cartelera: Word (.docx) con dos personas por hoja (solo Milagros Marchioro y admin) ----
+// ---- carteles para la cartelera: Word (.docx) con cuatro personas por hoja (A4 vertical) (solo Milagros Marchioro y admin) ----
 const cuCartelOk=()=>!(window.SRV&&SRV.mode==='online')||(!!SRV.user&&!SRV.imp&&(SRV.user.username==='mmarchioro'||SRV.user.rol==='admin'));
 async function cuCarteles(){
   if(typeof JSZip==='undefined'){
@@ -133,15 +133,15 @@ async function cuCarteles(){
   const par=(t,sz,b)=>`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="120"/></w:pPr>${run(t,sz,b)}</w:p>`;
   // el tamaño baja si el apellido es largo, para que entre en una línea
   // tamaño (en medios puntos) para que el texto entre en una línea: ancho útil ~495 pt, Arial negrita en mayúscula ≈ 0,7 del tamaño por letra
-  const tam=t=>Math.max(36,Math.min(130,Math.floor(495/(Math.max(6,t.length)*0.7))*2));
-  const celda=(p,borde)=>`<w:tr><w:trPr><w:trHeight w:val="7500" w:hRule="exact"/><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9900" w:type="dxa"/><w:vAlign w:val="center"/>
+  const tam=t=>Math.max(36,Math.min(120,Math.floor(495/(Math.max(6,t.length)*0.7))*2));
+  const celda=(p,borde)=>`<w:tr><w:trPr><w:trHeight w:val="3700" w:hRule="exact"/><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9900" w:type="dxa"/><w:vAlign w:val="center"/>
     <w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:bottom w:val="${borde?'dashed':'nil'}" w:sz="8" w:color="999999"/></w:tcBorders></w:tcPr>
     ${p?par(p.ap,T,true)+par(p.no,T,true):'<w:p/>'}</w:tc></w:tr>`;
   // un solo tamaño para todo el documento: el que hace entrar en una línea al apellido o nombre más largo del mes
   const T=tam(R.map(r=>partes(r.nombre,r.leg)).flatMap(p=>[p.ap,p.no]).reduce((a,b)=>b.length>a.length?b:a,''));
-  let body=''; for(let i=0;i<R.length;i+=2){ const a=partes(R[i].nombre,R[i].leg), b=R[i+1]?partes(R[i+1].nombre,R[i+1].leg):null;
-    body+=`<w:tbl><w:tblPr><w:tblW w:w="9900" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="9900"/></w:tblGrid>${celda(a,true)}${celda(b,false)}</w:tbl>`+
-      (i+2<R.length?'<w:p><w:r><w:br w:type="page"/></w:r></w:p>':''); }
+  const POR=4; let body=''; for(let i=0;i<R.length;i+=POR){ const G=[0,1,2,3].map(k=>R[i+k]?partes(R[i+k].nombre,R[i+k].leg):null);
+    body+=`<w:tbl><w:tblPr><w:tblW w:w="9900" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="9900"/></w:tblGrid>${G.map((p,k)=>celda(p,k<POR-1&&!!G[k+1])).join('')}</w:tbl>`+
+      (i+POR<R.length?'<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>':''); }
   const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}
     <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="850" w:right="1000" w:bottom="700" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const z=new JSZip();
@@ -150,7 +150,7 @@ async function cuCarteles(){
   z.file('word/document.xml',doc);
   const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`carteles_cumpleanos_${MESES_N[cuState.mes-1].toLowerCase()}.docx`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
-  App.toast(`Word con ${R.length} cartel(es) de ${MESES_N[cuState.mes-1]} (${Math.ceil(R.length/2)} hoja(s))`);
+  App.toast(`Word con ${R.length} cartel(es) de ${MESES_N[cuState.mes-1]} (${Math.ceil(R.length/4)} hoja(s), 4 por hoja)`);
 }
 function cuRows(mes){
   const C=DB.cumple; if(!C) return [];
