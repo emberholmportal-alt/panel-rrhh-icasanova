@@ -95,10 +95,55 @@ async function loadCumple(files){
   }catch(e){ App.toast(e.message,true); }
 }
 const sinTilde=s=>normTxt(s).replace(/,/g,' ').replace(/\s+/g,' ').trim();
+// eventuales: salen de la planilla de Eventuales (activos con fecha de nacimiento); se copian a Cumpleaños cada vez que se guarda
+window.cuSyncEv=function(){
+  if(typeof antRows!=='function'||!DB.ant||!canEditMod('cumpleanos')) return;
+  const ev=antRows().filter(r=>r.activo&&r.nac).map(r=>({leg:nmLeg(r.legajo),nombre:String(r.nombre||'').replace(/\s+/g,' ').trim(),nac:r.nac,tipo:'Eventual'}))
+    .sort((a,b)=>a.leg.localeCompare(b.leg)), bajas=antRows().filter(r=>!r.activo).map(r=>nmLeg(r.legajo)).sort();
+  const C=DB.cumple||(DB.cumple={emps:[],file:'',at:''}), k=JSON.stringify([ev,bajas]);
+  if(C.evsK!==k){ C.evs=ev; C.evsBajas=bajas; delete C.evsLegs; C.evsK=k; C.evsAt=new Date().toISOString(); }
+};
+function cuEmps(){
+  const C=DB.cumple; if(!C) return [];
+  if(!C.evs) return C.emps||[];
+  // con la planilla de Eventuales: salen los dados de baja y se suman los nuevos que tienen fecha de nacimiento
+  const baja=new Set(C.evsBajas||[]), ev=new Map(C.evs.map(e=>[e.leg,e]));
+  const base=(C.emps||[]).filter(e=>!(e.leg&&baja.has(e.leg))).map(e=>e.leg&&ev.has(e.leg)?Object.assign({},e,{nac:ev.get(e.leg).nac}):e);
+  const ya=new Set(base.map(e=>e.leg).filter(Boolean)), yaN=new Set(base.map(e=>sinTilde(e.nombre)));
+  return base.concat(C.evs.filter(e=>!ya.has(e.leg)&&!yaN.has(sinTilde(e.nombre))));
+}
+// ---- carteles para la cartelera: Word (.docx) con dos personas por hoja (solo Milagros Marchioro y admin) ----
+const cuCartelOk=()=>!(window.SRV&&SRV.mode==='online')||(!!SRV.user&&!SRV.imp&&(SRV.user.username==='mmarchioro'||SRV.user.rol==='admin'));
+async function cuCarteles(){
+  if(typeof JSZip==='undefined'){ App.toast('No cargó la librería para armar el Word. Recargá la página.',true); return; }
+  const R=cuRows(cuState.mes); if(!R.length){ App.toast('No hay cumpleaños en ese mes.',true); return; }
+  const x=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cap=t=>t.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+  const partes=n=>{ const [ap,...no]=String(n).split(','); return {ap:ap.trim().toUpperCase(),no:cap(no.join(',').trim())}; };
+  const run=(t,sz,b)=>`<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${b?'<w:b/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${x(t)}</w:t></w:r>`;
+  const par=(t,sz,b)=>`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="120"/></w:pPr>${run(t,sz,b)}</w:p>`;
+  // el tamaño baja si el apellido es largo, para que entre en una línea
+  const tam=s=>s.length<=10?120:s.length<=14?96:s.length<=18?76:s.length<=24?60:48;
+  const celda=(p,borde)=>`<w:tr><w:trPr><w:trHeight w:val="7500" w:hRule="exact"/><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9900" w:type="dxa"/><w:vAlign w:val="center"/>
+    <w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:bottom w:val="${borde?'dashed':'nil'}" w:sz="8" w:color="999999"/></w:tcBorders></w:tcPr>
+    ${p?par(p.ap,tam(p.ap),true)+par(p.no,Math.min(72,Math.round(tam(p.ap)*.7)),false):'<w:p/>'}</w:tc></w:tr>`;
+  let body=''; for(let i=0;i<R.length;i+=2){ const a=partes(R[i].nombre), b=R[i+1]?partes(R[i+1].nombre):null;
+    body+=`<w:tbl><w:tblPr><w:tblW w:w="9900" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="9900"/></w:tblGrid>${celda(a,true)}${celda(b,false)}</w:tbl>`+
+      (i+2<R.length?'<w:p><w:r><w:br w:type="page"/></w:r></w:p>':''); }
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}
+    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="850" w:right="1000" w:bottom="700" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const z=new JSZip();
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  z.file('word/document.xml',doc);
+  const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`carteles_cumpleanos_${MESES_N[cuState.mes-1].toLowerCase()}.docx`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  App.toast(`Word con ${R.length} cartel(es) de ${MESES_N[cuState.mes-1]} (${Math.ceil(R.length/2)} hoja(s))`);
+}
 function cuRows(mes){
   const C=DB.cumple; if(!C) return [];
   const y=+hoy().slice(0,4), nmMap={}; try{ nmRows().forEach(r=>nmMap[sinTilde(r.nombre)]=r); }catch(e){}
-  return C.emps.filter(e=>+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
+  return cuEmps().filter(e=>e.nac&&+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
     return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:(y-+e.nac.slice(0,4))>=15?y-+e.nac.slice(0,4):null,sector:x.sector||'',turno:x.turno||''}); })
     .sort((a,b)=>a.dia-b.dia||a.nombre.localeCompare(b.nombre,'es'));
 }
@@ -108,7 +153,8 @@ function renderCumple(){
   if(!cuState.mes) cuState.mes=+hoy().slice(5,7);
   const C=DB.cumple, R=cuRows(cuState.mes), h=hoy(), ed=canEditMod('cumpleanos');
   $('#cu-mes').innerHTML=MESES_N.map((m,i)=>`<option value="${i+1}"${i+1===cuState.mes?' selected':''}>${m}</option>`).join('');
-  $('#cu-st').innerHTML=C?`<b>${C.emps.length} personas</b> · ${esc(C.file)} · ${fmtAt(C.at)}`:'Sin cargar';
+  $('#cu-st').innerHTML=C?`<b>${cuEmps().length} personas</b> · ${esc(C.file||'')}${C.at?' · '+fmtAt(C.at):''}${C.evs?`<br>Sincronizado con la planilla de Eventuales (${fmtAt(C.evsAt)}): se quitan las bajas y se suman los eventuales nuevos con fecha de nacimiento`:''}`:'Sin cargar';
+  { const b=$('#cu-doc'); if(b) b.style.display=cuCartelOk()?'':'none'; }
   $('#cu-load').style.display=ed?'':'none';
   const hoyN=R.filter(r=>r.fecha===h), sem=R.filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
   $('#cu-kpis').innerHTML=[{l:`Cumplen en ${MESES_N[cuState.mes-1].toLowerCase()}`,v:R.length,s:C?'en todo el plantel':'cargá el archivo'},{l:'Hoy',v:hoyN.length,s:hoyN.map(r=>r.nombre.split(',')[0]).join(', ')||'nadie',c:hoyN.length?'acc-ochre':''},{l:'Próximos 7 días',v:sem.length,s:'incluye hoy'}]
@@ -152,7 +198,7 @@ function hookComedor(){
   $('#mn-file').onchange=e=>{ const f=e.target.files[0]; if(f) mnSubir(f); e.target.value=''; };
   document.addEventListener('paste',e=>{ if(!e.target.closest||!e.target.closest('#mn-grid')) return; const t=(e.clipboardData||window.clipboardData).getData('text'); if(t&&t.includes('\t')&&t.includes('\n')){ e.preventDefault(); mnPegar(t); } });
   $('#cu-mes').onchange=e=>{ cuState.mes=+e.target.value; renderCumple(); };
-  $('#cu-xls').onclick=cuExcel;
+  $('#cu-xls').onclick=cuExcel; { const b=$('#cu-doc'); if(b) b.onclick=cuCarteles; }
   $('#cu-pick').onclick=()=>$('#cu-file').click();
   $('#cu-file').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadCumple(f); e.target.value=''; };
 }

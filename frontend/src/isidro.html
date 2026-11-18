@@ -1463,7 +1463,7 @@ $('#btnReset').onclick=async()=>{
   vacSel=new Set(); antSel=new Set(); boot2(); toast('Base borrada');
 };
 
-async function persist(){ const ok=await Store.save(DB); if(!ok) toast('No pude guardar. Usá "Exportar base" para no perder datos.') }
+async function persist(){ try{ if(window.cuSyncEv) window.cuSyncEv(); }catch(e){} const ok=await Store.save(DB); if(!ok) toast('No pude guardar. Usá "Exportar base" para no perder datos.') }
 
 /* ============================================================
    12. VACACIONES
