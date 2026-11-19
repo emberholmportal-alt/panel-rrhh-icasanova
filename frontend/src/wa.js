@@ -39,7 +39,7 @@ async function waCargar(f){
   }catch(e){ console.error(e); App.toast('No pude leer la lista de celulares.',true); } }
 
 function waFilas(){ const W=WA();
-  return antAct().map(r=>{ const l=nmLeg(r.legajo), t=W.tel[l]||{}; return {l,nombre:r.nombre,tarea:r.tarea!=='SIN DATO'?r.tarea:'',turno:r.turno!=='SIN DATO'?r.turno:'',tel:t.tel||''}; })
+  return antAct().filter(r=>!/COORDINAD/i.test(r.tarea||'')&&String(r.legajo).trim()!=='285485').map(r=>{   // sin coordinadores (cuentan como fuera de convenio) const l=nmLeg(r.legajo), t=W.tel[l]||{}; return {l,nombre:r.nombre,tarea:r.tarea!=='SIN DATO'?r.tarea:'',turno:r.turno!=='SIN DATO'?r.turno:'',tel:t.tel||''}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')); }
 
 function waRender(){
@@ -69,6 +69,6 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{ if(e.target.id==='wa-file'){ const f=e.target.files[0]; e.target.value=''; if(f) waCargar(f); } });
 document.addEventListener('input',e=>{ if(e.target.id==='wa-q'){ waQ=e.target.value; const p=e.target.selectionStart; waRender(); const i=$('#wa-q'); if(i){ i.focus(); try{ i.setSelectionRange(p,p); }catch(x){} } } });
 (function(){ const v=$('#v-bajas'); if(!v||$('#wa-card')) return; const c=document.createElement('div'); c.className='card wa-card'; c.id='wa-card'; c.style.display='none';
-  const k=$('#kpisAnt'); v.insertBefore(c,k?k.nextSibling:null); })();
+  const pl=$('#pa-plantel'); if(pl) pl.appendChild(c); else { const k=$('#kpisAnt'); v.insertBefore(c,k?k.nextSibling:null); } })();   // debajo del plantel activo
 const _ovWa=App.onView; App.onView=(id,f)=>{ _ovWa(id,f); if(id==='v-bajas') waRender(); };
 const _rfWa=App.refresh; App.refresh=()=>{ _rfWa(); requestAnimationFrame(()=>{ try{ if($('#v-bajas')&&$('#v-bajas').classList.contains('on')) waRender(); }catch(e){} }); };
