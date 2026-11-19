@@ -40,7 +40,9 @@ function amMotivo(raw){
   return t?{n:t.charAt(0)+t.slice(1).toLowerCase(),c:'otro'}:null;
 }
 const AM_CATDE={}; const amCat=n=>AM_CATDE[n]||(AM_CATDE[n]=(amMotivo(n)||{c:'otro'}).c);
-let amState={mes:'',dia:'',tipo:'',sector:'',turno:'',lic:false};
+let amState={mes:'',dia:'',tipo:'',sector:'',turno:'',lic:false,desde:'',hasta:'',q:''};
+// colaborador: busca por apellido, nombre o legajo (sin acentos)
+const amQ=(p,q)=>{ q=normTxt(q||''); if(!q) return true; return normTxt(p.nombre).includes(q)||String(p.leg).includes(q); };
 
 // ---- Ausentismo por motivo: suma un export de Movimientos (no guarda; lo hace quien llama) ----
 function amMerge(rows,fname){
@@ -146,14 +148,21 @@ function amDatos(){
   const s=amState, nm={}; try{ nmRows().forEach(x=>nm[x.leg]=x); }catch(e){}
   const per=leg=>{ const n=nm[leg]||{}, e=A.emps[leg]||{}; return {leg,nombre:n.nombre||e.n||leg,tipo:n.tipo||e.t||'',sector:n.sector||'NO ESTÁ EN NÓMINA',turno:n.turno||'NO ESTÁ EN NÓMINA',baja:!nm[leg]}; };
   const P={}; const gp=leg=>P[leg]||(P[leg]=per(leg));
-  const okP=p=>(!s.tipo||p.tipo===s.tipo)&&(!s.sector||p.sector===s.sector)&&(!s.turno||p.turno===s.turno);
-  const okM=m=>!s.mes||m===s.mes;
+  const okP=p=>(!s.tipo||p.tipo===s.tipo)&&(!s.sector||p.sector===s.sector)&&(!s.turno||p.turno===s.turno)&&amQ(p,s.q);
+  const rango=!!(s.desde||s.hasta), d0=s.desde||'0000', d1=s.hasta||'9999';
+  const okF=f=>rango?(f>=d0&&f<=d1):(!s.mes||f.slice(0,7)===s.mes);
+  const okM=m=>rango?(m>=d0.slice(0,7)&&m<=d1.slice(0,7)):(!s.mes||m===s.mes);
   const cats=s.lic?['aus','lic']:['aus'];
-  const E=A.ev.filter(e=>okM(e[1].slice(0,7))&&cats.includes(amCat(e[2]))).map(e=>({p:gp(e[0]),f:e[1],mes:e[1].slice(0,7),m:e[2],c:amCat(e[2])})).filter(e=>okP(e.p));
-  const prog=[]; Object.entries(A.prog).forEach(([leg,o])=>{ const p=gp(leg); if(!okP(p)) return; Object.entries(o).forEach(([m,n])=>{ if(okM(m)) prog.push({p,mes:m,n}); }); });
+  const E=A.ev.filter(e=>okF(e[1])&&cats.includes(amCat(e[2]))).map(e=>({p:gp(e[0]),f:e[1],mes:e[1].slice(0,7),m:e[2],c:amCat(e[2])})).filter(e=>okP(e.p));
+  // días programados: con rango de fechas se cuentan día por día; si no, por mes
+  const prog=[]; Object.entries(A.prog).forEach(([leg,o])=>{ const p=gp(leg); if(!okP(p)) return; Object.entries(o).forEach(([m,n])=>{ if(!okM(m)) return;
+    if(rango){ const str=((A.progD||{})[leg]||{})[m]||''; let k=0; for(let i=0;i<str.length;i++) if(str[i]==='1'){ const f=`${m}-${String(i+1).padStart(2,'0')}`; if(f>=d0&&f<=d1) k++; } if(k) prog.push({p,mes:m,n:k}); }
+    else prog.push({p,mes:m,n}); }); });
+  // todo lo que tiene cada persona en el período (incluye licencias y vacaciones), para el detalle por colaborador
+  const T=A.ev.filter(e=>okF(e[1])).map(e=>({p:gp(e[0]),f:e[1],m:e[2],c:amCat(e[2])})).filter(e=>okP(e.p));
   // si una persona tiene dos motivos el mismo día cuenta un solo día de ausencia
   const dias=new Map(); E.forEach(e=>{ const k=e.p.leg+'|'+e.f; if(!dias.has(k)) dias.set(k,e); });
-  return {A,E,D:[...dias.values()],prog,P,meses:uniq(A.ev.map(e=>e[1].slice(0,7)).concat(Object.values(A.prog).flatMap(o=>Object.keys(o)))).sort()};
+  return {A,E,T,rango,D:[...dias.values()],prog,P,meses:uniq(A.ev.map(e=>e[1].slice(0,7)).concat(Object.values(A.prog).flatMap(o=>Object.keys(o)))).sort()};
 }
 const amPct=(a,b)=>b?(a/b*100).toFixed(1).replace('.',',')+'%':'—';
 const amMesL=m=>`${MESES_N[+m.slice(5)-1]} ${m.slice(0,4)}`;
@@ -187,6 +196,10 @@ function renderAusmot(){
   const opt=(id,k,lab,fmt)=>{ $(id).innerHTML=`<option value="">${lab}</option>`+uniq(all.map(p=>p[k]).filter(Boolean)).sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>`<option value="${esc(v)}"${s[k]===v?' selected':''}>${esc(fmt?fmt(v):v)}</option>`).join(''); };
   opt('#am-tip','tipo','Todos los tipos',v=>NM_TIPO[v]||v); opt('#am-sec','sector','Todos los sectores'); opt('#am-tur','turno','Todos los turnos');
   $('#am-lic').checked=s.lic;
+  $('#am-des').value=s.desde; $('#am-has').value=s.hasta; $('#am-mes').disabled=!!(s.desde||s.hasta); $('#am-mes').title=s.desde||s.hasta?'Con Desde/Hasta se usa ese período':'';
+  if(document.activeElement!==$('#am-q')) $('#am-q').value=s.q;
+  { const nm={}; try{ nmRows().forEach(x=>nm[x.leg]=x.nombre); }catch(e){} const L=Object.entries(X.A.emps).map(([l,e])=>[l,nm[l]||e.n||l]).sort((a,b)=>a[1].localeCompare(b[1],'es'));
+    const h=L.map(([l,n])=>`<option value="${esc(n)}">${esc(l)}</option>`).join(''); if($('#am-ql')._h!==h){ $('#am-ql')._h=h; $('#am-ql').innerHTML=h; } }
   const dias=X.D.length, prog=X.prog.reduce((a,r)=>a+r.n,0), pers=new Set(X.D.map(e=>e.p.leg)).size;
   const mot={}; X.E.forEach(e=>mot[e.m]=(mot[e.m]||0)+1); const M=Object.entries(mot).sort((a,b)=>b[1]-a[1]);
   $('#am-kpis').innerHTML=[{l:'Tasa de ausentismo',v:amPct(dias,prog),s:`${dias} días sobre ${prog} programados`,c:'acc-alert'},{l:'Días de ausencia',v:dias,s:s.lic?'incluye licencias':'sin licencias ni vacaciones'},
@@ -196,12 +209,13 @@ function renderAusmot(){
   const s0=s.mes; amState.mes=''; const XA=amDatos(); amState.mes=s0;
   const motsA=Object.entries(XA.E.reduce((o,e)=>(o[e.m]=(o[e.m]||0)+1,o),{})).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
   const byM={}; XA.meses.forEach(m=>byM[m]={d:0,p:0,mot:{}}); XA.prog.forEach(r=>byM[r.mes].p+=r.n); XA.D.forEach(e=>byM[e.mes].d++); XA.E.forEach(e=>{ const o=byM[e.mes].mot; o[e.m]=(o[e.m]||0)+1; });
-  const MS=s.mes?[s.mes]:XA.meses, mxT=Math.max(.0001,...XA.meses.map(m=>byM[m].p?byM[m].d/byM[m].p:0));
+  const MS=s.desde||s.hasta?XA.meses.filter(m=>m>=(s.desde||'0000').slice(0,7)&&m<=(s.hasta||'9999').slice(0,7)):s.mes?[s.mes]:XA.meses, mxT=Math.max(.0001,...XA.meses.map(m=>byM[m].p?byM[m].d/byM[m].p:0));
   $('#am-mesT').innerHTML=`<thead><tr><th>Mes</th>${motsA.map(m=>`<th class="num" title="${esc(m)}">${esc(m.replace(/^Ausencia /,'Aus. ').replace(/^Licencia /,'Lic. '))}</th>`).join('')}<th class="num">Días</th><th class="num">Programados</th><th class="num">Tasa</th><th style="width:14%"></th></tr></thead><tbody>`+
     MS.map(m=>{ const x=byM[m]; return `<tr class="${m===s.mes?'am-sel':''}" data-amm="${m}"><td><b>${amMesL(m)}</b></td>${motsA.map(k=>`<td class="num">${x.mot[k]||''}</td>`).join('')}<td class="num"><b>${x.d||''}</b></td><td class="num">${x.p||''}</td><td class="num"><b>${amPct(x.d,x.p)}</b></td><td><div class="nm-bar"><i style="width:${x.p?x.d/x.p/mxT*100:0}%;background:#f87171"></i></div></td></tr>`; }).join('')+
     (s.mes?'':`<tr class="tot"><td>Total</td>${motsA.map(k=>`<td class="num">${XA.E.filter(e=>e.m===k).length}</td>`).join('')}<td class="num">${XA.D.length}</td><td class="num">${XA.prog.reduce((a,r)=>a+r.n,0)}</td><td class="num">${amPct(XA.D.length,XA.prog.reduce((a,r)=>a+r.n,0))}</td><td></td></tr>`)+'</tbody>';
   $('#am-mesH').textContent=s.mes?`Motivos de ${amMesL(s.mes)}`:'Por mes y motivo'; $('#am-mesM').textContent=s.mes?'clic en el mes para volver a ver todos':'clic en un mes para filtrarlo';
   renderAmDia(X);
+  renderAmPersona(X);
   // por motivo
   const tot=M.reduce((a,x)=>a+x[1],0);
   $('#am-motT').innerHTML=M.length?`<thead><tr><th>Motivo</th><th>Tipo</th><th class="num">Días</th><th class="num">Personas</th><th class="num">% del total</th><th style="width:30%"></th></tr></thead><tbody>`+
@@ -213,10 +227,31 @@ function renderAusmot(){
   const PL=Object.values(pp).sort((a,b)=>b.d-a.d||a.p.nombre.localeCompare(b.p.nombre,'es'));
   $('#am-n').textContent=`${PL.length} persona(s)`;
   $('#am-perT').innerHTML=PL.length?`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th>Sector</th><th>Turno</th><th class="num">Días</th><th class="num">Tasa</th><th>Motivos</th></tr></thead><tbody>`+
-    PL.slice(0,400).map(x=>`<tr><td class="mono">${esc(x.p.leg)}</td><td><b>${esc(x.p.nombre)}</b>${x.p.baja?' <span class="tag n" title="No figura en la nómina actual">baja</span>':''}</td><td>${esc(NM_TIPO[x.p.tipo]||'')}</td><td>${esc(x.p.sector)}</td><td>${esc(x.p.turno)}</td><td class="num"><b>${x.d}</b></td><td class="num">${amPct(x.d,x.prog)}</td><td>${Object.entries(x.mot).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`${esc(m)} <b>${n}</b>`).join(' · ')}</td></tr>`).join('')+'</tbody>'
+    PL.slice(0,400).map(x=>`<tr data-amp="${esc(x.p.leg)}" class="am-click" title="Ver el detalle de sus ausencias"><td class="mono">${esc(x.p.leg)}</td><td><b>${esc(x.p.nombre)}</b>${x.p.baja?' <span class="tag n" title="No figura en la nómina actual">baja</span>':''}</td><td>${esc(NM_TIPO[x.p.tipo]||'')}</td><td>${esc(x.p.sector)}</td><td>${esc(x.p.turno)}</td><td class="num"><b>${x.d}</b></td><td class="num">${amPct(x.d,x.prog)}</td><td>${Object.entries(x.mot).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`${esc(m)} <b>${n}</b>`).join(' · ')}</td></tr>`).join('')+'</tbody>'
     :'<tbody><tr><td><div class="empty">Nadie con ausencias en este filtro.</div></td></tr></tbody>';
 }
 
+// detalle por colaborador: todas sus ausencias del período, día por día, con totales
+const amPerL=()=>amState.desde||amState.hasta?`del ${amState.desde?dmy(amState.desde):'inicio'} al ${amState.hasta?dmy(amState.hasta):'último dato'}`:amState.mes?amMesL(amState.mes):'todo el período cargado';
+function amPersonas(X){ const by={}; X.T.forEach(e=>{ (by[e.p.leg]||(by[e.p.leg]={p:e.p,T:[]})).T.push(e); });
+  X.prog.forEach(r=>{ const x=by[r.p.leg]||(by[r.p.leg]={p:r.p,T:[]}); x.prog=(x.prog||0)+r.n; });
+  return Object.values(by).sort((a,b)=>a.p.nombre.localeCompare(b.p.nombre,'es')); }
+function renderAmPersona(X){
+  const c=$('#am-pcard'); if(!c) return; if(!amState.q.trim()){ c.style.display='none'; return; } c.style.display='';
+  const L=amPersonas(X);
+  if(!L.length){ $('#am-pbody').innerHTML='<div class="empty">Nadie coincide con esa búsqueda en el período elegido.</div>'; $('#am-pn').textContent=''; return; }
+  $('#am-pn').textContent=`${L.length} colaborador(es) · ${amPerL()}`;
+  $('#am-pbody').innerHTML=L.slice(0,15).map(x=>{
+    const dias=new Map(); x.T.filter(e=>e.c==='aus'||(amState.lic&&e.c==='lic')).forEach(e=>dias.set(e.f,1)); const da=dias.size, pr=x.prog||0;
+    const tot={}; x.T.forEach(e=>{ const k=e.m; tot[k]=tot[k]||{n:0,c:e.c}; tot[k].n++; });
+    const porCat=c=>x.T.filter(e=>e.c===c).length;
+    const L2=x.T.slice().sort((a,b)=>a.f.localeCompare(b.f));
+    return `<div class="am-pp"><div class="am-ph"><div><b>${esc(x.p.nombre)}</b> <span class="meta">${esc(x.p.leg)} · ${esc(NM_TIPO[x.p.tipo]||'')} · ${esc(x.p.sector)} · ${esc(x.p.turno)}</span></div>
+      <div class="am-pk"><span>Ausentismo <b>${porCat('aus')}</b></span><span>Licencias <b>${porCat('lic')}</b></span><span>Otros (vacaciones, etc.) <b>${porCat('otro')}</b></span><span>Programados <b>${pr}</b></span><span>Tasa <b>${amPct(da,pr)}</b></span></div></div>
+      ${L2.length?`<div class="am-pchips">${Object.entries(tot).sort((a,b)=>b[1].n-a[1].n).map(([m,o])=>`<span class="am-chip c-${o.c}">${esc(m)} <b>${o.n}</b></span>`).join('')}</div>
+      <div class="tscroll" style="max-height:320px"><table class="nm-t"><thead><tr><th>Fecha</th><th>Día</th><th>Motivo</th><th>Tipo</th></tr></thead><tbody>${L2.map(e=>`<tr><td class="mono">${dmy(e.f)}</td><td>${DOWL[dObj(e.f).getDay()]}</td><td><b>${esc(e.m)}</b></td><td>${esc(AM_CAT[e.c])}</td></tr>`).join('')}
+        <tr class="tot"><td colspan="2">Total</td><td>${L2.length} día(s) con motivo</td><td>${porCat('aus')} ausentismo · ${porCat('lic')} licencias · ${porCat('otro')} otros</td></tr></tbody></table></div>`:'<div class="empty" style="padding:10px 0">Sin ausencias en el período.</div>'}</div>`; }).join('')+(L.length>15?`<p class="meta">Se muestran 15 de ${L.length}: escribí más del apellido o el legajo.</p>`:'');
+}
 function amExcel(){
   const X=amDatos(); if(!X||!X.D.length){ App.toast('No hay ausencias para exportar con este filtro.',true); return; }
   const s=amState, wb=XLSX.utils.book_new(), add=(a,n,w)=>{ const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=w.map(x=>({wch:x})); XLSX.utils.book_append_sheet(wb,ws,n); };
@@ -230,7 +265,9 @@ function amExcel(){
     return [amMesL(m)].concat(mots.map(k=>E.filter(e=>e.m===k).length||''),[d,p,pct(d,p)]); })),'Por mes',[18].concat(mots.map(()=>12),[8,12,9]));
   for(const [k,n] of [['sector','Por sector'],['turno','Por turno']]) add([[k==='sector'?'Sector':'Turno','Días de ausencia','Días programados','Tasa (%)'].concat(mots)].concat(amPorGrupo(X,k).map(x=>[x.k,x.dias,x.prog,pct(x.dias,x.prog)].concat(mots.map(m=>x.mot[m]||'')))),n,[24,14,14,9].concat(mots.map(()=>12)));
   add([['Fecha','Legajo','Apellido y nombre','Tipo','Sector','Turno','Motivo']].concat(X.E.slice().sort((a,b)=>a.f.localeCompare(b.f)||a.p.nombre.localeCompare(b.p.nombre,'es')).map(e=>[dmy(e.f),e.p.leg,e.p.nombre,NM_TIPO[e.p.tipo]||'',e.p.sector,e.p.turno,e.m])),'Detalle',[11,9,32,16,20,16,30]);
-  XLSX.writeFile(wb,`ausentismo_motivos_${s.mes||'periodo'}.xlsx`); App.toast('Excel de ausentismo descargado');
+  if(s.q.trim()){ const L=amPersonas(X); add([['Legajo','Apellido y nombre','Sector','Turno','Fecha','Día','Motivo','Tipo']].concat(L.flatMap(x=>x.T.slice().sort((a,b)=>a.f.localeCompare(b.f)).map(e=>[x.p.leg,x.p.nombre,x.p.sector,x.p.turno,dmy(e.f),DOWL[dObj(e.f).getDay()],e.m,AM_CAT[e.c]]))).concat([[]],
+    [['Legajo','Apellido y nombre','Ausentismo','Licencias','Otros','Programados','Tasa (%)']],L.map(x=>{ const c=k=>x.T.filter(e=>e.c===k).length, d=new Set(x.T.filter(e=>e.c==='aus'||(s.lic&&e.c==='lic')).map(e=>e.f)).size; return [x.p.leg,x.p.nombre,c('aus'),c('lic'),c('otro'),x.prog||0,pct(d,x.prog||0)]; })),'Por colaborador',[9,32,18,14,11,11,30,16]); }
+  XLSX.writeFile(wb,`ausentismo_motivos_${s.desde||s.hasta?(s.desde||'inicio')+'_'+(s.hasta||'fin'):s.mes||'periodo'}${s.q.trim()?'_'+normTxt(s.q).replace(/\W+/g,'_').toLowerCase():''}.xlsx`); App.toast('Excel de ausentismo descargado');
 }
 
 /* ---------- ausentismo del día, por sector y turno ---------- */
@@ -336,8 +373,13 @@ function amInforme(){
   $('#am-tur').onchange=e=>{ amState.turno=e.target.value; renderAusmot(); };
   $('#am-lic').onchange=e=>{ amState.lic=e.target.checked; renderAusmot(); };
   $('#am-dia').onchange=e=>{ amState.dia=e.target.value; renderAusmot(); };
+  $('#am-des').onchange=e=>{ amState.desde=e.target.value; renderAusmot(); };
+  $('#am-has').onchange=e=>{ amState.hasta=e.target.value; renderAusmot(); };
+  let tq=0; $('#am-q').oninput=e=>{ clearTimeout(tq); tq=setTimeout(()=>{ amState.q=e.target.value; renderAusmot(); },250); };
+  $('#am-clr').onclick=()=>{ Object.assign(amState,{q:'',desde:'',hasta:''}); $('#am-q').value=''; renderAusmot(); };
   $('#am-xls').onclick=amExcel; $('#am-rep').onclick=amInforme;
   document.addEventListener('click',e=>{
-    const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); } });
+    const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); }
+    const pr=e.target.closest('#am-perT tr[data-amp]'); if(pr){ amState.q=pr.dataset.amp; $('#am-q').value=pr.dataset.amp; renderAusmot(); const c=$('#am-pcard'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); } });
 })();
 const _ovAm=App.onView; App.onView=(id,f)=>{ _ovAm(id,f); if(id==='v-ausmot') renderAusmot(); };
