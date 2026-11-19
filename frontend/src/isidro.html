@@ -833,13 +833,16 @@ function parseMov(raw){
 // diferencia circular: sirve para turnos que cruzan medianoche
 function delta(entry,start){let d=entry-start;if(d>720)d-=1440;if(d<-720)d+=1440;return d}
 
+// Personal que viene en combi externa (Combi 2026): si llega tarde no depende de ellos, no cuenta como llegada tarde.
+const COMBI=new Set(['181509','181511','181514','181516','181520','230379','181522','181523','181528','181531','181532','181537','181548','181549','181550','197796','181551','181552','181561','181564','181565']);
+const esCombi=leg=>COMBI.has(String(leg==null?'':leg).trim().replace(/\.0+$/,''));
 function evaluate(rec){
   const sh=shiftOf(rec.jornada);
   rec.start = sh? sh.start : null;
   if(rec.start==null){rec.status='sin_turno';rec.atraso=null;return rec}
   if(rec.entrada==null){rec.status = rec.eventos.length? 'novedad':'sin_fichada'; rec.atraso=null; return rec}
   rec.atraso = delta(rec.entrada, rec.start);
-  rec.status = rec.atraso > DB.tolerancia ? 'tarde' : 'ok';
+  rec.status = rec.atraso > DB.tolerancia ? (esCombi(rec.legajo)?'combi':'tarde') : 'ok';   // combi: llegó tarde pero no se cuenta
   return rec;
 }
 

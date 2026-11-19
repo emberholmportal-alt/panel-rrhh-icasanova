@@ -204,3 +204,5 @@ body.sin-agenda .bell,body.sin-agenda #h-sum,body.sin-agenda #h-chips,body.sin-a
 .nm-frk{cursor:pointer} .nm-frk.on{outline:2px solid #38bdf8}
 
 #kpisAnt .ant-frk{cursor:pointer} #kpisAnt .ant-frk.on{outline:2px solid #38bdf8}
+
+.combi{margin-left:4px;font-size:.95em}

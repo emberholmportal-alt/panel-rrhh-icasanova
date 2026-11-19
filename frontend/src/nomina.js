@@ -136,7 +136,7 @@ function renderNomina(){
   // detalle
   $('#nm-n').textContent=`${R.length} persona(s)`;
   $('#nm-det').innerHTML=R.length?`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th>Sector</th><th>Turno</th><th>Ingreso</th></tr></thead><tbody>`+
-    R.map(r=>`<tr><td class="mono">${esc(r.leg)}</td><td><b>${esc(r.nombre)}</b>${FRIO(r.leg)}${r.tipo==='EV'&&canEditMod('eventuales')?`<button class="frio-tg${esFrio(r.leg)?' on':''}" data-frio="${esc(r.leg)}" title="${esFrio(r.leg)?'Quitar apto frío':'Marcar apto frío'}">${esFrio(r.leg)?'quitar ❄':'+ ❄'}</button>`:''}</td><td><span class="nm-tp" style="--c:${NM_COL[r.tipo]}">${esc(NM_TIPO[r.tipo])}</span></td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="mono">${r.ingreso?dmy(r.ingreso):''}</td></tr>`).join('')+'</tbody>'
+    R.map(r=>`<tr><td class="mono">${esc(r.leg)}</td><td><b>${esc(r.nombre)}</b>${FRIO(r.leg)}${typeof esCombi==='function'&&esCombi(r.leg)?' <span class="combi" title="Viene en combi externa: no cuenta para llegadas tarde">🚐</span>':''}${r.tipo==='EV'&&canEditMod('eventuales')?`<button class="frio-tg${esFrio(r.leg)?' on':''}" data-frio="${esc(r.leg)}" title="${esFrio(r.leg)?'Quitar apto frío':'Marcar apto frío'}">${esFrio(r.leg)?'quitar ❄':'+ ❄'}</button>`:''}</td><td><span class="nm-tp" style="--c:${NM_COL[r.tipo]}">${esc(NM_TIPO[r.tipo])}</span></td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="mono">${r.ingreso?dmy(r.ingreso):''}</td></tr>`).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${ALL.length?'Nadie con este filtro.':'Cargá el export de Movimientos del reloj y, si querés, una planilla con sector y turno.'}</div></td></tr></tbody>`;
 }
 const nmFiltroTxt=()=>[nmState.tipos.length?'Tipo: '+nmState.tipos.map(k=>NM_TIPO[k]).join(', '):'',nmState.sectores.length?'Sector: '+nmState.sectores.join(', '):'',nmState.turnos.length?'Turno: '+nmState.turnos.join(', '):'',nmState.q?'Búsqueda: '+nmState.q:'',nmState.frio?'Solo apto frío':''].filter(Boolean).join(' · ')||'Sin filtros (toda la nómina)';
@@ -151,7 +151,7 @@ function nmExcel(){
   const ts=uniq(R.map(r=>r.turno)).sort(), ss=uniq(R.map(r=>r.sector)).sort();
   const mx=[['Sector \\ Turno'].concat(ts,['Total'])].concat(ss.map(s=>[s].concat(ts.map(t=>R.filter(r=>r.sector===s&&r.turno===t).length),[R.filter(r=>r.sector===s).length]))).concat([['Total'].concat(ts.map(t=>R.filter(r=>r.turno===t).length),[R.length])]);
   const w3=XLSX.utils.aoa_to_sheet(mx); w3['!cols']=[{wch:26}].concat(ts.map(()=>({wch:12})),[{wch:9}]); XLSX.utils.book_append_sheet(wb,w3,'Sector x turno');
-  const det=[['Legajo','Apellido y nombre','Tipo','Sector','Turno','Ingreso','Apto frío']].concat(R.map(r=>[r.leg,r.nombre,NM_TIPO[r.tipo],r.sector,r.turno,r.ingreso?dmy(r.ingreso):'',esFrio(r.leg)?'Sí':'']));
+  const det=[['Legajo','Apellido y nombre','Tipo','Sector','Turno','Ingreso','Apto frío','Combi']].concat(R.map(r=>[r.leg,r.nombre,NM_TIPO[r.tipo],r.sector,r.turno,r.ingreso?dmy(r.ingreso):'',esFrio(r.leg)?'Sí':'',typeof esCombi==='function'&&esCombi(r.leg)?'Sí':'']));
   const w4=XLSX.utils.aoa_to_sheet(det); w4['!cols']=[{wch:9},{wch:34},{wch:17},{wch:22},{wch:16},{wch:11}]; w4['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:det.length-1,c:5}})}; XLSX.utils.book_append_sheet(wb,w4,'Detalle');
   XLSX.writeFile(wb,`nomina_${hoy()}.xlsx`); App.toast('Excel de nómina descargado');
 }
