@@ -161,17 +161,17 @@ async function vdVacCargar(){ if(!(window.SRV&&SRV.mode==='online')) return; if(
   try{ const r=await fetch('/api/vacaciones/semanas',{credentials:'same-origin'}); if(r.ok){ vdVac=await r.json(); const el=$('#cm-vac'); if(el) el.innerHTML=vdVacHtml(); } }catch(e){} }
 function vdVacHtml(){
   const V=vdVac; if(!V) return '<div class="meta" style="padding:12px 16px">Cargando vacaciones…</div>';
-  const n=c=>`<b>${c.total}</b> <span class="meta">(NIC 1: ${c['NIC 1']} · NIC 2: ${c['NIC 2']})</span>`;
-  const lab=(s,i)=>i===0?'Esta semana':i===1?'Semana que viene':`En ${i} semanas`;
+  // simple: por semana (lunes a domingo), cuántas personas están de vacaciones esa semana y cuántas empiezan esa semana
+  const nic=c=>`NIC 1: ${c['NIC 1']} · NIC 2: ${c['NIC 2']}`;
+  const lab=i=>i===0?'Esta semana':i===1?'Semana que viene':`En ${i} semanas`;
   const S=V.semanas||[], a=S[0], b=S[1];
   return `<div class="cm-vk">
-      <div><span>Hoy de vacaciones</span><b>${V.hoy.total}</b><small>NIC 1: ${V.hoy['NIC 1']} · NIC 2: ${V.hoy['NIC 2']}</small></div>
-      ${a?`<div><span>Esta semana</span><b>${a.de_vacaciones.total}</b><small>de vacaciones · salen ${a.salen.total}</small></div>`:''}
-      ${b?`<div class="hl"><span>Semana que viene</span><b>${b.de_vacaciones.total}</b><small>de vacaciones · <b>salen ${b.salen.total}</b> · vuelven ${b.vuelven.total}</small></div>`:''}
+      ${a?`<div><span>Esta semana · ${dmy(a.desde).slice(0,5)} al ${dmy(a.hasta).slice(0,5)}</span><b>${a.de_vacaciones.total}</b><small>de vacaciones · ${nic(a.de_vacaciones)}</small></div>`:''}
+      ${b?`<div class="hl"><span>Semana que viene · ${dmy(b.desde).slice(0,5)} al ${dmy(b.hasta).slice(0,5)}</span><b>${b.de_vacaciones.total}</b><small>de vacaciones · ${nic(b.de_vacaciones)}</small></div>`:''}
     </div>
-    <div class="tscroll"><table class="nm-t"><thead><tr><th>Semana</th><th>Lunes a domingo</th><th class="num">De vacaciones</th><th class="num">Salen</th><th class="num">Vuelven</th></tr></thead><tbody>
-    ${S.map((s,i)=>`<tr${i===1?' class="cm-sel"':''}><td><b>${lab(s,i)}</b></td><td class="mono">${dmy(s.desde).slice(0,5)} al ${dmy(s.hasta).slice(0,5)}</td><td class="num">${n(s.de_vacaciones)}</td><td class="num">${n(s.salen)}</td><td class="num">${n(s.vuelven)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="vd-nota" style="padding:0 16px 12px">Cantidad de personas, sin nombres. "De vacaciones" = está de vacaciones algún día de esa semana. Incluye el plan de vacaciones y las solicitudes aprobadas.</p>`;
+    <div class="tscroll"><table class="nm-t"><thead><tr><th>Semana</th><th>Lunes a domingo</th><th class="num">De vacaciones</th><th class="num">NIC 1</th><th class="num">NIC 2</th><th class="num">Empiezan esa semana</th></tr></thead><tbody>
+    ${S.map((s,i)=>`<tr${i===1?' class="cm-sel"':''}><td><b>${lab(i)}</b></td><td class="mono">${dmy(s.desde).slice(0,5)} al ${dmy(s.hasta).slice(0,5)}</td><td class="num"><b>${s.de_vacaciones.total}</b></td><td class="num">${s.de_vacaciones['NIC 1']}</td><td class="num">${s.de_vacaciones['NIC 2']}</td><td class="num">${s.salen.total}</td></tr>`).join('')}</tbody></table></div>
+    <p class="vd-nota" style="padding:0 16px 12px">Cantidad de personas de vacaciones en cada semana, sin nombres (plan de vacaciones y solicitudes aprobadas). "Empiezan esa semana" son las que salen de vacaciones esa semana; ya están incluidas en el total.</p>`;
 }
 function renderViandas(){
   const el=$('#vd-body'); if(!el) return; const V=DB.viandas;
