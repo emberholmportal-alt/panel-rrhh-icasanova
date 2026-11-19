@@ -323,6 +323,8 @@ const SRVX=(()=>{
   // la barra de avisos (ticker) es solo del administrador; a los usuarios sin agenda tampoco se les muestran pendientes en Inicio
   if(!isAdm) document.body.classList.add('no-ticker');
   if(U.sinagenda) document.body.classList.add('sin-agenda');
+  // los carteles de carga de archivos (y de qué archivo vienen los datos) solo los ven Ariel (admin), Joaquín y Rubén
+  if(!isAdm&&!['joliva','rcampos'].includes(U.username)) document.body.classList.add('no-cargas');
   // coordinadores: sin las fechas de baja de eventuales (el servidor tampoco se las manda)
   if(U.nobajas){ setTimeout(()=>{ const t=document.querySelector('#tabsAnt [data-p="pa-prox"]'), p=document.getElementById('pa-prox');
     if(t){ t.style.display='none'; } if(p) p.style.display='none';

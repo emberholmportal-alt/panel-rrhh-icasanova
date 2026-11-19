@@ -231,3 +231,7 @@ tr.cm-sel td{background:rgba(251,191,36,.07)}
 .nm-fav{display:none} .nm-fav.on{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px;padding:10px 14px;border-radius:12px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.1);font-size:13px;animation:nmFav 2s ease-in-out infinite}
 @keyframes nmFav{50%{background:rgba(251,191,36,.18)}}
 @media (prefers-reduced-motion:reduce){#nm-kpis .nm-on,.nm-fav.on{animation:none}}
+
+/* sin carteles de carga para quien no carga archivos (el menú semanal lo sigue cargando quien tenga permiso) */
+body.no-cargas #nm-drop,body.no-cargas #am-load,body.no-cargas #fr-mdrop,body.no-cargas #fr-drop,body.no-cargas #ro-drop,body.no-cargas #ro-tdrop,
+body.no-cargas #an-drop,body.no-cargas #drop,body.no-cargas #dropVac,body.no-cargas #dropAnt,body.no-cargas #cu-load,body.no-cargas .updbar{display:none!important}
