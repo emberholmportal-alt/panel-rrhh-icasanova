@@ -120,6 +120,23 @@ def startup():
             if ua and (ua.nombre or "").strip().lower() == "ariel":
                 ua.nombre = "Flores, Ariel"
             nuevas.append("2026-11-17-nombre-admin")
+        clave_af, legs_af = seed.APTO_FRIO
+        if clave_af not in hechas:
+            ed = db.get(Doc, "eventuales")
+            if ed is None:
+                ed = Doc(key="eventuales", data={}, version=0)
+                db.add(ed)
+            data = dict(ed.data or {})
+            af = dict(data.get("aptoFrio") or {})
+            for leg, nom in legs_af.items():
+                af.setdefault(leg, {"n": nom, "at": iso(now()), "por": "sistema"})
+            data["aptoFrio"] = af
+            ed.data = data
+            ed.version = (ed.version or 0) + 1
+            ed.updated_at = now()
+            ed.updated_by = "sistema"
+            auth.audit(db, "sistema", "apto_frio", f"{len(legs_af)} eventuales con apto frío")
+            nuevas.append(clave_af)
         for clave, extra in seed.NOMINA_EXTRA:
             if clave in hechas:
                 continue

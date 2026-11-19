@@ -95,7 +95,7 @@ function nmRows(){
     return {leg:e.leg,nombre:e.nombre||f.nombre||'',tipo,sector:e.sector||normTxt(f.sector)||'SIN SECTOR',turno:e.turno||normTxt(f.turno)||'SIN TURNO',ingreso:e.ingreso||f.ingreso||''}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
 }
-let nmState={tipos:[],sectores:[],turnos:[],q:''};
+let nmState={tipos:[],sectores:[],turnos:[],q:'',frio:false};
 function nmMsel(sel,key,lab,vals,labf){
   const box=$(sel); if(!box) return; const cnt={}; vals.forEach(k=>cnt[k]=(cnt[k]||0)+1);
   const ks=Object.keys(cnt).sort((a,b)=>String(labf?labf(a):a).localeCompare(String(labf?labf(b):b),'es'));
@@ -106,7 +106,7 @@ function nmMsel(sel,key,lab,vals,labf){
   box.classList.toggle('open',open); box.classList.toggle('act',!!on.length);
 }
 function nmFiltered(R){ const q=nmState.q.trim().toLowerCase();
-  return R.filter(r=>(!nmState.tipos.length||nmState.tipos.includes(r.tipo))&&(!nmState.sectores.length||nmState.sectores.includes(r.sector))&&(!nmState.turnos.length||nmState.turnos.includes(r.turno))&&(!q||r.nombre.toLowerCase().includes(q)||r.leg.includes(q))); }
+  return R.filter(r=>(!nmState.tipos.length||nmState.tipos.includes(r.tipo))&&(!nmState.sectores.length||nmState.sectores.includes(r.sector))&&(!nmState.turnos.length||nmState.turnos.includes(r.turno))&&(!q||r.nombre.toLowerCase().includes(q)||r.leg.includes(q))&&(!nmState.frio||esFrio(r.leg))); }
 function nmGroup(R,k){ const g={}; R.forEach(r=>{ const x=g[r[k]]||(g[r[k]]={EF:0,FC:0,EV:0,EXT:0,'':0,t:0}); x[r.tipo]++; x.t++; }); return g; }
 function renderNomina(){
   if(!$('#v-nomina')) return;
@@ -117,7 +117,7 @@ function renderNomina(){
   nmMsel('#nm-ms','sectores','Sector',ALL.map(r=>r.sector));
   nmMsel('#nm-mu','turnos','Turno',ALL.map(r=>r.turno));
   const R=nmFiltered(ALL), c=k=>R.filter(r=>r.tipo===k).length, sc=ALL.filter(r=>!r.tipo).length;
-  $('#nm-kpis').innerHTML=[{l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} con el filtro`:'personas en nómina',c:''},{l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'}].concat(ALL.some(r=>r.tipo==='EXT')?[{l:'Personal externo',v:c('EXT'),s:'EXT',c:''}]:[])
+  $('#nm-kpis').innerHTML=[{l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} con el filtro`:'personas en nómina',c:''},{l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'},{l:'❄ Apto frío',v:R.filter(r=>r.tipo==='EV'&&esFrio(r.leg)).length,s:nmState.frio?'mostrando solo ellos · clic para ver todos':'eventuales · clic para ver solo ellos',c:'acc-cyan nm-frk'+(nmState.frio?' on':'')}].concat(ALL.some(r=>r.tipo==='EXT')?[{l:'Personal externo',v:c('EXT'),s:'EXT',c:''}]:[])
     .concat(sc?[{l:'Sin clasificar',v:R.filter(r=>!r.tipo).length,s:'cargá el Movimientos del reloj',c:'acc-alert'}]:[])
     .map(k=>`<div class="kpi ${k.c}"><div class="lab">${esc(k.l)}</div><div class="val">${esc(k.v)}</div><div class="sub">${esc(k.s)}</div></div>`).join('');
   const tbl=(id,key,lab)=>{ const g=nmGroup(R,key), ks=Object.keys(g).sort((a,b)=>g[b].t-g[a].t||a.localeCompare(b,'es'));
@@ -136,10 +136,10 @@ function renderNomina(){
   // detalle
   $('#nm-n').textContent=`${R.length} persona(s)`;
   $('#nm-det').innerHTML=R.length?`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th>Sector</th><th>Turno</th><th>Ingreso</th></tr></thead><tbody>`+
-    R.map(r=>`<tr><td class="mono">${esc(r.leg)}</td><td><b>${esc(r.nombre)}</b></td><td><span class="nm-tp" style="--c:${NM_COL[r.tipo]}">${esc(NM_TIPO[r.tipo])}</span></td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="mono">${r.ingreso?dmy(r.ingreso):''}</td></tr>`).join('')+'</tbody>'
+    R.map(r=>`<tr><td class="mono">${esc(r.leg)}</td><td><b>${esc(r.nombre)}</b>${FRIO(r.leg)}${r.tipo==='EV'&&canEditMod('eventuales')?`<button class="frio-tg${esFrio(r.leg)?' on':''}" data-frio="${esc(r.leg)}" title="${esFrio(r.leg)?'Quitar apto frío':'Marcar apto frío'}">${esFrio(r.leg)?'quitar ❄':'+ ❄'}</button>`:''}</td><td><span class="nm-tp" style="--c:${NM_COL[r.tipo]}">${esc(NM_TIPO[r.tipo])}</span></td><td>${esc(r.sector)}</td><td>${esc(r.turno)}</td><td class="mono">${r.ingreso?dmy(r.ingreso):''}</td></tr>`).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${ALL.length?'Nadie con este filtro.':'Cargá el export de Movimientos del reloj y, si querés, una planilla con sector y turno.'}</div></td></tr></tbody>`;
 }
-const nmFiltroTxt=()=>[nmState.tipos.length?'Tipo: '+nmState.tipos.map(k=>NM_TIPO[k]).join(', '):'',nmState.sectores.length?'Sector: '+nmState.sectores.join(', '):'',nmState.turnos.length?'Turno: '+nmState.turnos.join(', '):'',nmState.q?'Búsqueda: '+nmState.q:''].filter(Boolean).join(' · ')||'Sin filtros (toda la nómina)';
+const nmFiltroTxt=()=>[nmState.tipos.length?'Tipo: '+nmState.tipos.map(k=>NM_TIPO[k]).join(', '):'',nmState.sectores.length?'Sector: '+nmState.sectores.join(', '):'',nmState.turnos.length?'Turno: '+nmState.turnos.join(', '):'',nmState.q?'Búsqueda: '+nmState.q:'',nmState.frio?'Solo apto frío':''].filter(Boolean).join(' · ')||'Sin filtros (toda la nómina)';
 function nmExcel(){
   const R=nmFiltered(nmRows()); if(!R.length){ App.toast('No hay datos para exportar.',true); return; }
   const wb=XLSX.utils.book_new(), sum=k=>R.filter(r=>r.tipo===k).length;
@@ -151,7 +151,7 @@ function nmExcel(){
   const ts=uniq(R.map(r=>r.turno)).sort(), ss=uniq(R.map(r=>r.sector)).sort();
   const mx=[['Sector \\ Turno'].concat(ts,['Total'])].concat(ss.map(s=>[s].concat(ts.map(t=>R.filter(r=>r.sector===s&&r.turno===t).length),[R.filter(r=>r.sector===s).length]))).concat([['Total'].concat(ts.map(t=>R.filter(r=>r.turno===t).length),[R.length])]);
   const w3=XLSX.utils.aoa_to_sheet(mx); w3['!cols']=[{wch:26}].concat(ts.map(()=>({wch:12})),[{wch:9}]); XLSX.utils.book_append_sheet(wb,w3,'Sector x turno');
-  const det=[['Legajo','Apellido y nombre','Tipo','Sector','Turno','Ingreso']].concat(R.map(r=>[r.leg,r.nombre,NM_TIPO[r.tipo],r.sector,r.turno,r.ingreso?dmy(r.ingreso):'']));
+  const det=[['Legajo','Apellido y nombre','Tipo','Sector','Turno','Ingreso','Apto frío']].concat(R.map(r=>[r.leg,r.nombre,NM_TIPO[r.tipo],r.sector,r.turno,r.ingreso?dmy(r.ingreso):'',esFrio(r.leg)?'Sí':'']));
   const w4=XLSX.utils.aoa_to_sheet(det); w4['!cols']=[{wch:9},{wch:34},{wch:17},{wch:22},{wch:16},{wch:11}]; w4['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:det.length-1,c:5}})}; XLSX.utils.book_append_sheet(wb,w4,'Detalle');
   XLSX.writeFile(wb,`nomina_${hoy()}.xlsx`); App.toast('Excel de nómina descargado');
 }
@@ -182,7 +182,11 @@ function hookNomina(){
   $('#nm-xls').onclick=nmExcel; $('#nm-rep').onclick=nmInforme;
   $('#nm-del').onclick=async()=>{ if(!confirm('¿Vaciar la nómina cargada?')) return; DB.nomina=null; await persist(); renderNomina(); App.toast('Nómina vaciada'); };
   let qt; $('#nm-q').oninput=e=>{ clearTimeout(qt); qt=setTimeout(()=>{ nmState.q=e.target.value; renderNomina(); },200); };
-  document.addEventListener('click',e=>{ if(!e.target.closest('#v-nomina')) return;
+  document.addEventListener('click',async e=>{ if(!e.target.closest('#v-nomina')) return;
+    if(e.target.closest('.nm-frk')){ nmState.frio=!nmState.frio; renderNomina(); return; }
+    const tg=e.target.closest('[data-frio]'); if(tg){ const l=nmLeg(tg.dataset.frio); DB.aptoFrio=Object.assign({},DB.aptoFrio||{}); const r=nmRows().find(x=>x.leg===l);
+      if(DB.aptoFrio[l]) delete DB.aptoFrio[l]; else DB.aptoFrio[l]={n:r?r.nombre:'',at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:''};
+      await persist(); renderNomina(); App.refresh(); App.toast(DB.aptoFrio[l]?`❄ ${r?r.nombre:l}: apto frío`:`${r?r.nombre:l}: sin apto frío`); return; }
     const mb=e.target.closest('.msel-b'); if(mb){ const m=mb.parentElement, was=m.classList.contains('open'); document.querySelectorAll('#v-nomina .msel.open').forEach(x=>x.classList.remove('open')); m.classList.toggle('open',!was); return; }
     const ma=e.target.closest('[data-nm-all],[data-nm-none]'); if(ma){ const k=ma.dataset.nmAll||ma.dataset.nmNone; nmState[k]=ma.dataset.nmAll?[...ma.closest('.msel').querySelectorAll('input[data-nm]')].map(i=>i.value):[]; renderNomina(); return; } });
   document.addEventListener('change',e=>{ const c=e.target.closest('input[data-nm]'); if(!c) return; const k=c.dataset.nm; nmState[k]=c.checked?uniq(nmState[k].concat(c.value)):nmState[k].filter(x=>x!==c.value); renderNomina(); });

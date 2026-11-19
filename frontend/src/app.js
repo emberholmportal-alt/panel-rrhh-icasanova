@@ -1180,7 +1180,7 @@ function renderFrDia(){
   const L=frDeFranco(d).filter(frFlt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')), G={};
   L.forEach(e=>{ const k=secKey(e.sector)+' · '+turKey(e.turno); (G[k]||(G[k]=[])).push(e); });
   el.innerHTML=`<div class="fr-dnav"><button class="fr-arr" data-frdia="-1">‹</button><div><b>${esc(DOWL[dObj(d).getDay()][0].toUpperCase()+DOWL[dObj(d).getDay()].slice(1))} ${dmy(d)}</b><span>${L.length?`${L.length} colaborador(es) con franco asignado${frState.sectors.length||frState.turnos.length||frState.q?' en este filtro':''}`:'Nadie con franco asignado'}</span></div><button class="fr-arr" data-frdia="1">›</button>${d!==hoy()?'<button class="btn ghost sm" data-frdia="0">Hoy</button>':''}<input type="date" id="fr-dia-i" value="${d}"></div>
-    ${Object.keys(G).sort((a,b)=>a.localeCompare(b,'es')).map(k=>`<div class="fr-dg"><h4>${esc(k)} <i>${G[k].length}</i></h4><div>${G[k].map(e=>{ const m=frMeta(e,d); return `<span class="fr-dp" title="${esc(m&&m.v==='F'?'Cargado por '+m.by+' · '+fmtAt(m.at):'Del plan de francos')}">${esc(e.nombre)}<em>${esc(e.legajo||'')}</em></span>`; }).join('')}</div></div>`).join('')||'<div class="empty">No hay francos asignados ese día con este filtro.</div>'}`;
+    ${Object.keys(G).sort((a,b)=>a.localeCompare(b,'es')).map(k=>`<div class="fr-dg"><h4>${esc(k)} <i>${G[k].length}</i></h4><div>${G[k].map(e=>{ const m=frMeta(e,d); return `<span class="fr-dp" title="${esc(m&&m.v==='F'?'Cargado por '+m.by+' · '+fmtAt(m.at):'Del plan de francos')}">${esc(e.nombre)}${FRIO(e.legajo)}<em>${esc(e.legajo||'')}</em></span>`; }).join('')}</div></div>`).join('')||'<div class="empty">No hay francos asignados ese día con este filtro.</div>'}`;
 }
 function frFlt(e){ const q=frState.q.trim().toLowerCase(); return (!frState.turnos.length||frState.turnos.includes(turKey(e.turno)))&&(!frState.sectors.length||frState.sectors.includes(secKey(e.sector)))&&(!q||e.nombre.toLowerCase().includes(q)||String(e.legajo).includes(q)); }
 const frAsig=(e,ds)=>ds.reduce((a,d)=>a+(e.d[d]==='F'&&!(e.ingreso&&d<e.ingreso)&&!(e.egreso&&d>e.egreso)&&dObj(d).getDay()!==0?1:0),0);
@@ -1276,6 +1276,9 @@ async function loadMovFrancos(rows,hi,name){
   frMovMerge(M,name); await persist(); return Object.keys(M.emps).length;
 }
 const CX_DEF={obj:20,art:true};
+// apto frío (eventuales con certificado para trabajar en cámara): ❄ junto al nombre en Nómina y Francos
+function esFrio(leg){ return !!((DB.aptoFrio||{})[String(leg==null?'':leg).trim().replace(/\.0+$/,'')]); }
+function FRIO(leg){ return esFrio(leg)?' <span class="frio" title="Apto frío">❄</span>':''; }
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
 const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable/i.test(f.t||'')?f:null; };
 function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(frState.liq); }
@@ -1360,11 +1363,11 @@ function renderFrancos(){
   { const lista=frState.modo==='lista'; $('#fr-gridw').hidden=lista; $('#fr-cx-ley').hidden=lista; $('#fr-n').hidden=lista; $('#fr-dia').hidden=!lista; if(lista) renderFrDia(); }
   { const cur=liqDe(hoy()), rows=C?C.rows:[], asig=rows.reduce((a,r)=>a+frAsig(r.e,C.dias),0), sin=rows.filter(r=>!frAsig(r.e,C.dias)).length,
       falta=hoy()>=P.d0&&hoy()<=P.d1?Math.round((dObj(P.d1)-dObj(hoy()))/864e5):null;
-    const nA=rows.length;
+    const nA=rows.length, nF=rows.filter(r=>esFrio(r.e.legajo)).length;
     $('#fr-liq').innerHTML=`<div class="fr-hp"><button class="fr-arr" data-liq="-1" title="Período anterior">‹</button>
       <div class="fr-hn"><span>Liquidación</span><b>${liqNom(P.ym)}</b><em>${dmy(P.d0)} al ${dmy(P.d1)}${P.ym===cur?' · en curso':''}</em></div>
       <button class="fr-arr" data-liq="1" title="Período siguiente">›</button>${P.ym!==cur?'<button class="btn ghost sm" data-liq="0">Volver al actual</button>':''}</div>
-      <div class="fr-hs"><div><b>${nA}</b><span>eventuales activos</span></div><div><b>${asig}</b><span>francos asignados</span></div><div class="${sin?'w':''}"><b>${sin}</b><span>sin francos</span></div><div><b>${falta==null?(hoy()>P.d1?'—':'·'):falta}</b><span>${falta==null?(hoy()>P.d1?'período cerrado':'no empezó'):'días al cierre'}</span></div></div>`; }
+      <div class="fr-hs"><div><b>${nA}</b><span>eventuales activos</span></div><div class="frio-k"><b>❄ ${nF}</b><span>con apto frío</span></div><div><b>${asig}</b><span>francos asignados</span></div><div class="${sin?'w':''}"><b>${sin}</b><span>sin francos</span></div><div><b>${falta==null?(hoy()>P.d1?'—':'·'):falta}</b><span>${falta==null?(hoy()>P.d1?'período cerrado':'no empezó'):'días al cierre'}</span></div></div>`; }
   const nAnt=[...ANTOF.values()].filter(a=>a.activo).length, nBaja=ANTOF.size-nAnt, nPl=F?Object.keys(F.emps||{}).length:0;
   $('#fr-drop').classList.toggle('ok',!!E.length); $('#fr-mdrop').classList.toggle('ok',!!(C&&C.M));
   const LA=F&&F.asig&&F.asig[F.asig.length-1];
@@ -1402,7 +1405,7 @@ function renderFrancos(){
   $('#fr-cx').innerHTML=!C?`<tbody><tr><td><div class="empty">Cargá el plan de francos (paso 1) y los movimientos del reloj (paso 2).</div></td></tr></tbody>`:
     `<thead><tr><th class="fr-ck"><input type="checkbox" id="fr-sel-all" title="Elegir todos los del filtro"${R.length&&R.every(r=>frState.sel.includes(cxKey(r.e)))?' checked':''}></th><th>Legajo</th><th>Empleado</th><th>Turno / sector</th>${th('Fichadas','Días con fichada en el reloj (incluye domingos y feriados trabajados)')}${th('Francos<br>restantes','Francos que le faltan tomar para no pasar de '+cfg.obj+' jornadas')}${th('Jornadas<br>a la fecha','Fichadas + enfermedad'+(cfg.art?' + ART':''))}${th('Le quedan<br>planificadas','Jornadas del plan después del corte (sin domingos ni feriados)')}${th('Total al<br>cierre','Jornadas a la fecha + planificadas')}${th('Francos<br>tomados','Días sin fichada (+ francos ya planificados), sin contar domingos')}<th>Novedades</th></tr></thead><tbody>`+
     (R.length?R.map(r=>{ const g=r.g, nov=[g.DT?g.DT+' dom. trab.':'',g.FT?g.FT+' fer. trab.':'',g.ENF?g.ENF+' enferm.':'',g.ART?g.ART+' ART':'',g.AUS?g.AUS+' ausencia':'',g.VAC?g.VAC+' vac.':'',g.LIC+g.OTRO?(g.LIC+g.OTRO)+' otras':'',r.mv?'':'sin fichadas',r.falt?`no llega a ${cfg.obj} (faltan ${r.falt})`:''].filter(Boolean).join(' · ');
-      return `<tr data-cxe="${esc(cxKey(r.e))}" class="${frState.emp===cxKey(r.e)?'sel':''}"><td class="fr-ck"><input type="checkbox" data-frsel="${esc(cxKey(r.e))}"${frState.sel.includes(cxKey(r.e))?' checked':''}></td><td class="mono">${esc(r.e.legajo)}</td><td><b>${esc(r.e.nombre)}</b></td>
+      return `<tr data-cxe="${esc(cxKey(r.e))}" class="${frState.emp===cxKey(r.e)?'sel':''}"><td class="fr-ck"><input type="checkbox" data-frsel="${esc(cxKey(r.e))}"${frState.sel.includes(cxKey(r.e))?' checked':''}></td><td class="mono">${esc(r.e.legajo)}</td><td><b>${esc(r.e.nombre)}</b>${FRIO(r.e.legajo)}</td>
       <td style="font-size:12.5px">${esc(r.e.turno||'')}<div style="color:var(--text3);font-size:11.5px">${esc(r.e.sector||'')}</div></td>
       <td class="mono" style="text-align:center;font-weight:600">${g.T+g.DT+g.FT}</td><td style="text-align:center">${cxTag(r,cfg)}</td><td class="mono" style="text-align:center">${r.comp}</td><td class="mono" style="text-align:center">${g.P}</td>
       <td class="mono" style="text-align:center;font-weight:600;color:${r.proy>cfg.obj?'#fcd34d':'var(--text)'}">${r.proy}</td><td class="mono" style="text-align:center">${r.ftom}</td>
@@ -1420,7 +1423,7 @@ function renderFrancos(){
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
       return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C&&C.M?'<th class="frt" title="Francos que le faltan tomar según las fichadas">Faltan</th>':''}</tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
-      return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
+      return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}${FRIO(e.legajo)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
         return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
@@ -1445,7 +1448,7 @@ function renderFrEmp(C){
   const card=$('#fr-emp-card'), r=C&&frState.emp&&C.by[frState.emp];
   if(!r){ card.hidden=true; return; } card.hidden=false;
   const e=r.e, g=r.g, cfg=C.cfg;
-  $('#fr-emp-h').innerHTML=`${esc(e.nombre)} <span style="font-weight:400;color:var(--text3);font-size:12.5px">· ${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}${e.ingreso?' · ingreso '+dmy(e.ingreso):''}${e.egreso?' · egreso '+dmy(e.egreso):''}</span>`;
+  $('#fr-emp-h').innerHTML=`${esc(e.nombre)}${FRIO(e.legajo)} <span style="font-weight:400;color:var(--text3);font-size:12.5px">· ${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}${e.ingreso?' · ingreso '+dmy(e.ingreso):''}${e.egreso?' · egreso '+dmy(e.egreso):''}</span>`;
   const first=C.dias[0], off=(dObj(first).getDay()+6)%7;
   const cells=Array(off).fill('<div class="d e"></div>').concat(C.dias.map(d=>{ const c=r.cal[d], nov=C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
     return `<div class="d frc c${c==='-'?'b':c}" title="${esc(lblDay(d)+(nov?' · '+nov:''))}"><b>${dObj(d).getDate()}</b>${esc(CX_LAB[c])}${cxFer(d)?'<br><i style="font-size:10px">'+esc(cxFer(d).n.slice(0,40))+'</i>':''}</div>`; }));
@@ -1559,7 +1562,7 @@ async function cxCoordExcel(soloPend){ soloPend=soloPend===true;
     h.height=30;
     const L=p.R;
     L.forEach((r,i)=>{ const row=ws.getRow(7+i), n=7+i;
-      [r.e.legajo,r.e.nombre,secKey(r.e.sector),r.e.turno||'',r.comp,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j>=1&&j<=3?'left':'center',vertical:'middle'}; if(j===5){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
+      [r.e.legajo,r.e.nombre+(esFrio(r.e.legajo)?" ❄":""),secKey(r.e.sector),r.e.turno||'',r.comp,r.sup?0:r.pend].forEach((v,j)=>{ const c=row.getCell(j+1); c.value=j===0?String(v):v; c.border=B; c.alignment={horizontal:j>=1&&j<=3?'left':'center',vertical:'middle'}; if(j===5){ c.font={bold:true,size:12}; c.fill=fill('FFFEF3C7'); } });
       fut.forEach((d,j)=>{ const c=row.getCell(FC+j), st=r.cal[d]; c.border=B; c.alignment={horizontal:'center',vertical:'middle'};
         if(st==='-'||st==='FER'||st==='FT'){ c.value=st==='-'?'–':'Fe'; c.fill=fill('FFE2E8F0'); c.font={color:{argb:'FF64748B'}}; }
         else if(st==='P'||st==='PF'){ c.value=st==='PF'?'F':null; c.protection={locked:false}; c.font={bold:true,color:{argb:'FF0E7490'},size:12};

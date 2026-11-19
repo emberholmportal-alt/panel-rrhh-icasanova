@@ -7,7 +7,7 @@
 (function(){
   if(!/^https?:$/.test(location.protocol)) return;
   var MAP={ausentismo:['version','tolerancia','escPedidos','escApercib','renglones','shifts','records','people','templates','files'],
-    vacaciones:['vac','vacOv'],eventuales:['ant','antOv','antAdd','antLog'],francos:['francos'],
+    vacaciones:['vac','vacOv'],eventuales:['ant','antOv','antAdd','antLog','aptoFrio'],francos:['francos'],
     indumentaria:['ropa','ropaOv','ropaPrep','ropaTalles','ropaTallesMeta'],anticipos:['anticipos'],agenda:['recs'],nomina:['nomina'],menu:['menu'],cumpleanos:['cumple'],ausmot:['ausmot'],viandas:['viandas'],wagrupo:['wa']};
   var F3K=['panelF3_base_v1','panelF3_ajustes_v1','panelF3_codigos_v1'];
   var S=window.SRV={MAP:MAP,F3K:F3K,mode:'login',docs:{},initial:{}};
