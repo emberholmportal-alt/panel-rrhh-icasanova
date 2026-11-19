@@ -19,6 +19,8 @@ def perfil(tipo: str) -> dict:
     elif tipo == "lectura":        # ve todas las secciones y descarga informes, sin modificar nada
         p = {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda", "hextras"]}
         return p
+    elif tipo == "medico":         # servicio médico: solo consulta en pantalla (sin descargar ni modificar)
+        return {"nomina": "consulta", "francos": "consulta", "eventuales": "consulta", "vacaciones": "consulta"}
     elif tipo == "aylen":          # vacaciones (próximas y en curso) y nómina
         p = {"vacaciones": "ver", "nomina": "ver"}
     else:
@@ -34,6 +36,8 @@ USUARIOS = [
     ("lmunoz", "Muñoz, Luis", "sin_ropa", "$2b$12$BAyGnlyR3En4ZWITncztvOSV1Z4IFcM5MSs6.I4Er62yPt.i7XxoK"),
     ("rcampos", "Campos, Rubén", "lectura", "$2b$12$1R31TnKWCT2xtJ4hSr0szuwVI67cie3EAqJIvPZ/ex0yXv3PbXkRO"),
     # alta 19/11/2026: mismos permisos que Rubén Campos
+    # alta 19/11/2026: servicio médico, usuario de consulta
+    ("smedico", "Servicio Médico", "medico", "$2b$12$d1Df2BBZwrJZFg1wE0D.reeR2cHtlHx7nxaD/S.7J7g6.wsuBdS0W"),
     ("gmaamari", "Maamari, Guadalupe", "lectura", "$2b$12$LIZRVbi/rXiB6Qrysb2nIOB5wecZuIHV2aJIr1PqIrxjzt7mPlK.O"),
     ("avivone", "Vivone, Aylén", "aylen", "$2b$12$5qmwwOlRlCleVF4kg8.gpeRkNM5OvO4JPYKTR/Opr0zoreH8aLfBq"),
     ("mmarchioro", "Marchioro, Milagros", "milagros", "$2b$12$EfYydoVP4K3ZRW4ryGGre.uzbEuAitYu1o3gfZlbiiWiP0CMrZ5Ve"),
