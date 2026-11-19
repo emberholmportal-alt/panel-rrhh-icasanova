@@ -33,6 +33,8 @@ USUARIOS = [
     ("joliva", "Oliva, Joaquín", "todos", "$2b$12$EK7kl.NTVcbwieI2hb.O/eHenAteFLXxVPfFcr2phK2JXTD7Bug1i"),
     ("lmunoz", "Muñoz, Luis", "sin_ropa", "$2b$12$BAyGnlyR3En4ZWITncztvOSV1Z4IFcM5MSs6.I4Er62yPt.i7XxoK"),
     ("rcampos", "Campos, Rubén", "lectura", "$2b$12$1R31TnKWCT2xtJ4hSr0szuwVI67cie3EAqJIvPZ/ex0yXv3PbXkRO"),
+    # alta 19/11/2026: mismos permisos que Rubén Campos
+    ("gmaamari", "Maamari, Guadalupe", "lectura", "$2b$12$LIZRVbi/rXiB6Qrysb2nIOB5wecZuIHV2aJIr1PqIrxjzt7mPlK.O"),
     ("avivone", "Vivone, Aylén", "aylen", "$2b$12$5qmwwOlRlCleVF4kg8.gpeRkNM5OvO4JPYKTR/Opr0zoreH8aLfBq"),
     ("mmarchioro", "Marchioro, Milagros", "milagros", "$2b$12$EfYydoVP4K3ZRW4ryGGre.uzbEuAitYu1o3gfZlbiiWiP0CMrZ5Ve"),
     # coordinadores (alta 16/11/2026)
@@ -75,6 +77,12 @@ MIGRACIONES = [
     ("2026-11-16-rcampos", [
         # Rubén Campos: todas las secciones, solo ver y descargar informes
         ("rcampos", {m: "ver" for m in TODOS + ["menu", "vacsol", "agenda"]}),
+    ]),
+    ("2026-11-19-ausentismo-ruben", [
+        # Rubén ve Ausentismo completo (llegadas tarde y la sección Ausentismo por motivo);
+        # Guadalupe Maamari, igual que Rubén
+        ("rcampos", {"ausentismo": "ver", "ausmot": "ver"}),
+        ("gmaamari", {"ausentismo": "ver", "ausmot": "ver", "chat": "editar"}),
     ]),
 ]
 

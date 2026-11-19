@@ -131,7 +131,7 @@ def require_admin(u: User = Depends(current_user)) -> User:
 MENU_EDITORES = {"mmarchioro"}
 
 # En Ausentismo estos usuarios ven solo "Llegadas tarde" y "Reincidencias" (no pedidos, sin fichada, turnos ni plantilla).
-AUS_PARCIAL = {"cbertetti", "joliva", "rcampos", "lmunoz"}
+AUS_PARCIAL = {"cbertetti", "joliva", "lmunoz"}
 
 
 def sin_agenda(u: User) -> bool:
