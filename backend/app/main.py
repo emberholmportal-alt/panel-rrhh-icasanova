@@ -629,6 +629,11 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     if base is not None and int(base) != d.version:
         raise HTTPException(409, json.dumps({"msg": f"{d.updated_by or 'Otro usuario'} modificó {MODULES.get(key, key)} mientras trabajabas",
                                               "version": d.version, "updated_by": d.updated_by}))
+    if key == "viandas":
+        # lo que contó la cocina se carga aparte (/api/comidas/cocina): el recálculo de Comidas no lo pisa
+        cur = ((d.data or {}).get("viandas") or {}).get("cocina")
+        if cur is not None and isinstance(data.get("viandas"), dict):
+            data = {**data, "viandas": {**data["viandas"], "cocina": cur}}
     d.data = data
     d.version += 1
     d.updated_at = now()
@@ -637,6 +642,42 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     auth.audit(db, u, "guardar", MODULES.get(key, key) + (": " + nota if nota else ""))
     db.commit()
     return {"version": d.version, "updated_at": iso(d.updated_at), "updated_by": d.updated_by}
+
+
+@app.post("/api/comidas/cocina")
+async def comidas_cocina(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Lo que contó la cocina en un día, por comedor y servicio. Lo carga quien ve Comidas (ej. Milagros)."""
+    if not can_read(u, "viandas"):
+        raise HTTPException(403, "No tenés acceso a Comidas")
+    body = json.loads(await request.body() or b"{}")
+    fecha, clave, valor = str(body.get("fecha") or ""), str(body.get("clave") or ""), body.get("valor")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fecha) or clave not in ("NIC 1|alm", "NIC 1|cen", "NIC 2|alm", "NIC 2|cen"):
+        raise HTTPException(400, "Formato inválido")
+    d = db.scalar(select(Doc).where(Doc.key == "viandas").with_for_update())
+    if d is None:
+        d = Doc(key="viandas", data={"viandas": {}}, version=0)
+        db.add(d)
+    data = copy.deepcopy(d.data or {})
+    v = data.setdefault("viandas", {}) or {}
+    data["viandas"] = v
+    coc = v.setdefault("cocina", {})
+    dia = coc.setdefault(fecha, {})
+    if valor in (None, ""):
+        dia.pop(clave, None)
+    else:
+        try:
+            dia[clave] = max(0, min(5000, int(round(float(valor)))))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Número inválido")
+    if not dia:
+        coc.pop(fecha, None)
+    d.data = data
+    d.version = (d.version or 0) + 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    auth.audit(db, u, "guardar", f"Comidas: cocina {fecha} {clave} = {valor}")
+    db.commit()
+    return {"cocina": coc, "version": d.version}
 
 
 @app.post("/api/francos/celdas")

@@ -77,7 +77,7 @@ function vdCalc(fname){
     com,pend:VD_GR.filter(g=>!ini[g]&&VD_NIC.some(n=>C[n][g].e)),frEv,proy,pQueda,hist:HD};
 }
 // se recalcula en cada carga única (si quien carga puede editar Comidas)
-window.vdActualizar=function(fname){ try{ if(!canEditMod('viandas')) return false; const v=vdCalc(fname); if(!v) return false; v.cocina=(DB.viandas&&DB.viandas.cocina)||{}; DB.viandas=v; return true; }catch(e){ console.warn('comidas',e); return false; } };
+window.vdActualizar=function(fname){ try{ if(!canEditMod('viandas')) return false; const v=vdCalc(fname); if(!v) return false; v.cocina=(DB.viandas&&DB.viandas.cocina)||{}; DB.viandas=v;   /* el servidor conserva siempre su versión de cocina */ return true; }catch(e){ console.warn('comidas',e); return false; } };
 
 // eventuales con franco asignado HOY (sección Francos)
 function vdFrancosHoy(V){
@@ -135,7 +135,7 @@ let vdDiaSel='';
 function vdHistHtml(V){
   const H=V.hist||{}, dias=Object.keys(H).filter(d=>d<hoy()).sort().reverse(); if(!dias.length) return '';
   if(!vdDiaSel||!H[vdDiaSel]) vdDiaSel=dias[0];
-  const d=H[vdDiaSel], K=(V.cocina||{})[vdDiaSel]||{}, ed=canEditMod('viandas'), parcial=vdDiaSel===V.fecha;
+  const d=H[vdDiaSel], K=(V.cocina||{})[vdDiaSel]||{}, ed=!(window.SRV&&SRV.mode==='online')||(!!SRV.can&&SRV.can('viandas')&&!SRV.imp), parcial=vdDiaSel===V.fecha;   // quien ve Comidas puede anotar lo que contó la cocina
   const z={M:0,I:0,Iq:0,T:0,N:0}, srv=(nic,c)=>{ const o=d[nic]||z; return c==='alm'?{n:o.M+o.I-o.Iq,t:`Mañana ${o.M} + Intermedio ${o.I-o.Iq}`}:{n:o.T+o.N+o.Iq,t:`Tarde ${o.T} + Noche ${o.N}${o.Iq?` + ${o.Iq} intermedio (horas extras)`:''}`}; };
   const fila=(nic,c)=>{ const x=srv(nic,c), k=K[nic+'|'+c], dif=k!=null&&k!==''?(+k)-x.n:null;
     return `<tr><td><b>${nic}</b></td><td>${c==='alm'?'Almuerzo (TM)':'Cena (TN)'}</td><td class="num"><b>${x.n}</b><div class="meta">${x.t}</div></td>
@@ -143,14 +143,17 @@ function vdHistHtml(V){
       <td class="num">${dif==null?'':`<b class="${dif<0?'cm-neg':''}">${dif>0?'+':''}${dif}</b>`}</td></tr>`; };
   return `<div class="card" style="margin-top:14px"><div class="card-h"><h3>Días anteriores · lo que comió nuestro personal</h3>
     <select id="cm-dia">${dias.map(x=>`<option value="${x}"${x===vdDiaSel?' selected':''}>${DOWL[dObj(x).getDay()]} ${dmy(x)}</option>`).join('')}</select></div>
-    <div class="card-b flush"><div class="tscroll"><table class="nm-t"><thead><tr><th>Comedor</th><th>Servicio</th><th class="num">Nuestro (ficharon)</th><th class="num">Contó la cocina</th><th class="num">Diferencia ≈ Carrefour</th></tr></thead><tbody>
+    <div class="card-b flush"><div class="tscroll"><table class="nm-t"><thead><tr><th>Comedor</th><th>Servicio</th><th class="num">Nuestro (ficharon)</th><th class="num">Contó la cocina</th><th class="num">Diferencia</th></tr></thead><tbody>
     ${VD_NIC.map(n=>fila(n,'alm')+fila(n,'cen')).join('')}</tbody></table></div>
-    <p class="vd-nota" style="padding:0 16px 12px">Cuenta a los que ficharon ese día (personal GLD). El intermedio que fichó después de las 19 se cuenta en la cena.${parcial?` <b>Ojo:</b> el último export es del ${dmy(V.fecha)}${V.hora?' a las '+V.hora:''}, así que ese día puede estar incompleto (sobre todo la cena).`:''}${ed?' Cargá lo que contó la cocina y la diferencia queda guardada.':''}</p></div></div>`;
+    <p class="vd-nota" style="padding:0 16px 12px">Cuenta a los que ficharon ese día (personal GLD). El intermedio que fichó después de las 19 se cuenta en la cena.${parcial?` <b>Ojo:</b> el último export es del ${dmy(V.fecha)}${V.hora?' a las '+V.hora:''}, así que ese día puede estar incompleto (sobre todo la cena).`:''}${ed?' Anotá lo que contó la cocina: queda guardado y la diferencia se calcula sola.':''} Diferencia = lo que contó la cocina − los que ficharon. Puede ser personal de Carrefour, visitas, viandas extra o un error de conteo: sirve para ir ajustando el número.</p></div></div>`;
 }
 document.addEventListener('change',async e=>{
   if(e.target.id==='cm-dia'){ vdDiaSel=e.target.value; renderViandas(); }
-  const k=e.target.dataset&&e.target.dataset.cmk; if(k&&DB.viandas){ const V=DB.viandas; V.cocina=V.cocina||{}; const o=V.cocina[vdDiaSel]||(V.cocina[vdDiaSel]={});
-    if(e.target.value==='') delete o[k]; else o[k]=Math.max(0,Math.round(+e.target.value)); await persist(); renderViandas(); }
+  const k=e.target.dataset&&e.target.dataset.cmk; if(k&&DB.viandas){ const V=DB.viandas, val=e.target.value;
+    if(window.SRV&&SRV.mode==='online'){ try{ const r=await fetch('/api/comidas/cocina',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha:vdDiaSel,clave:k,valor:val})});
+        const j=await r.json().catch(()=>({})); if(!r.ok){ App.toast(j.detail||'No se pudo guardar',true); return; } V.cocina=j.cocina||{}; App.toast('Guardado lo que contó la cocina'); }catch(x){ App.toast('No se pudo guardar: sin conexión',true); return; } }
+    else { V.cocina=V.cocina||{}; const o=V.cocina[vdDiaSel]||(V.cocina[vdDiaSel]={}); if(val==='') delete o[k]; else o[k]=Math.max(0,Math.round(+val)); await persist(); }
+    renderViandas(); }
 });
 // ---- vacaciones por semana (sin nombres), para que la cocina sepa cuánta gente falta
 let vdVac=null, vdVacAt=0;
