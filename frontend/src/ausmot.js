@@ -246,11 +246,70 @@ function renderAmPersona(X){
     const tot={}; x.T.forEach(e=>{ const k=e.m; tot[k]=tot[k]||{n:0,c:e.c}; tot[k].n++; });
     const porCat=c=>x.T.filter(e=>e.c===c).length;
     const L2=x.T.slice().sort((a,b)=>a.f.localeCompare(b.f));
-    return `<div class="am-pp"><div class="am-ph"><div><b>${esc(x.p.nombre)}</b> <span class="meta">${esc(x.p.leg)} · ${esc(NM_TIPO[x.p.tipo]||'')} · ${esc(x.p.sector)} · ${esc(x.p.turno)}</span></div>
+    return `<div class="am-pp"><div class="am-ph"><div><b>${esc(x.p.nombre)}</b> <span class="meta">${esc(x.p.leg)} · ${esc(NM_TIPO[x.p.tipo]||'')} · ${esc(x.p.sector)} · ${esc(x.p.turno)}</span>
+        <button class="btn primary sm am-pxls" data-amx="${esc(x.p.leg)}" style="margin-left:10px">⬇ Excel del colaborador</button></div>
       <div class="am-pk"><span>Ausentismo <b>${porCat('aus')}</b></span><span>Licencias <b>${porCat('lic')}</b></span><span>Otros (vacaciones, etc.) <b>${porCat('otro')}</b></span><span>Programados <b>${pr}</b></span><span>Tasa <b>${amPct(da,pr)}</b></span></div></div>
       ${L2.length?`<div class="am-pchips">${Object.entries(tot).sort((a,b)=>b[1].n-a[1].n).map(([m,o])=>`<span class="am-chip c-${o.c}">${esc(m)} <b>${o.n}</b></span>`).join('')}</div>
       <div class="tscroll" style="max-height:320px"><table class="nm-t"><thead><tr><th>Fecha</th><th>Día</th><th>Motivo</th><th>Tipo</th></tr></thead><tbody>${L2.map(e=>`<tr><td class="mono">${dmy(e.f)}</td><td>${DOWL[dObj(e.f).getDay()]}</td><td><b>${esc(e.m)}</b></td><td>${esc(AM_CAT[e.c])}</td></tr>`).join('')}
         <tr class="tot"><td colspan="2">Total</td><td>${L2.length} día(s) con motivo</td><td>${porCat('aus')} ausentismo · ${porCat('lic')} licencias · ${porCat('otro')} otros</td></tr></tbody></table></div>`:'<div class="empty" style="padding:10px 0">Sin ausencias en el período.</div>'}</div>`; }).join('')+(L.length>15?`<p class="meta">Se muestran 15 de ${L.length}: escribí más del apellido o el legajo.</p>`:'');
+}
+// Excel prolijo de UN colaborador: datos, totales, por mes y motivo, y detalle día por día
+async function amExcelPersona(leg){
+  if(typeof ExcelJS==='undefined'){ App.toast('No se pudo cargar el generador de Excel. Recargá la página.',true); return; }
+  const X=amDatos(), x=amPersonas(X).find(y=>String(y.p.leg)===String(leg)); if(!x){ App.toast('No hay datos de ese colaborador en el período.',true); return; }
+  const s=amState, wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
+  const AZ='FF0F2A44', GR='FFF1F5F9', BD={style:'thin',color:{argb:'FFCBD5E1'}}, B={top:BD,left:BD,bottom:BD,right:BD};
+  const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), CATC={aus:'FFFEE2E2',lic:'FFEDE9FE',otro:'FFF1F5F9'};
+  const T=x.T.slice().sort((a,b)=>a.f.localeCompare(b.f));
+  const cuenta=e=>e.c==='aus'||(s.lic&&e.c==='lic');   // lo que entra en la tasa
+  const meses=uniq(T.map(e=>e.f.slice(0,7)).concat(X.prog.filter(r=>r.p.leg===x.p.leg).map(r=>r.mes))).sort();
+  const progM={}; X.prog.filter(r=>r.p.leg===x.p.leg).forEach(r=>progM[r.mes]=(progM[r.mes]||0)+r.n);
+  const mots=uniq(T.map(e=>e.m)).sort((a,b)=>({aus:0,lic:1,otro:2}[amCat(a)]-{aus:0,lic:1,otro:2}[amCat(b)])||a.localeCompare(b,'es'));
+  const diasC=new Set(T.filter(cuenta).map(e=>e.f)).size, prog=x.prog||0, nCat=c=>T.filter(e=>e.c===c).length;
+  // ---- hoja Resumen
+  const ws=wb.addWorksheet('Resumen',{views:[{showGridLines:false}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  const ncol=Math.max(6,mots.length+4);
+  ws.columns=[{width:34}].concat(mots.map(()=>({width:14})),[{width:12},{width:13},{width:10}]);
+  const titulo=(r,t,sz,col)=>{ ws.mergeCells(r,1,r,ncol); const c=ws.getCell(r,1); c.value=t; c.font={bold:true,size:sz,color:{argb:col||AZ}}; };
+  titulo(1,'INFORME DE AUSENTISMO POR COLABORADOR',15); titulo(2,'CD Isidro Casanova · Grupo Gestión',10,'FF64748B');
+  const datos=[['Colaborador',x.p.nombre],['Legajo',x.p.leg],['Tipo',NM_TIPO[x.p.tipo]||''],['Sector',x.p.sector],['Turno',x.p.turno],['Período',amPerL()],['Emitido',`${dmy(hoy())}${window.SRV&&SRV.user?' · '+SRV.user.nombre:''}`]];
+  datos.forEach(([k,v],i)=>{ const r=4+i; ws.getCell(r,1).value=k; ws.getCell(r,1).font={bold:true,color:{argb:'FF475569'}}; ws.mergeCells(r,2,r,ncol); ws.getCell(r,2).value=v; ws.getCell(r,2).font={bold:k==='Colaborador',size:k==='Colaborador'?12:11}; });
+  let r=12; titulo(r,'TOTALES DEL PERÍODO',12); r++;
+  const tot=[['Días de ausentismo',nCat('aus')],['Días de licencia',nCat('lic')],['Otros (vacaciones, franco comp., etc.)',nCat('otro')],['Días programados',prog],['Tasa de ausentismo',prog?diasC/prog:null]];
+  tot.forEach(([k,v])=>{ ws.mergeCells(r,1,r,3); const a=ws.getCell(r,1); a.value=k; a.border=B; a.fill=fill(GR); a.font={bold:true};
+    const c=ws.getCell(r,4); c.value=v; c.border=B; c.alignment={horizontal:'center'}; c.font={bold:true,size:12}; if(k.startsWith('Tasa')) c.numFmt='0.0%'; r++; });
+  ws.mergeCells(r,1,r,ncol); ws.getCell(r,1).value=`Tasa = días de ${s.lic?'ausentismo y licencia':'ausentismo'} ÷ días programados (jornadas de trabajo, sin francos ni vacaciones).`; ws.getCell(r,1).font={italic:true,size:9,color:{argb:'FF64748B'}}; r+=2;
+  // por motivo
+  titulo(r,'POR MOTIVO',12); r++;
+  ['Motivo','Tipo','Días','% del total'].forEach((h,j)=>{ const c=ws.getCell(r,j+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill=fill(AZ); c.border=B; c.alignment={horizontal:j?'center':'left'}; }); r++;
+  mots.forEach(m=>{ const n=T.filter(e=>e.m===m).length; [m,AM_CAT[amCat(m)],n,T.length?n/T.length:0].forEach((v,j)=>{ const c=ws.getCell(r,j+1); c.value=v; c.border=B; c.fill=fill(CATC[amCat(m)]); c.alignment={horizontal:j?'center':'left'}; if(j===3) c.numFmt='0.0%'; }); r++; });
+  [['Total','',T.length,T.length?1:0]].forEach(row=>{ row.forEach((v,j)=>{ const c=ws.getCell(r,j+1); c.value=v; c.font={bold:true}; c.border=B; c.fill=fill(GR); c.alignment={horizontal:j?'center':'left'}; if(j===3) c.numFmt='0.0%'; }); r++; }); r++;
+  // por mes y motivo
+  titulo(r,'POR MES Y MOTIVO',12); r++;
+  const H=['Mes'].concat(mots,['Total días','Programados','Tasa']);
+  H.forEach((h,j)=>{ const c=ws.getCell(r,j+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'},size:10}; c.fill=fill(AZ); c.border=B; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; }); ws.getRow(r).height=32; r++;
+  const r0=r;
+  meses.forEach(m=>{ const E=T.filter(e=>e.f.slice(0,7)===m), dc=new Set(E.filter(cuenta).map(e=>e.f)).size, p=progM[m]||0;
+    const row=[amMesL(m)].concat(mots.map(k=>E.filter(e=>e.m===k).length||null),[E.length||null,p||null,p?dc/p:null]);
+    row.forEach((v,j)=>{ const c=ws.getCell(r,j+1); c.value=v; c.border=B; c.alignment={horizontal:j?'center':'left'}; if(j===row.length-1) c.numFmt='0.0%'; if(j>0&&j<=mots.length&&v) c.fill=fill(CATC[amCat(mots[j-1])]); }); r++; });
+  const tr=['Total'].concat(mots.map(k=>T.filter(e=>e.m===k).length),[T.length,prog,prog?diasC/prog:null]);
+  tr.forEach((v,j)=>{ const c=ws.getCell(r,j+1); c.value=v; c.font={bold:true}; c.border=B; c.fill=fill(GR); c.alignment={horizontal:j?'center':'left'}; if(j===tr.length-1) c.numFmt='0.0%'; });
+  // ---- hoja Detalle
+  const wd=wb.addWorksheet('Detalle día por día',{views:[{state:'frozen',ySplit:4,showGridLines:false}],pageSetup:{orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  wd.columns=[{width:13},{width:12},{width:16},{width:34},{width:18}];
+  wd.mergeCells(1,1,1,5); wd.getCell(1,1).value=`${x.p.nombre} · legajo ${x.p.leg}`; wd.getCell(1,1).font={bold:true,size:13,color:{argb:AZ}};
+  wd.mergeCells(2,1,2,5); wd.getCell(2,1).value=`Ausencias ${amPerL()} · ${x.p.sector} · ${x.p.turno}`; wd.getCell(2,1).font={size:10,color:{argb:'FF64748B'}};
+  ['Fecha','Día','Mes','Motivo','Tipo'].forEach((h,j)=>{ const c=wd.getCell(4,j+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill=fill(AZ); c.border=B; });
+  let q=5; T.forEach(e=>{ [new Date(Date.UTC(+e.f.slice(0,4),+e.f.slice(5,7)-1,+e.f.slice(8,10))),DOWL[dObj(e.f).getDay()],amMesL(e.f.slice(0,7)),e.m,AM_CAT[e.c]].forEach((v,j)=>{ const c=wd.getCell(q,j+1); c.value=v; c.border=B; c.fill=fill(CATC[e.c]); if(j===0) c.numFmt='dd/mm/yyyy'; }); q++; });
+  if(!T.length){ wd.getCell(q,1).value='Sin ausencias en el período.'; q++; }
+  wd.mergeCells(q,1,q,3); wd.getCell(q,1).value='Total'; wd.getCell(q,1).font={bold:true}; wd.getCell(q,4).value=`${T.length} día(s) con motivo`; wd.getCell(q,5).value=`${nCat('aus')} aus. · ${nCat('lic')} lic. · ${nCat('otro')} otros`;
+  [1,4,5].forEach(j=>{ const c=wd.getCell(q,j); c.font={bold:true}; c.fill=fill(GR); c.border=B; });
+  wd.autoFilter={from:{row:4,column:1},to:{row:Math.max(4,q-1),column:5}};
+  const buf=await wb.xlsx.writeBuffer();
+  const nom=normTxt(x.p.nombre).replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').toLowerCase();
+  const per=s.desde||s.hasta?`${s.desde||'inicio'}_al_${s.hasta||'fin'}`:s.mes||'periodo';
+  download(buf,`ausentismo_${x.p.leg}_${nom}_${per}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  App.toast(`Excel de ${x.p.nombre} descargado`);
 }
 function amExcel(){
   const X=amDatos(); if(!X||!X.D.length){ App.toast('No hay ausencias para exportar con este filtro.',true); return; }
@@ -380,6 +439,7 @@ function amInforme(){
   $('#am-xls').onclick=amExcel; $('#am-rep').onclick=amInforme;
   document.addEventListener('click',e=>{
     const r=e.target.closest('#am-mesT tr[data-amm]'); if(r){ amState.mes=amState.mes===r.dataset.amm?'':r.dataset.amm; renderAusmot(); }
+    const bx=e.target.closest('.am-pxls[data-amx]'); if(bx){ amExcelPersona(bx.dataset.amx); return; }
     const pr=e.target.closest('#am-perT tr[data-amp]'); if(pr){ amState.q=pr.dataset.amp; $('#am-q').value=pr.dataset.amp; renderAusmot(); const c=$('#am-pcard'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); } });
 })();
 const _ovAm=App.onView; App.onView=(id,f)=>{ _ovAm(id,f); if(id==='v-ausmot') renderAusmot(); };
