@@ -441,6 +441,64 @@ def vs_guardar(db: Session, d: Doc, items: list, u: User, accion: str, detalle: 
     db.commit()
 
 
+@app.get("/api/vacaciones/semanas")
+def vacaciones_semanas(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Resumen sin nombres para la cocina (Comidas): por semana, cuántos están de vacaciones y cuántos salen,
+    por comedor (NIC 2 = eventuales, fuera de convenio, FYV y NIC 3; NIC 1 = el resto)."""
+    if not (can_read(u, "viandas") or can_read(u, "vacaciones")):
+        raise HTTPException(403, "Sin permiso")
+    vd = db.get(Doc, "vacaciones")
+    rows = list(((vd.data or {}).get("vac") or {}).get("rows") or []) if vd else []
+    ya = {(str(r.get("legajo")), r.get("desde")) for r in rows}
+    sd = db.get(Doc, "vacsol")
+    for x in ((sd.data or {}).get("items") or []) if sd else []:
+        if x.get("estado") == "aprobada" and (str(x.get("legajo")), x.get("desde")) not in ya:
+            rows.append({"legajo": x.get("legajo"), "desde": x.get("desde"), "hasta": x.get("hasta")})
+    nd = db.get(Doc, "nomina")
+    emps = (((nd.data or {}).get("nomina") or {}).get("emps") or {}) if nd else {}
+
+    def nic(leg):
+        e = emps.get(str(leg).strip()) or {}
+        tipo = e.get("tipoF") or e.get("tipo") or ""
+        sec = str(e.get("sector") or "").upper()
+        return "NIC 2" if tipo in ("EV", "FC") or "FYV" in sec or re.search(r"NIC\s*3", sec) else "NIC 1"
+
+    hoy = datetime.now(timezone(timedelta(hours=-3))).date()
+    lunes = hoy - timedelta(days=hoy.weekday())
+    semanas = []
+    for k in range(0, 5):
+        a = lunes + timedelta(days=7 * k)
+        b = a + timedelta(days=6)
+        A, B = a.isoformat(), b.isoformat()
+        en, salen, vuelven = {}, {}, {}
+        for r in rows:
+            d0 = str(r.get("desde") or "")
+            d1 = str(r.get("hasta") or d0)
+            if not d0:
+                continue
+            leg = str(r.get("legajo") or "").strip()
+            if d0 <= B and d1 >= A:
+                en[leg] = nic(leg)
+            if A <= d0 <= B:
+                salen[leg] = nic(leg)
+            vuelta = (datetime.fromisoformat(d1) + timedelta(days=1)).date().isoformat() if len(d1) == 10 else ""
+            if A <= vuelta <= B:
+                vuelven[leg] = nic(leg)
+
+        def cnt(m):
+            return {"total": len(m), "NIC 1": sum(1 for v in m.values() if v == "NIC 1"), "NIC 2": sum(1 for v in m.values() if v == "NIC 2")}
+        semanas.append({"desde": A, "hasta": B, "de_vacaciones": cnt(en), "salen": cnt(salen), "vuelven": cnt(vuelven)})
+    hoy_s = hoy.isoformat()
+    hoy_m = {}
+    for r in rows:
+        d0 = str(r.get("desde") or "")
+        if d0 and d0 <= hoy_s <= str(r.get("hasta") or d0):
+            leg = str(r.get("legajo") or "").strip()
+            hoy_m[leg] = nic(leg)
+    return {"hoy": {"total": len(hoy_m), "NIC 1": sum(1 for v in hoy_m.values() if v == "NIC 1"), "NIC 2": sum(1 for v in hoy_m.values() if v == "NIC 2")},
+            "semanas": semanas, "actualizado": iso(vd.updated_at) if vd and vd.updated_at else None}
+
+
 @app.get("/api/vacsol")
 def vacsol_list(u: User = Depends(current_user), db: Session = Depends(get_db)):
     if not vs_ve(u):

@@ -218,3 +218,9 @@ td:has(.frio),.frn:has(.frio){position:relative;
 #kpisAnt .ant-frk{cursor:pointer} #kpisAnt .ant-frk.on{outline:2px solid #38bdf8}
 
 .combi{margin-left:4px;font-size:.95em}
+
+.cm-vk{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 16px}
+.cm-vk>div{border:1px solid rgba(127,127,127,.25);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
+.cm-vk>div.hl{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.07)}
+.cm-vk span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)} .cm-vk>div>b{font-size:32px;font-weight:800;color:#fbbf24} .cm-vk small{font-size:12px;color:var(--text3)}
+tr.cm-sel td{background:rgba(251,191,36,.07)}

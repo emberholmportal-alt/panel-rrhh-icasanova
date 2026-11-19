@@ -152,9 +152,29 @@ document.addEventListener('change',async e=>{
   const k=e.target.dataset&&e.target.dataset.cmk; if(k&&DB.viandas){ const V=DB.viandas; V.cocina=V.cocina||{}; const o=V.cocina[vdDiaSel]||(V.cocina[vdDiaSel]={});
     if(e.target.value==='') delete o[k]; else o[k]=Math.max(0,Math.round(+e.target.value)); await persist(); renderViandas(); }
 });
+// ---- vacaciones por semana (sin nombres), para que la cocina sepa cuánta gente falta
+let vdVac=null, vdVacAt=0;
+async function vdVacCargar(){ if(!(window.SRV&&SRV.mode==='online')) return; if(Date.now()-vdVacAt<5*60e3&&vdVac) return; vdVacAt=Date.now();
+  try{ const r=await fetch('/api/vacaciones/semanas',{credentials:'same-origin'}); if(r.ok){ vdVac=await r.json(); const el=$('#cm-vac'); if(el) el.innerHTML=vdVacHtml(); } }catch(e){} }
+function vdVacHtml(){
+  const V=vdVac; if(!V) return '<div class="meta" style="padding:12px 16px">Cargando vacaciones…</div>';
+  const n=c=>`<b>${c.total}</b> <span class="meta">(NIC 1: ${c['NIC 1']} · NIC 2: ${c['NIC 2']})</span>`;
+  const lab=(s,i)=>i===0?'Esta semana':i===1?'Semana que viene':`En ${i} semanas`;
+  const S=V.semanas||[], a=S[0], b=S[1];
+  return `<div class="cm-vk">
+      <div><span>Hoy de vacaciones</span><b>${V.hoy.total}</b><small>NIC 1: ${V.hoy['NIC 1']} · NIC 2: ${V.hoy['NIC 2']}</small></div>
+      ${a?`<div><span>Esta semana</span><b>${a.de_vacaciones.total}</b><small>de vacaciones · salen ${a.salen.total}</small></div>`:''}
+      ${b?`<div class="hl"><span>Semana que viene</span><b>${b.de_vacaciones.total}</b><small>de vacaciones · <b>salen ${b.salen.total}</b> · vuelven ${b.vuelven.total}</small></div>`:''}
+    </div>
+    <div class="tscroll"><table class="nm-t"><thead><tr><th>Semana</th><th>Lunes a domingo</th><th class="num">De vacaciones</th><th class="num">Salen</th><th class="num">Vuelven</th></tr></thead><tbody>
+    ${S.map((s,i)=>`<tr${i===1?' class="cm-sel"':''}><td><b>${lab(s,i)}</b></td><td class="mono">${dmy(s.desde).slice(0,5)} al ${dmy(s.hasta).slice(0,5)}</td><td class="num">${n(s.de_vacaciones)}</td><td class="num">${n(s.salen)}</td><td class="num">${n(s.vuelven)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="vd-nota" style="padding:0 16px 12px">Cantidad de personas, sin nombres. "De vacaciones" = está de vacaciones algún día de esa semana. Incluye el plan de vacaciones y las solicitudes aprobadas.</p>`;
+}
 function renderViandas(){
   const el=$('#vd-body'); if(!el) return; const V=DB.viandas;
-  el.innerHTML=V?vdHtml(V,false):'<div class="empty">Todavía no hay datos: las comidas aparecen cuando se sube el export de Movimientos.</div>';
+  el.innerHTML=(V?vdHtml(V,false):'<div class="empty">Todavía no hay datos: las comidas aparecen cuando se sube el export de Movimientos.</div>')+
+    `<div class="card" style="margin-top:14px"><div class="card-h"><h3>🏖 Vacaciones por semana</h3><span class="meta">para planificar la cocina</span></div><div class="card-b flush" id="cm-vac">${vdVacHtml()}</div></div>`;
+  vdVacCargar();
 }
 function renderViandasHome(){
   const el=$('#h-viandas'); if(!el) return;
