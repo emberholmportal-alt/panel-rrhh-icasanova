@@ -38,8 +38,9 @@ async function waCargar(f){
     await persist(); waRender(); App.toast(`Celulares cargados: ${Object.keys(got.tel).length}`+(got.mal.length?` · ${got.mal.length} sin número válido`:''),!!got.mal.length);
   }catch(e){ console.error(e); App.toast('No pude leer la lista de celulares.',true); } }
 
+// sin coordinadores (cuentan como fuera de convenio)
 function waFilas(){ const W=WA();
-  return antAct().filter(r=>!/COORDINAD/i.test(r.tarea||'')&&String(r.legajo).trim()!=='285485').map(r=>{   // sin coordinadores (cuentan como fuera de convenio) const l=nmLeg(r.legajo), t=W.tel[l]||{}; return {l,nombre:r.nombre,tarea:r.tarea!=='SIN DATO'?r.tarea:'',turno:r.turno!=='SIN DATO'?r.turno:'',tel:t.tel||''}; })
+  return antAct().filter(r=>!/COORDINAD/i.test(r.tarea||'')&&String(r.legajo).trim()!=='285485').map(r=>{ const l=nmLeg(r.legajo), t=W.tel[l]||{}; return {l,nombre:r.nombre,tarea:r.tarea!=='SIN DATO'?r.tarea:'',turno:r.turno!=='SIN DATO'?r.turno:'',tel:t.tel||''}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')); }
 
 function waRender(){
