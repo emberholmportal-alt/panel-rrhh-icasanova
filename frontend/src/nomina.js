@@ -88,7 +88,7 @@ function nmRows(){
     for(const a of A){ const l=nmLeg(a.legajo); if(!l) continue; const e=base[l];
       if(!a.activo){ if(e&&(e.tipoF||e.tipo||'EV')==='EV'&&!(N.extra||{})[l]) delete base[l]; continue; }
       if(!e) base[l]={leg:l,nombre:a.nombre,tipo:'EV',sector:ok(a.tarea)?normTxt(a.tarea):'',turno:ok(a.turno)?normTxt(a.turno):'',ingreso:a.ingreso||'',src:'eventuales'};
-      else if(!e.sector&&ok(a.tarea)) base[l]=Object.assign({},e,{sector:normTxt(a.tarea)}); } } }catch(err){ console.warn('nómina/eventuales',err); }
+      else { const x={}; if(!e.sector&&ok(a.tarea)) x.sector=normTxt(a.tarea); if(!(e.tipoF||e.tipo)) x.tipo='EV'; if(Object.keys(x).length) base[l]=Object.assign({},e,x); } } } }catch(err){ console.warn('nómina/eventuales',err); }
   return Object.values(base).filter(e=>!(e.egreso&&e.egreso<hoyI)).map(e=>{ const f=fr[e.leg]||{};
     let tipo=e.tipoF||e.tipo||(f.legajo?'EV':'');
     if(tipo==='EV'&&(NM_COORD.has(e.leg)||/COORDINAD/.test(e.sector||'')||/COORDINAD/.test(normTxt(f.sector||'')))) tipo='FC';   // coordinadores eventuales cuentan como fuera de convenio
@@ -116,10 +116,21 @@ function renderNomina(){
   nmMsel('#nm-mt','tipos','Tipo',ALL.map(r=>r.tipo),k=>NM_TIPO[k]);
   nmMsel('#nm-ms','sectores','Sector',ALL.map(r=>r.sector));
   nmMsel('#nm-mu','turnos','Turno',ALL.map(r=>r.turno));
-  const R=nmFiltered(ALL), c=k=>R.filter(r=>r.tipo===k).length, sc=ALL.filter(r=>!r.tipo).length;
-  $('#nm-kpis').innerHTML=[{l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} con el filtro`:'personas en nómina',c:''},{l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'},{l:'❄ Apto frío',v:R.filter(r=>r.tipo==='EV'&&esFrio(r.leg)).length,s:nmState.frio?'mostrando solo ellos · clic para ver todos':'eventuales · clic para ver solo ellos',c:'acc-cyan nm-frk'+(nmState.frio?' on':'')}].concat(ALL.some(r=>r.tipo==='EXT')?[{l:'Personal externo',v:c('EXT'),s:'EXT',c:''}]:[])
-    .concat(sc?[{l:'Sin clasificar',v:R.filter(r=>!r.tipo).length,s:'cargá el Movimientos del reloj',c:'acc-alert'}]:[])
-    .map(k=>`<div class="kpi ${k.c}"><div class="lab">${esc(k.l)}</div><div class="val">${esc(k.v)}</div><div class="sub">${esc(k.s)}</div></div>`).join('');
+  const R=nmFiltered(ALL), sc=ALL.filter(r=>!r.tipo).length;
+  // las tarjetas filtran la nómina: los números de cada tarjeta no dependen del tipo elegido (sí del resto de los filtros)
+  const R0=(()=>{ const t=nmState.tipos, f=nmState.frio; nmState.tipos=[]; nmState.frio=false; const x=nmFiltered(ALL); nmState.tipos=t; nmState.frio=f; return x; })();
+  const c=k=>R0.filter(r=>r.tipo===k).length, solo=k=>nmState.tipos.length===1&&nmState.tipos[0]===k&&!nmState.frio;
+  const K=[{k:'all',l:'Total',v:R.length,s:R.length!==ALL.length?`de ${ALL.length} · clic para ver toda la nómina`:'personas en nómina',c:''},
+    {k:'EF',l:'Efectivos',v:c('EF'),s:'en convenio',c:'acc-cyan'},{k:'FC',l:'Fuera de convenio',v:c('FC'),s:'GLD FC',c:''},{k:'EV',l:'Eventuales',v:c('EV'),s:'jornalizados',c:'acc-ochre'},
+    {k:'frio',l:'❄ Apto frío',v:R0.filter(r=>r.tipo==='EV'&&esFrio(r.leg)).length,s:'eventuales con apto frío',c:'acc-cyan'}]
+    .concat(ALL.some(r=>r.tipo==='EXT')?[{k:'EXT',l:'Personal externo',v:c('EXT'),s:'EXT',c:''}]:[])
+    .concat(sc?[{k:'',l:'Sin clasificar',v:R0.filter(r=>!r.tipo).length,s:'cargá el Movimientos del reloj',c:'acc-alert'}]:[]);
+  const on=k=>k==='frio'?nmState.frio:k==='all'?false:solo(k);
+  $('#nm-kpis').innerHTML=K.map(k=>`<div class="kpi ${k.c} nm-k${on(k.k)?' nm-on':''}" data-nmk="${k.k}" title="${k.k==='all'?'Ver toda la nómina':on(k.k)?'Tocá de nuevo para ver toda la nómina':'Ver solo '+esc(k.l.replace('❄ ',''))}"><div class="lab">${esc(k.l)}</div><div class="val">${esc(k.v)}</div><div class="sub">${on(k.k)?'<b>mostrando solo estos</b> · tocá para quitar':esc(k.s)}</div></div>`).join('');
+  // aviso de filtro activo
+  { let b=$('#nm-fav'); if(!b){ b=document.createElement('div'); b.id='nm-fav'; $('#nm-kpis').after(b); }
+    const act=nmState.tipos.length||nmState.sectores.length||nmState.turnos.length||nmState.q.trim()||nmState.frio;
+    b.className='nm-fav'+(act?' on':''); b.innerHTML=act?`⚠ <b>Estás viendo una parte de la nómina</b> (${R.length} de ${ALL.length}): ${esc(nmFiltroTxt())}. <button class="btn sm" data-nmk="all">Ver toda la nómina</button>`:''; }
   const tbl=(id,key,lab)=>{ const g=nmGroup(R,key), ks=Object.keys(g).sort((a,b)=>g[b].t-g[a].t||a.localeCompare(b,'es'));
     $(id).innerHTML=ks.length?`<thead><tr><th>${lab}</th><th class="num">Efectivos</th><th class="num">Fuera conv.</th><th class="num">Eventuales</th><th class="num">Externos</th><th class="num">Total</th><th style="width:34%"></th></tr></thead><tbody>`+
       ks.map(k=>{ const x=g[k], m=Math.max(...ks.map(z=>g[z].t)); return `<tr><td><b>${esc(k)}</b></td><td class="num">${x.EF||''}</td><td class="num">${x.FC||''}</td><td class="num">${x.EV||''}</td><td class="num">${x.EXT||''}</td><td class="num"><b>${x.t}</b></td>
@@ -183,7 +194,11 @@ function hookNomina(){
   $('#nm-del').onclick=async()=>{ if(!confirm('¿Vaciar la nómina cargada?')) return; DB.nomina=null; await persist(); renderNomina(); App.toast('Nómina vaciada'); };
   let qt; $('#nm-q').oninput=e=>{ clearTimeout(qt); qt=setTimeout(()=>{ nmState.q=e.target.value; renderNomina(); },200); };
   document.addEventListener('click',async e=>{ if(!e.target.closest('#v-nomina')) return;
-    if(e.target.closest('.nm-frk')){ nmState.frio=!nmState.frio; renderNomina(); return; }
+    const kk=e.target.closest('[data-nmk]'); if(kk){ const k=kk.dataset.nmk;
+      if(k==='all'){ Object.assign(nmState,{tipos:[],sectores:[],turnos:[],q:'',frio:false}); const q=$('#nm-q'); if(q) q.value=''; }
+      else if(k==='frio'){ nmState.frio=!nmState.frio; if(nmState.frio) nmState.tipos=[]; }
+      else { const ya=nmState.tipos.length===1&&nmState.tipos[0]===k&&!nmState.frio; nmState.tipos=ya?[]:[k]; nmState.frio=false; }
+      renderNomina(); return; }
     const tg=e.target.closest('[data-frio]'); if(tg){ const l=nmLeg(tg.dataset.frio); DB.aptoFrio=Object.assign({},DB.aptoFrio||{}); const r=nmRows().find(x=>x.leg===l);
       if(DB.aptoFrio[l]) delete DB.aptoFrio[l]; else DB.aptoFrio[l]={n:r?r.nombre:'',at:new Date().toISOString(),por:window.SRV&&SRV.user?SRV.user.nombre:''};
       await persist(); renderNomina(); App.refresh(); App.toast(DB.aptoFrio[l]?`❄ ${r?r.nombre:l}: apto frío`:`${r?r.nombre:l}: sin apto frío`); return; }

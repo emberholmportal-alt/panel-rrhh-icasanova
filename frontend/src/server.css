@@ -224,3 +224,10 @@ td:has(.frio),.frn:has(.frio){position:relative;
 .cm-vk>div.hl{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.07)}
 .cm-vk span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)} .cm-vk>div>b{font-size:32px;font-weight:800;color:#fbbf24} .cm-vk small{font-size:12px;color:var(--text3)}
 tr.cm-sel td{background:rgba(251,191,36,.07)}
+
+#nm-kpis .nm-k{cursor:pointer;transition:transform .15s} #nm-kpis .nm-k:hover{transform:translateY(-2px)}
+#nm-kpis .nm-on{outline:2px solid #38bdf8;animation:nmOn 1.3s ease-in-out infinite}
+@keyframes nmOn{0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.0)}50%{box-shadow:0 0 0 6px rgba(56,189,248,.28);outline-color:#fbbf24}}
+.nm-fav{display:none} .nm-fav.on{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px;padding:10px 14px;border-radius:12px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.1);font-size:13px;animation:nmFav 2s ease-in-out infinite}
+@keyframes nmFav{50%{background:rgba(251,191,36,.18)}}
+@media (prefers-reduced-motion:reduce){#nm-kpis .nm-on,.nm-fav.on{animation:none}}
