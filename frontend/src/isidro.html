@@ -1746,12 +1746,19 @@ function bajasProx(){
     .sort((a,b)=>a.ultimo<b.ultimo?-1:a.ultimo>b.ultimo?1:a.nombre.localeCompare(b.nombre));
 }
 
+// ❄ apto frío: el indicador filtra el plantel activo
+document.addEventListener('click',e=>{ if(!e.target.closest('#kpisAnt .ant-frk')) return; window.ANT_FRIO=!window.ANT_FRIO; renderAnt();
+  if(window.ANT_FRIO){ const t=document.querySelector('#tabsAnt [data-p="pa-plantel"]'); if(t) t.click(); } });
 function renderAnt(){
   const all=antRows(), act=antAct(), hoy=todayISO();
   const en7=act.filter(r=>r.ultimo&&r.ultimo>=hoy&&r.ultimo<=new Date(Date.now()+7*864e5).toISOString().slice(0,10)).length;
   const vencidos=act.filter(r=>r.ultimo&&r.ultimo<hoy).length;
+  // los coordinadores eventuales (ej. Falcón) cuentan como fuera de convenio: no suman a los eventuales
+  const esCoord=r=>/COORDINAD/i.test(r.tarea||'')||r.legajo==='285485', coords=act.filter(esCoord);
+  const fz=l=>!!((DB.aptoFrio||{})[String(l).trim()]), nFrio=act.filter(r=>!esCoord(r)&&fz(r.legajo)).length;
   $('#kpisAnt').innerHTML=[
-    {l:'Eventuales activos',v:act.length,s:`${all.length} en el archivo`},
+    {l:'Eventuales activos',v:act.length-coords.length,s:`${coords.length?`+${coords.length} coordinador(es) · `:''}${all.length} en el archivo`},
+    {l:'❄ Apto frío',v:nFrio,s:window.ANT_FRIO?'mostrando solo ellos · clic para ver todos':'clic para verlos en el plantel',c:'acc-cyan ant-frk'+(window.ANT_FRIO?' on':'')},
     ...(window.NOBAJAS?[]:[{l:'Bajan esta semana',v:en7,s:'próximos 7 días',c:en7?'acc-alert':'acc-lime'},
     {l:'Ya vencidos',v:vencidos,s:'último día pasado',c:vencidos?'acc-ochre':''}]),
     {l:'Turnos',v:new Set(act.map(r=>r.turno)).size,s:'con gente activa'},
@@ -1774,7 +1781,7 @@ function renderAnt(){
       return `<tr><td><input type="checkbox" class="achk" data-l="${esc(r.legajo)}" ${antSel.has(r.legajo)?'checked':''}></td>
       <td class="mono" style="font-weight:600">${dmy(r.ultimo)}</td>
       <td><span class="tag ${d<=3?'tarde':d<=7?'sinf':'n'}">${d===0?'hoy':d+' d'}</span></td>
-      <td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td><td class="mono">${dmy(r.ingreso)}</td>
+      <td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}${fz(r.legajo)?' <span class="frio" title="Apto frío">❄</span>':''}</td><td class="mono">${dmy(r.ingreso)}</td>
       <td style="font-size:12.5px">${esc(cap(r.tarea))}</td><td style="font-size:12.5px">${esc(cap(r.turno))}</td>
       <td class="editable"><input type="text" class="afield" data-l="${esc(r.legajo)}" data-f="motivo" value="${esc(motivoDe(r))}"></td>
       <td class="editable"><input type="text" class="afield" data-l="${esc(r.legajo)}" data-f="detalle" value="${esc(detalleDe(r))}"></td></tr>`}).join('')+'</tbody>'
@@ -1783,11 +1790,11 @@ function renderAnt(){
   renderDot();
 
   const q2=$('#aBusca2').value.trim().toLowerCase();
-  const pl=act.filter(r=>!q2||r.nombre.toLowerCase().includes(q2)||r.legajo.includes(q2))
+  const pl=act.filter(r=>(!q2||r.nombre.toLowerCase().includes(q2)||r.legajo.includes(q2))&&(!window.ANT_FRIO||fz(r.legajo)))
     .sort((a,b)=>(a.ultimo||'9')<(b.ultimo||'9')?-1:1);
   $('#tPlantel').innerHTML=`<thead><tr><th>Legajo</th><th>Apellido y nombre</th><th>F. Ingreso</th><th>Antigüedad</th>
     ${window.NOBAJAS?'':'<th>Último día</th>'}<th>Tarea</th><th>Turno</th><th>U.O.</th></tr></thead>`+
-    (pl.length?'<tbody>'+pl.map(r=>`<tr><td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}</td>
+    (pl.length?'<tbody>'+pl.map(r=>`<tr><td class="mono">${esc(r.legajo)}</td><td>${esc(r.nombre)}${fz(r.legajo)?' <span class="frio" title="Apto frío">❄</span>':''}</td>
       <td class="mono">${dmy(r.ingreso)}</td><td class="mono">${r.antig} d</td>
       ${window.NOBAJAS?'':`<td class="mono ${r.ultimo&&r.ultimo<hoy?'late-min':''}">${dmy(r.ultimo)}</td>`}
       <td style="font-size:12.5px">${esc(cap(r.tarea))}</td><td style="font-size:12.5px">${esc(cap(r.turno))}</td>

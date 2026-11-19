@@ -1279,6 +1279,7 @@ const CX_DEF={obj:20,art:true};
 // apto frío (eventuales con certificado para trabajar en cámara): ❄ junto al nombre en Nómina y Francos
 function esFrio(leg){ return !!((DB.aptoFrio||{})[String(leg==null?'':leg).trim().replace(/\.0+$/,'')]); }
 function FRIO(leg){ return esFrio(leg)?' <span class="frio" title="Apto frío">❄</span>':''; }
+window.esFrio=esFrio; window.FRIO=FRIO;   // también para la sección Eventuales
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
 const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable/i.test(f.t||'')?f:null; };
 function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(frState.liq); }
