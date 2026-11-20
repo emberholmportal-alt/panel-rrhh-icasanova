@@ -65,12 +65,13 @@ function vdCalc(fname){
     if(!x.g) continue;
     if(!x.M.length&&frHoy.has(nmLeg(r.legajo))){ FR[x.nic].e++; continue; }        // franco asignado en Francos
     if(r.status==='novedad'&&!x.M.length) continue;                                 // vacaciones, licencia, enfermedad
-    const c=C[x.nic][x.g]; c.e++; if(x.M.length) c.f++; if(x.st!=null&&(st[x.g]==null||x.st<st[x.g])) st[x.g]=x.st; }
+    const c=C[x.nic][x.g]; c.e++; if(x.M.length) c.f++; if(x.st!=null&&(st[x.g]==null||x.st<st[x.g])) st[x.g]=x.st;
+    const hk=x.st!=null?vdHm(x.st):(x.M.length?vdHm(Math.floor(Math.min(...x.M)/60)*60):'s/h'), h=(c.h||(c.h={}))[hk]||(c.h[hk]={e:0,f:0}); h.e++; if(x.M.length) h.f++; }
   const ini={}; VD_GR.forEach(g=>ini[g]=st[g]!=null&&horaMin>=st[g]+20);
   const p=nic=>{ const v=pQueda[nic][dow]; return v!=null?v:pQueda[nic].all; };
   const com={};
   for(const nic of VD_NIC){ const o={};
-    VD_GR.forEach(g=>{ const c=C[nic][g], t=tasa(nic,g); o[g]={e:c.e,f:c.f,ini:ini[g],tasa:Math.round(t*100),n:ini[g]?c.f:Math.round(c.e*t)}; });
+    VD_GR.forEach(g=>{ const c=C[nic][g], t=tasa(nic,g); o[g]={e:c.e,f:c.f,h:c.h||{},ini:ini[g],tasa:Math.round(t*100),n:ini[g]?c.f:Math.round(c.e*t)}; });
     const qi=Math.round(o.Intermedio.n*p(nic));
     com[nic]={t:o,pq:Math.round(p(nic)*100),intCena:qi,alm:o['Mañana'].n+o.Intermedio.n-qi,cen:o.Tarde.n+o.Noche.n+qi,fr:FR[nic]}; }
   return {v:2,fecha,at:new Date().toISOString(),file:fname||'',hora:horaMin<24*60?hhmm(horaMin):'',por:window.SRV&&SRV.user?SRV.user.nombre:'',
@@ -99,6 +100,16 @@ function vdDia(V){
   return {modo:'proy',com,n:P.n,pend:VD_GR};
 }
 
+// ficharon de cuántos, por turno y por horario de ingreso (ej. Mañana · 06:00 60/70 · 08:00 14/15)
+const vdHm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const VD_TL={Mañana:'TM',Intermedio:'TI',Tarde:'TT',Noche:'TN'};
+function vdFich(t){
+  const fil=VD_GR.filter(g=>t[g]&&t[g].e).map(g=>{ const x=t[g], hs=Object.entries(x.h||{}).sort((a,b)=>a[0].localeCompare(b[0]));
+    const est=x.ini?`<b>${x.f}</b> de ${x.e}`:`<span class="cm-pend">todavía no ingresan</span> · ${x.e} con jornada`;
+    return `<tr><td><b>${VD_TL[g]}</b> <span class="meta">${g}</span></td><td class="cm-hs">${hs.map(([h,v])=>`<span>${h==='s/h'?'sin horario':h+' hs'} <b>${x.ini?v.f+'/':''}${v.e}</b></span>`).join('')}</td><td class="num cm-fx">${x.ini?'Ficharon ':''}${est}</td></tr>`; }).join('');
+  const ya=VD_GR.filter(g=>t[g]&&t[g].ini), F=ya.reduce((n,g)=>n+t[g].f,0), E=ya.reduce((n,g)=>n+t[g].e,0);
+  return fil?`${E?`<div class="cm-ftot">Ficharon <b>${F}</b> de ${E} <span class="meta">· turnos que ya ingresaron (${ya.map(g=>VD_TL[g]).join(', ')})</span></div>`:''}<table class="cm-ft"><tbody>${fil}</tbody></table>`:'';
+}
 function vdHtml(V,compacto){
   if(!V.com) return '<div class="empty">Hay que volver a subir el export de Movimientos para ver las comidas por comedor.</div>';
   const D=vdDia(V), H=hoy(), w=dObj(H).getDay(), dia=`${DOWL[w]} ${dmy(H)}`, FE=vdFrancosHoy(V)||[];
@@ -107,6 +118,7 @@ function vdHtml(V,compacto){
     return `<div class="cm-c"><div class="cm-nic">${nic}<small>${nic==='NIC 1'?'efectivos':'eventuales, fuera de convenio, FYV y NIC 3'}</small></div>
       <div class="cm-row"><div class="cm-s"><span>Almuerzo</span><b>${c.alm}</b><small>Mañana ${det('Mañana')} + Intermedio ${t.Intermedio.n-c.intCena}</small></div>
       <div class="cm-s"><span>Cena</span><b>${c.cen}</b><small>Tarde ${det('Tarde')} + Noche ${det('Noche')}${c.intCena?` + ${c.intCena} de intermedio (horas extras)`:''}</small></div></div>
+      ${D.modo==='hoy'?vdFich(t):''}
       ${fr?`<div class="cm-fr">🏖 ${fr} de franco hoy, ya descontados</div>`:''}</div>`; };
   const pend=D.modo==='hoy'?D.pend:[];
   const nota=D.modo==='hoy'?(pend.length?`Turnos que todavía no figuran en el archivo: <b>${pend.join(', ')}</b> (estimados con su asistencia habitual).`:'Todos los turnos de hoy ya figuran en el archivo.')

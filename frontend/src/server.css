@@ -235,3 +235,9 @@ tr.cm-sel td{background:rgba(251,191,36,.07)}
 /* sin carteles de carga para quien no carga archivos (el menú semanal lo sigue cargando quien tenga permiso) */
 body.no-cargas #nm-drop,body.no-cargas #am-load,body.no-cargas #fr-mdrop,body.no-cargas #fr-drop,body.no-cargas #ro-drop,body.no-cargas #ro-tdrop,
 body.no-cargas #an-drop,body.no-cargas #drop,body.no-cargas #dropVac,body.no-cargas #dropAnt,body.no-cargas #cu-load,body.no-cargas .updbar{display:none!important}
+
+.cm-ft{width:100%;margin-top:12px;border-collapse:collapse;font-size:12.5px}
+.cm-ft td{padding:5px 4px;border-top:1px solid rgba(127,127,127,.18);vertical-align:middle}
+.cm-hs{display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--text3)} .cm-hs b{color:var(--text)}
+.cm-fx{white-space:nowrap;font-family:inherit!important;text-align:right} .cm-fx b{font-size:15px;color:#38bdf8} .cm-pend{color:#fbbf24}
+.cm-ftot{margin-top:12px;font-size:13px} .cm-ftot b{font-size:18px;color:#38bdf8}
