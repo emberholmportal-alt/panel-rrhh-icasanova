@@ -680,6 +680,53 @@ async def comidas_cocina(request: Request, u: User = Depends(current_user), db: 
     return {"cocina": coc, "version": d.version}
 
 
+@app.post("/api/francos/fichadas")
+async def francos_fichadas(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Completa las fichadas que usa Francos (las que ven los coordinadores) con días del historial.
+    Se aplica sobre la última versión del documento: no choca con los francos que cargan los coordinadores."""
+    if not writable(u, "francos"):
+        raise HTTPException(403, "No tenés permiso para editar Francos")
+    body = json.loads(await request.body() or b"{}")
+    add = body.get("emps") or {}
+    if not isinstance(add, dict) or len(add) > 3000:
+        raise HTTPException(400, "Formato inválido")
+    d = db.scalar(select(Doc).where(Doc.key == "francos").with_for_update())
+    if d is None:
+        raise HTTPException(404, "Todavía no hay datos de Francos")
+    data = copy.deepcopy(d.data or {})
+    F = data.setdefault("francos", {})
+    mov = F.get("mov")
+    if not isinstance(mov, dict):
+        raise HTTPException(409, "Primero hay que subir un export de Movimientos")
+    emps = mov.setdefault("emps", {})
+    n, d0 = 0, mov.get("d0") or ""
+    for leg, v in add.items():
+        if not isinstance(v, dict):
+            continue
+        leg = str(leg)[:20]
+        x = emps.setdefault(leg, {"n": str(v.get("n") or "")[:120], "c": str(v.get("c") or "")[:60], "d": {}, "o": {}})
+        x.setdefault("d", {})
+        x.setdefault("o", {})
+        for f, k in (v.get("d") or {}).items():
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(f)) or f in x["d"]:
+                continue   # solo completa días que faltan: nunca pisa lo que vino en un export
+            x["d"][f] = str(k or "")[:6]
+            o = (v.get("o") or {}).get(f)
+            if o:
+                x["o"][f] = str(o)[:60]
+            n += 1
+            if not d0 or f < d0:
+                d0 = f
+    mov["d0"] = d0
+    d.data = data
+    d.version = (d.version or 0) + 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    auth.audit(db, u, "guardar", f"Francos: fichadas completadas con el historial ({n} día(s) desde {d0})")
+    db.commit()
+    return {"agregados": n, "d0": d0, "d1": mov.get("d1"), "version": d.version}
+
+
 @app.post("/api/francos/celdas")
 async def francos_celdas(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Asigna o quita francos día por día desde la página. El servidor anota quién y cuándo,

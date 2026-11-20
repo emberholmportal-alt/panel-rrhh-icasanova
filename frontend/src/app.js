@@ -1356,11 +1356,20 @@ let frBackfillHecho=false;
 async function frBackfill(){
   if(frBackfillHecho) return; frBackfillHecho=true;
   try{ const m=DB.francos&&DB.francos.mov, R=DB.records; if(!m||!R||!canEditMod('francos')) return;
-    const desde=addD(hoy(),-100); let min='';
-    for(const k in R){ const f=R[k]&&R[k].fecha; if(f&&f>=desde&&f<=m.d1&&(!min||f<min)) min=f; }
-    if(!min||min>=m.d0) return;
-    frMovMerge({emps:{},d0:m.d1,d1:m.d1},m.file||'historial',{at:m.at,por:m.por,file:m.file});
-    if(DB.francos.mov.d0<m.d0){ await persist(); if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas de Francos completadas con el historial (desde ${dmy(DB.francos.mov.d0)})`); renderFrancos(); }
+    const desde=addD(hoy(),-100), add={}; let n=0;
+    for(const k in R){ const r=R[k]; if(!r||!r.fecha||r.fecha<desde||r.fecha>m.d1) continue; const leg=String(r.legajo).trim().replace(/\.0+$/,'');
+      const x=m.emps[leg]; if(x&&x.d&&x.d[r.fecha]!==undefined) continue;
+      const ev=[].concat(r.eventos||[]).map(e=>typeof e==='string'?e:'').join(' '), kk=(r.marcas||[]).length?'T':movClase(ev,0);
+      const a=add[leg]||(add[leg]={n:r.nombre||'',c:r.empresa||'',d:{},o:{}}); a.d[r.fecha]=kk||''; if(kk&&kk!=='T') a.o[r.fecha]=ev.trim().slice(0,60); n++; }
+    if(!n) return;
+    if(!(window.SRV&&SRV.mode==='online')){ frMovMerge({emps:{},d0:m.d1,d1:m.d1},m.file||'historial',{at:m.at,por:m.por,file:m.file}); await persist(); renderFrancos(); return; }
+    // se manda al servidor solo lo que falta: se aplica sobre la última versión (no choca con los francos que cargan los coordinadores)
+    const r=await fetch('/api/francos/fichadas',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({emps:add})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){ console.warn('francos historial',j); return; }
+    Object.entries(add).forEach(([leg,v])=>{ const x=m.emps[leg]||(m.emps[leg]={n:v.n,c:v.c,d:{},o:{}}); x.o=x.o||{}; Object.entries(v.d).forEach(([f,k])=>{ if(x.d[f]===undefined){ x.d[f]=k; if(v.o[f]) x.o[f]=v.o[f]; } }); });
+    m.d0=j.d0||m.d0; if(window.SRV&&SRV.setVer) SRV.setVer('francos',j.version);
+    App.toast(`Fichadas de Francos completadas con el historial desde ${dmy(m.d0)}: los coordinadores ya ven los días anteriores`); renderFrancos();
   }catch(e){ console.warn('francos historial',e); } }
 function renderFrancos(){
   setTimeout(frBackfill,1500);
