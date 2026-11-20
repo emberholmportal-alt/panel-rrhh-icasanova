@@ -212,32 +212,26 @@ def _mov_clase(txt: str) -> str:
     return "OTRO" if s.strip() else ""
 
 
-def francos_completar_fichadas(db: Session, quien: str = "sistema") -> int:
-    """Las fichadas que ven los coordinadores en Francos se completan con el historial de Llegadas tarde
-    (solo los días que falten, últimos 100 días). Lo hace el servidor: no depende de que alguien abra el panel."""
-    fd = db.scalar(select(Doc).where(Doc.key == "francos").with_for_update())
-    ad = db.get(Doc, "ausentismo")
-    if not fd or not ad:
-        return 0
-    data = copy.deepcopy(fd.data or {})
-    mov = (data.get("francos") or {}).get("mov")
-    recs = (ad.data or {}).get("records") or {}
-    if not isinstance(mov, dict) or not recs:
-        return 0
+def _completar_mov(mov: dict, recs: dict) -> int:
+    """Agrega a las fichadas de Francos (mov) los días del historial de Llegadas tarde que falten (últimos 100 días)."""
     desde = (datetime.now(timezone(timedelta(hours=-3))).date() - timedelta(days=100)).isoformat()
     d1 = mov.get("d1") or ""
     emps = mov.setdefault("emps", {})
     n, d0 = 0, mov.get("d0") or d1
-    for r in recs.values():
-        f = str((r or {}).get("fecha") or "")
+    for r in (recs or {}).values():
+        if not isinstance(r, dict):
+            continue
+        f = str(r.get("fecha") or "")
         if not f or f < desde or (d1 and f > d1):
             continue
         leg = re.sub(r"\.0+$", "", str(r.get("legajo") or "").strip())
         if not leg:
             continue
         x = emps.setdefault(leg, {"n": r.get("nombre") or "", "c": r.get("empresa") or "", "d": {}, "o": {}})
-        x.setdefault("d", {})
-        x.setdefault("o", {})
+        if not isinstance(x.get("d"), dict):
+            x["d"] = {}
+        if not isinstance(x.get("o"), dict):
+            x["o"] = {}
         if f in x["d"]:
             continue
         ev = " ".join(e for e in (r.get("eventos") or []) if isinstance(e, str))
@@ -248,16 +242,67 @@ def francos_completar_fichadas(db: Session, quien: str = "sistema") -> int:
         n += 1
         if not d0 or f < d0:
             d0 = f
+    if n:
+        mov["d0"] = d0
+    return n
+
+
+# lo que recibe cada usuario de Francos ya viene completo con el historial (aunque lo guardado esté incompleto)
+_FR_CACHE: dict = {}
+
+
+def _francos_con_historial(db: Session, d: Doc, data: dict) -> dict:
+    ad = db.get(Doc, "ausentismo")
+    mov = (data.get("francos") or {}).get("mov") if isinstance(data.get("francos"), dict) else None
+    if not ad or not isinstance(mov, dict):
+        return data
+    k = (d.version, ad.version)
+    if _FR_CACHE.get("k") == k:
+        return _FR_CACHE["data"]
+    out = copy.deepcopy(data)
+    n = _completar_mov(out["francos"]["mov"], (ad.data or {}).get("records") or {})
+    _FR_CACHE.clear()
+    _FR_CACHE.update({"k": k, "data": out, "n": n})
+    return out
+
+
+def francos_completar_fichadas(db: Session, quien: str = "sistema") -> int:
+    """Guarda en Francos las fichadas de días anteriores que falten (con el historial de Llegadas tarde)."""
+    fd = db.scalar(select(Doc).where(Doc.key == "francos").with_for_update())
+    ad = db.get(Doc, "ausentismo")
+    if not fd or not ad:
+        return 0
+    data = copy.deepcopy(fd.data or {})
+    mov = (data.get("francos") or {}).get("mov")
+    if not isinstance(mov, dict):
+        return 0
+    n = _completar_mov(mov, (ad.data or {}).get("records") or {})
     if not n:
         return 0
-    mov["d0"] = d0
     fd.data = data
     fd.version = (fd.version or 0) + 1
     fd.updated_at = now()
     fd.updated_by = quien
-    auth.audit(db, quien, "guardar", f"Francos: fichadas completadas con el historial ({n} día(s) desde {d0})")
+    auth.audit(db, quien, "guardar", f"Francos: fichadas completadas con el historial ({n} día(s) desde {mov.get('d0')})")
     db.commit()
     return n
+
+
+@app.get("/api/diag/francos")
+def diag_francos(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Diagnóstico (solo admin): qué fichadas tiene guardadas Francos y qué historial hay para completarlas."""
+    if u.rol != "admin":
+        raise HTTPException(403, "Solo admin")
+    fd, ad = db.get(Doc, "francos"), db.get(Doc, "ausentismo")
+    mov = (((fd.data or {}).get("francos") or {}).get("mov") or {}) if fd else {}
+    recs = ((ad.data or {}).get("records") or {}) if ad else {}
+    fechas = sorted({str(r.get("fecha")) for r in recs.values() if isinstance(r, dict) and r.get("fecha")}) if isinstance(recs, dict) else []
+    dias = sorted({f for e in (mov.get("emps") or {}).values() if isinstance(e, dict) for f in (e.get("d") or {})})
+    return {"francos_version": fd.version if fd else None, "mov_d0": mov.get("d0"), "mov_d1": mov.get("d1"), "mov_emps": len(mov.get("emps") or {}),
+            "mov_dias": len(dias), "mov_primer_dia": dias[0] if dias else None,
+            "records_tipo": type(recs).__name__, "records": len(recs) if hasattr(recs, "__len__") else None,
+            "records_desde": fechas[0] if fechas else None, "records_hasta": fechas[-1] if fechas else None,
+            "cache": {"k": list(_FR_CACHE.get("k") or []), "agregados": _FR_CACHE.get("n")}}
 
 
 def sin_bajas(u: User) -> bool:
@@ -265,9 +310,15 @@ def sin_bajas(u: User) -> bool:
     return u.rol != "admin" and u.username in seed.COORDINADORES
 
 
-def doc_para(u: User, d: Doc) -> dict:
-    """El documento como lo recibe ese usuario: a los coordinadores se les quitan las fechas de baja de eventuales."""
+def doc_para(u: User, d: Doc, db: Session | None = None) -> dict:
+    """El documento como lo recibe ese usuario: a los coordinadores se les quitan las fechas de baja de eventuales,
+    y Francos llega con las fichadas de días anteriores completas con el historial de Llegadas tarde."""
     o = doc_out(d)
+    if d.key == "francos" and db is not None:
+        try:
+            o = {**o, "data": _francos_con_historial(db, d, o["data"])}
+        except Exception as e:
+            print("francos historial:", e)
     if d.key == "eventuales" and sin_bajas(u) and not can_write(u, "eventuales"):
         data = copy.deepcopy(o["data"])
         quitar = ("ultimo", "egreso")
@@ -433,7 +484,7 @@ def imp_out(request: Request) -> dict | None:
 
 @app.get("/api/bootstrap")
 def bootstrap(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    docs = {d.key: doc_para(u, d) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
+    docs = {d.key: doc_para(u, d, db) for d in db.scalars(select(Doc)) if d.key in DOC_KEYS and readable(u, d.key)}
     mine = {d.key: d.data for d in db.scalars(select(UserDoc).where(UserDoc.user_id == u.id))}
     return {"user": user_out(u), "modules": MODULES, "docs": docs, "user_docs": mine,
             "server_time": iso(now()), "build": BUILD, "imp": imp_out(request)}
@@ -678,7 +729,7 @@ def get_doc(key: str, u: User = Depends(current_user), db: Session = Depends(get
     if key not in DOC_KEYS or not readable(u, key):
         raise HTTPException(403, "No tenés acceso a este módulo")
     d = db.get(Doc, key)
-    return doc_para(u, d) if d else {"data": {}, "version": 0, "updated_at": None, "updated_by": None}
+    return doc_para(u, d, db) if d else {"data": {}, "version": 0, "updated_at": None, "updated_by": None}
 
 
 @app.put("/api/docs/{key}")
