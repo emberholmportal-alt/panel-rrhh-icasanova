@@ -120,6 +120,10 @@ def startup():
             if ua and (ua.nombre or "").strip().lower() == "ariel":
                 ua.nombre = "Flores, Ariel"
             nuevas.append("2026-11-17-nombre-admin")
+        try:
+            francos_completar_fichadas(db)
+        except Exception as e:   # nunca frena el arranque
+            print("francos historial:", e)
         clave_af, legs_af = seed.APTO_FRIO
         if clave_af not in hechas:
             ed = db.get(Doc, "eventuales")
@@ -186,6 +190,74 @@ def startup():
                 auth.audit(db, "sistema", "reset_admin", username)
                 db.commit()
                 print(f"Clave del administrador {username} restablecida desde ADMIN_RESET_PASSWORD: borrá la variable.")
+
+
+_MOV_MK = re.compile(r"(?:^|\s)[ECSecs]\s+\+?\d{1,2}:\d{2}")
+
+
+def _mov_clase(txt: str) -> str:
+    s = str(txt or "")
+    if _MOV_MK.search(s):
+        return "T"
+    if re.search(r"enfermedad", s, re.I):
+        return "ENF"
+    if re.search(r"\bART\b", s):
+        return "ART"
+    if re.search(r"vacaci", s, re.I):
+        return "VAC"
+    if re.search(r"ausencia", s, re.I):
+        return "AUS"
+    if re.search(r"licencia", s, re.I):
+        return "LIC"
+    return "OTRO" if s.strip() else ""
+
+
+def francos_completar_fichadas(db: Session, quien: str = "sistema") -> int:
+    """Las fichadas que ven los coordinadores en Francos se completan con el historial de Llegadas tarde
+    (solo los días que falten, últimos 100 días). Lo hace el servidor: no depende de que alguien abra el panel."""
+    fd = db.scalar(select(Doc).where(Doc.key == "francos").with_for_update())
+    ad = db.get(Doc, "ausentismo")
+    if not fd or not ad:
+        return 0
+    data = copy.deepcopy(fd.data or {})
+    mov = (data.get("francos") or {}).get("mov")
+    recs = (ad.data or {}).get("records") or {}
+    if not isinstance(mov, dict) or not recs:
+        return 0
+    desde = (datetime.now(timezone(timedelta(hours=-3))).date() - timedelta(days=100)).isoformat()
+    d1 = mov.get("d1") or ""
+    emps = mov.setdefault("emps", {})
+    n, d0 = 0, mov.get("d0") or d1
+    for r in recs.values():
+        f = str((r or {}).get("fecha") or "")
+        if not f or f < desde or (d1 and f > d1):
+            continue
+        leg = re.sub(r"\.0+$", "", str(r.get("legajo") or "").strip())
+        if not leg:
+            continue
+        x = emps.setdefault(leg, {"n": r.get("nombre") or "", "c": r.get("empresa") or "", "d": {}, "o": {}})
+        x.setdefault("d", {})
+        x.setdefault("o", {})
+        if f in x["d"]:
+            continue
+        ev = " ".join(e for e in (r.get("eventos") or []) if isinstance(e, str))
+        k = "T" if (r.get("marcas") or []) else _mov_clase(ev)
+        x["d"][f] = k
+        if k and k != "T":
+            x["o"][f] = ev.strip()[:60]
+        n += 1
+        if not d0 or f < d0:
+            d0 = f
+    if not n:
+        return 0
+    mov["d0"] = d0
+    fd.data = data
+    fd.version = (fd.version or 0) + 1
+    fd.updated_at = now()
+    fd.updated_by = quien
+    auth.audit(db, quien, "guardar", f"Francos: fichadas completadas con el historial ({n} día(s) desde {d0})")
+    db.commit()
+    return n
 
 
 def sin_bajas(u: User) -> bool:
@@ -641,7 +713,15 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     nota = str(body.get("nota") or "")[:280]
     auth.audit(db, u, "guardar", MODULES.get(key, key) + (": " + nota if nota else ""))
     db.commit()
-    return {"version": d.version, "updated_at": iso(d.updated_at), "updated_by": d.updated_by}
+    out = {"version": d.version, "updated_at": iso(d.updated_at), "updated_by": d.updated_by}
+    if key in ("ausentismo", "francos"):
+        # cada vez que se guardan fichadas, Francos queda con los días anteriores completos para los coordinadores
+        try:
+            if francos_completar_fichadas(db, u.nombre) and key == "francos":
+                out["version"] = db.get(Doc, "francos").version
+        except Exception as e:
+            print("francos historial:", e)
+    return out
 
 
 @app.post("/api/comidas/cocina")
