@@ -1274,6 +1274,7 @@ function frMovMerge(M,fname,extra){
       const ev=[].concat(r.eventos||[]).map(e=>typeof e==='string'?e:(e&&(e.txt||e.t||e.desc||e.nombre))||'').join(' ');
       const k=(r.marcas||[]).length?'T':movClase(ev,0); x.d[r.fecha]=k||''; if(k&&k!=='T') x.o[r.fecha]=ev.trim().slice(0,60);
       if(r.fecha<d0) d0=r.fecha; }); }catch(e){ console.warn('francos historial',e); }
+  for(const e of Object.values(emp)) for(const f in (e.d||{})) if(f<d0) d0=f;   // inicio = primer día con datos
   DB.francos=DB.francos||{emps:{},files:[]};
   DB.francos.mov=Object.assign({at:new Date().toISOString(),file:fname,por:window.SRV&&SRV.user?SRV.user.nombre:'',
     d0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp},extra||{});
@@ -1296,7 +1297,9 @@ function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(f
 function frFichadas(P){
   const F=DB.francos, mov=F&&F.mov&&F.mov.d1>=P.d0&&F.mov.d0<=P.d1?F.mov:null, emps={}, cov=new Set();
   const E=leg=>emps[leg]||(emps[leg]={n:'',c:'',d:{},o:{}});
-  if(mov){ for(let d=mov.d0<P.d0?P.d0:mov.d0; d<=mov.d1&&d<=P.d1; d=addD(d,1)) cov.add(d);
+  // el inicio real es el primer día con datos (d0 puede haber quedado mal guardado)
+  let m0=mov?mov.d0:''; if(mov) for(const e of Object.values(mov.emps||{})) for(const f in (e.d||{})) if(f<m0&&f>=P.d0) m0=f;
+  if(mov){ for(let d=m0<P.d0?P.d0:m0; d<=mov.d1&&d<=P.d1; d=addD(d,1)) cov.add(d);
     Object.entries(mov.emps).forEach(([leg,v])=>{ const x=E(leg); x.n=v.n; x.c=v.c; Object.entries(v.d).forEach(([d,k])=>{ if(d>=P.d0&&d<=P.d1){ x.d[d]=k; if(v.o&&v.o[d]) x.o[d]=v.o[d]; } }); }); }
   // reportes diarios del reloj: completan los días que el export de Movimientos no trae
   const R=Object.values(DB.records||{}).filter(r=>r.fecha>=P.d0&&r.fecha<=P.d1&&!cov.has(r.fecha));

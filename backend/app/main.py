@@ -242,8 +242,13 @@ def _completar_mov(mov: dict, recs: dict) -> int:
         n += 1
         if not d0 or f < d0:
             d0 = f
-    if n:
+    # el inicio de las fichadas es el primer día que de verdad tienen (aunque d0 haya quedado mal guardado)
+    primero = min((f for e in emps.values() if isinstance(e, dict) for f in (e.get("d") or {}) if f >= desde), default="")
+    if primero and (not d0 or primero < d0):
+        d0 = primero
+    if d0 and d0 != mov.get("d0"):
         mov["d0"] = d0
+        n = n or 1   # hubo un cambio que guardar
     return n
 
 
