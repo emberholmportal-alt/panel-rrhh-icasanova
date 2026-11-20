@@ -1266,9 +1266,17 @@ function frMovMerge(M,fname,extra){
   Object.entries(M.emps).forEach(([leg,v])=>{ const x=emp[leg]||(emp[leg]={n:v.n,c:v.c,d:{},o:{}}); x.n=v.n||x.n; x.c=v.c||x.c; x.o=x.o||{};
     Object.keys(x.d).forEach(d=>{ if(d>=md0&&d<=M.d1){ delete x.d[d]; delete x.o[d]; } });
     Object.entries(v.d).forEach(([d,k])=>{ if(d>=md0){ x.d[d]=k; if(v.o&&v.o[d]) x.o[d]=v.o[d]; } }); });
+  // los días que falten se completan con el historial de fichadas ya cargado en Llegadas tarde / Ausentismo
+  // (así los coordinadores ven siempre los días anteriores, aunque el export nuevo traiga solo los últimos días)
+  let d0=cur&&cur.d0&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0;
+  try{ Object.values(DB.records||{}).forEach(r=>{ if(!r||!r.fecha||r.fecha<desde||r.fecha>M.d1) return; const leg=String(r.legajo).trim().replace(/\.0+$/,'');
+      const x=emp[leg]||(emp[leg]={n:r.nombre||'',c:r.empresa||'',d:{},o:{}}); x.o=x.o||{}; if(x.d[r.fecha]!==undefined) return;
+      const ev=[].concat(r.eventos||[]).map(e=>typeof e==='string'?e:(e&&(e.txt||e.t||e.desc||e.nombre))||'').join(' ');
+      const k=(r.marcas||[]).length?'T':movClase(ev,0); x.d[r.fecha]=k||''; if(k&&k!=='T') x.o[r.fecha]=ev.trim().slice(0,60);
+      if(r.fecha<d0) d0=r.fecha; }); }catch(e){ console.warn('francos historial',e); }
   DB.francos=DB.francos||{emps:{},files:[]};
   DB.francos.mov=Object.assign({at:new Date().toISOString(),file:fname,por:window.SRV&&SRV.user?SRV.user.nombre:'',
-    d0:cur&&cur.d0&&cur.d0>=desde&&cur.d0<md0?cur.d0:md0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp},extra||{});
+    d0, d1:cur&&cur.d1>M.d1?cur.d1:M.d1, emps:emp},extra||{});
   return {d0:md0,d1:M.d1};
 }
 async function loadMovFrancos(rows,hi,name){
