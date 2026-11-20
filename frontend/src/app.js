@@ -1350,7 +1350,20 @@ const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',A
 const cxKey=e=>e.legajo||e.nombre;
 const cxFr=c=>c==='F'||c==='PF'||c==='DOM';   // de franco ese día (real o planificado)
 const cxTag=(r,cfg)=>r.sup?`<span class="cx-big s" title="Ya tiene ${r.comp} jornadas computables">superó</span>`:r.pend>0?`<span class="cx-big p">${r.pend}</span>`:`<span class="cx-big z">0</span>`;
+// si las fichadas de Francos (las que ven los coordinadores) tienen menos días que el historial guardado,
+// quien puede editar Francos y tiene el historial las completa solo, una vez por sesión, sin subir nada
+let frBackfillHecho=false;
+async function frBackfill(){
+  if(frBackfillHecho) return; frBackfillHecho=true;
+  try{ const m=DB.francos&&DB.francos.mov, R=DB.records; if(!m||!R||!canEditMod('francos')) return;
+    const desde=addD(hoy(),-100); let min='';
+    for(const k in R){ const f=R[k]&&R[k].fecha; if(f&&f>=desde&&f<=m.d1&&(!min||f<min)) min=f; }
+    if(!min||min>=m.d0) return;
+    frMovMerge({emps:{},d0:m.d1,d1:m.d1},m.file||'historial',{at:m.at,por:m.por,file:m.file});
+    if(DB.francos.mov.d0<m.d0){ await persist(); if(window.SRV&&SRV.nota) SRV.nota('francos',`Fichadas de Francos completadas con el historial (desde ${dmy(DB.francos.mov.d0)})`); renderFrancos(); }
+  }catch(e){ console.warn('francos historial',e); } }
 function renderFrancos(){
+  setTimeout(frBackfill,1500);
   if(!$('#v-francos')) return;
   renderUpd();
   const F=DB.francos, E=FRE(), C=frCruce(), cfg=cxCfg();
