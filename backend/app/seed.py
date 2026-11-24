@@ -52,11 +52,13 @@ USUARIOS = [
     ("hsalinas", "Salinas, Hernán", "coordinador", "$2b$12$4uyaYRixETJ.Od4L1tbRsOTvJhlMKnOgvo/7N9mLMF3U.8W0sttry"),
     # alta 18/11/2026
     ("scampos", "Campos, Sergio", "coordinador", "$2b$12$uDBVakoI1Mrd.d5iTRXQn.VcYKIWDqaG3xhriJk6jc6yzpLvy9N3m"),
+    # alta 24/11/2026
+    ("lgonzalez", "Gonzalez, Leonardo", "coordinador", "$2b$12$KaqozXOui8i1R2gqxazFBOv.gnuHEy0Zq8BQfpjWzxhuMWtJhSM9u"),
 ]
 
 
 # Cambios de permisos para usuarios que ya existen (se aplican una sola vez, en orden).
-COORDINADORES = ["wchaparro", "jovalles", "mleiva", "jalbarracin", "cdiarte", "ploiacono", "psilva", "hsalinas", "scampos"]
+COORDINADORES = ["wchaparro", "jovalles", "mleiva", "jalbarracin", "cdiarte", "ploiacono", "psilva", "hsalinas", "scampos", "lgonzalez"]
 MIGRACIONES = [
     ("2026-11-16-vacaciones", [
         # coordinadores: ven vacaciones y cumpleaños sin descargar ni modificar
