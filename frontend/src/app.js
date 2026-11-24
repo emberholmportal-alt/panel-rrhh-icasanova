@@ -1339,7 +1339,7 @@ function frCruce(){
       }
       cal[d]=c; g[c]++;
     }
-    const comp=g.T+g.DT+g.ENF+(cfg.art?g.ART:0), proy=comp+g.P;   // el feriado (aun trabajado) no suma para el tope
+    const comp=g.T+g.ENF+(cfg.art?g.ART:0), proy=comp+g.P;   // domingos y feriados (aun trabajados) no suman para el tope
     out.push({e,mv:!M||!!mv,g,cal,comp,proy,pend:Math.max(0,proy-cfg.obj),falt:Math.max(0,cfg.obj-proy),sup:comp>cfg.obj,
       ftom:g.F+g.PF, feriados:dias.filter(d=>cxFer(d)&&cal[d]!=='-').length});
   }
@@ -1347,7 +1347,7 @@ function frCruce(){
   const sinPl=M?Object.entries(M.emps).filter(([k,v])=>!enPl.has(k)&&/jornaliz/i.test(v.c)&&dias.some(d=>v.d[d]==='T')).map(([k,v])=>({legajo:k,nombre:v.n})):[];
   return {P,corte,M,dias,cfg,rows:out,sinPl,by:Object.fromEntries(out.map(r=>[r.e.legajo||r.e.nombre,r]))};
 }
-const CX_LAB={T:'Trabajó',DT:'Domingo trabajado',FT:'Feriado trabajado (no suma al tope)',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
+const CX_LAB={T:'Trabajó',DT:'Domingo trabajado (no suma al tope)',FT:'Feriado trabajado (no suma al tope)',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
 const CX_TXT={T:'✓',DT:'D',FT:'Fe',ENF:'E',ART:'A',AUS:'X',VAC:'V',LIC:'L',OTRO:'N',F:'F',DOM:'·',FER:'Fe',P:'·',PF:'F','-':'–'};
 const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',AUS:'#fee2e2',VAC:'#e0f2fe',LIC:'#ede9fe',OTRO:'#f1f5f9',F:'#cffafe',DOM:'#f1f5f9',FER:'#fef3c7',P:'#fff',PF:'#ecfeff','-':'#fff'};
 const cxKey=e=>e.legajo||e.nombre;
@@ -1397,11 +1397,11 @@ function renderFrancos(){
   { const lista=frState.modo==='lista'; $('#fr-gridw').hidden=lista; $('#fr-cx-ley').hidden=lista; $('#fr-n').hidden=lista; $('#fr-dia').hidden=!lista; if(lista) renderFrDia(); }
   { const cur=liqDe(hoy()), rows=C?C.rows:[], asig=rows.reduce((a,r)=>a+frAsig(r.e,C.dias),0), sin=rows.filter(r=>!frAsig(r.e,C.dias)).length,
       falta=hoy()>=P.d0&&hoy()<=P.d1?Math.round((dObj(P.d1)-dObj(hoy()))/864e5):null;
-    const nA=rows.length, nF=rows.filter(r=>esFrio(r.e.legajo)).length;
+    const nA=rows.length, nF=rows.filter(r=>esFrio(r.e.legajo)).length, pe=rows.filter(r=>r.pend>0), fa=pe.reduce((a,r)=>a+r.pend,0);
     $('#fr-liq').innerHTML=`<div class="fr-hp"><button class="fr-arr" data-liq="-1" title="Período anterior">‹</button>
       <div class="fr-hn"><span>Liquidación</span><b>${liqNom(P.ym)}</b><em>${dmy(P.d0)} al ${dmy(P.d1)}${P.ym===cur?' · en curso':''}</em></div>
       <button class="fr-arr" data-liq="1" title="Período siguiente">›</button>${P.ym!==cur?'<button class="btn ghost sm" data-liq="0">Volver al actual</button>':''}</div>
-      <div class="fr-hs"><div><b>${nA}</b><span>eventuales activos</span></div><div class="frio-k"><b>❄ ${nF}</b><span>con apto frío</span></div><div><b>${asig}</b><span>francos asignados</span></div><div class="${sin?'w':''}"><b>${sin}</b><span>sin francos</span></div><div><b>${falta==null?(hoy()>P.d1?'—':'·'):falta}</b><span>${falta==null?(hoy()>P.d1?'período cerrado':'no empezó'):'días al cierre'}</span></div></div>`; }
+      <div class="fr-hs"><div><b>${nA}</b><span>eventuales activos</span></div><div class="frio-k"><b>❄ ${nF}</b><span>con apto frío</span></div><div><b>${asig}</b><span>francos asignados</span></div><div class="${fa?'w':''}" title="Para que nadie pase de ${cfg.obj} jornadas en el período (domingos y feriados no suman${C&&C.M?'':'; sin fichadas, se supone que trabajan todo el período'})"><b>${fa}</b><span>faltan asignar${pe.length?` · ${pe.length} pers.`:''}</span></div><div class="${sin?'w':''}"><b>${sin}</b><span>sin francos</span></div><div><b>${falta==null?(hoy()>P.d1?'—':'·'):falta}</b><span>${falta==null?(hoy()>P.d1?'período cerrado':'no empezó'):'días al cierre'}</span></div></div>`; }
   const nAnt=[...ANTOF.values()].filter(a=>a.activo).length, nBaja=ANTOF.size-nAnt, nPl=F?Object.keys(F.emps||{}).length:0;
   $('#fr-drop').classList.toggle('ok',!!E.length); $('#fr-mdrop').classList.toggle('ok',!!(C&&C.M));
   const LA=F&&F.asig&&F.asig[F.asig.length-1];
@@ -1422,7 +1422,7 @@ function renderFrancos(){
   // KPIs
   if(C){ const act=C.rows.filter(r=>!(r.e.egreso&&r.e.egreso<hoy())), pend=act.filter(r=>r.pend>0), sup=act.filter(r=>r.sup), falt=act.filter(r=>r.falt>0), sinmv=C.rows.filter(r=>!r.mv);
     $('#fr-cx-kpis').innerHTML=[
-      {l:'Francos que faltan tomar',v:pend.reduce((a,r)=>a+r.pend,0),s:`entre ${pend.length} empleado(s)`,c:'acc-ochre'},
+      {l:'Francos que faltan asignar',v:pend.reduce((a,r)=>a+r.pend,0),s:`entre ${pend.length} empleado(s)`,c:'acc-ochre'},
       {l:'Empleados al día',v:act.length-pend.length-sup.length,s:`de ${act.length} activos`,c:''},
       {l:`Superaron ${cfg.obj} jornadas`,v:sup.length,s:sup.length?'ya no alcanza con francos':'ninguno',c:sup.length?'acc-alert':''},
       {l:`No llegan a ${cfg.obj}`,v:falt.length,s:'ingreso reciente, egreso o ausencias'},
@@ -1455,12 +1455,12 @@ function renderFrancos(){
   const EF=(C?C.rows.map(r=>r.e):E.filter(e=>ds.some(d=>e.d[d]!=null))).filter(flt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const ED=frCanEdit();
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
-      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C&&C.M?'<th class="frt" title="Francos que le faltan tomar según las fichadas">Faltan</th>':''}</tr></thead><tbody>`+
+      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C?`<th class="frt" title="Francos que faltan asignar para no pasar de ${cfg.obj} jornadas (${C.M?'fichadas y, después, el plan':'suponiendo que trabaja todo el período'}; domingos y feriados no suman)">Faltan</th>`:''}</tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
       return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}${FRIO(e.legajo)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C&&C.M?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
+        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${E.length?'Nadie con ese filtro.':'No hay eventuales: cargá la lista en la sección Eventuales.'}</div></td></tr></tbody>`;
   $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día</b> para asignar o quitar el franco. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
   $('#fr-cx-ley').innerHTML=(C&&C.M?['PF','P','T','F','DOM','FER','ENF','ART','AUS']:['PF','P','DOM','FER']).map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');
@@ -1685,7 +1685,7 @@ function cxInforme(){
   <h2 class="pb">Calendario día por día</h2>
   <div class="ley" id="ley"></div>
   <table class="cal"><thead id="ch"></thead><tbody id="cb"></tbody></table>
-  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos trabajados). Los feriados, aunque se trabajen, no suman al tope. Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Día sin fichada o con ausencia (con o sin aviso) = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
+  <h2>Criterios</h2><div class="crit">Fichadas = días con fichada en el reloj (también domingos y feriados trabajados). Los domingos y feriados, aunque se trabajen, no suman al tope. Jornadas a la fecha = fichadas + enfermedad${cfg.art?' + ART':''}. Día sin fichada o con ausencia (con o sin aviso) = franco tomado (los domingos ya son franco). Feriados del período se informan aparte y no suman. Hasta el último día del export de movimientos se usan las fichadas (el último día solo si tiene fichada); después, el plan de francos. <b>Francos restantes = total al cierre − ${cfg.obj}</b>.</div>
   <script>
   const D=${JSON.stringify(data).replace(/</g,'\\u003c')}, PRE=${JSON.stringify(pre)};
   const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1723,7 +1723,7 @@ function cxExcel(){
   const CODE={T:'T',DT:'DT',FT:'FT',ENF:'ENF',ART:'ART',AUS:'AUS',VAC:'VAC',LIC:'LIC',OTRO:'NOV',F:'F',DOM:'DOM',FER:'FER',P:'P',PF:'PF','-':''};
   const cal=[['Legajo','Apellido y nombre'].concat(C.dias.map(d=>DOW[dObj(d).getDay()].slice(0,2)+' '+dm(d))).concat(['Faltan tomar'])].concat(R.map(r=>[r.e.legajo,r.e.nombre].concat(C.dias.map(d=>CODE[r.cal[d]])).concat([r.sup?'Superó':r.pend])));
   const w2=XLSX.utils.aoa_to_sheet(cal); w2['!cols']=[{wch:9},{wch:34}].concat(C.dias.map(()=>({wch:7}))); XLSX.utils.book_append_sheet(wb,w2,'Calendario');
-  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','Sí'],['FT','Feriado trabajado','No (los feriados no suman al tope)'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['F (ausencia)','Ausencia con o sin aviso: cuenta como franco tomado','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
+  const ref=[['Código','Significado','¿Computa?'],['T','Trabajó (tiene fichada)','Sí'],['DT','Domingo trabajado','No (los domingos no suman al tope)'],['FT','Feriado trabajado','No (los feriados no suman al tope)'],['ENF','Enfermedad','Sí'],['ART','Licencia ART',cfg.art?'Sí':'No'],['F (ausencia)','Ausencia con o sin aviso: cuenta como franco tomado','No'],['VAC / LIC / NOV','Vacaciones, licencia u otra novedad','No'],['F','Sin fichada: franco tomado','No'],['DOM','Domingo (ya es franco)','No'],['FER','Feriado (se informa aparte)','No'],['P','Jornada planificada después del corte','Total al cierre'],['PF','Franco planificado después del corte','No'],[],
     ['Período',`${dmy(C.P.d0)} al ${dmy(C.P.d1)}`],['Fichadas hasta',C.M?dmy(C.corte)+' (el último día solo cuenta si tiene fichada)':'sin movimientos'],['Objetivo de jornadas',cfg.obj],['Feriados del período',C.dias.filter(cxFer).map(d=>dmy(d)+' '+cxFer(d).n).join(' · ')||'ninguno'],
     ['Francos que faltan tomar','Total al cierre − objetivo (si da negativo, 0)'],[],['Fichan y no están en el plan',C.sinPl.map(x=>x.legajo+' '+x.nombre).join(' · ')||'ninguno']];
   const w3=XLSX.utils.aoa_to_sheet(ref); w3['!cols']=[{wch:30},{wch:70},{wch:16}]; XLSX.utils.book_append_sheet(wb,w3,'Criterios');
@@ -1773,7 +1773,7 @@ async function frListadoXlsx(){
 }
 // detalle de francos pendientes de asignar (para no pasarnos de las jornadas del período)
 function frPendientesPrint(){
-  const C=frCruce(); if(!C||!C.M){ App.toast('Para calcular los francos pendientes hacen falta las fichadas del reloj (export de Movimientos) del período.',true); return; }
+  const C=frCruce(); if(!C){ App.toast('No hay eventuales para calcular los francos pendientes.',true); return; }
   const cfg=C.cfg, R=C.rows.filter(r=>frFlt(r.e));
   const P=R.filter(r=>r.pend>0), S=R.filter(r=>r.sup);
   if(!P.length&&!S.length){ App.toast('Nadie tiene francos pendientes de asignar con este filtro.'); return; }
@@ -1796,7 +1796,7 @@ function frPendientesPrint(){
   @media print{button{display:none}}</style></head><body>
   <button onclick="print()">Imprimir / guardar PDF</button>
   <h1>Francos pendientes de asignar · ${esc(liqNom(C.P.ym))}</h1>
-  <p class="m">Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · ${esc(filtro)} · fichadas hasta el ${dmy(C.corte)} · objetivo ${cfg.obj} jornadas · emitido ${dmy(hoy())}</p>
+  <p class="m">Período ${dmy(C.P.d0)} al ${dmy(C.P.d1)} · ${esc(filtro)} · ${C.M?'fichadas hasta el '+dmy(C.corte):'sin fichadas todavía: se supone que trabajan todo el período'} · objetivo ${cfg.obj} jornadas (domingos y feriados no suman) · emitido ${dmy(hoy())}</p>
   <div class="k"><div><span>Personas con francos pendientes</span><b>${P.length}</b></div><div><span>Francos por asignar</span><b>${tot}</b></div>${S.length?`<div><span>Ya superaron el objetivo</span><b>${S.length}</b></div>`:''}</div>
   <p class="nota">"Faltan asignar" = francos que todavía hay que darle para no pasar de ${cfg.obj} jornadas al cierre del período (proyección = jornadas a la fecha + días planificados de trabajo que le quedan). La última columna es para anotar a mano los días elegidos.</p>
   <h2>1 · Por orden alfabético</h2><table>${head(true)}${alfa.map(r=>fila(r,true)).join('')}</table>
