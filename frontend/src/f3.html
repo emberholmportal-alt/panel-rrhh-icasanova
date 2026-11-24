@@ -1486,9 +1486,20 @@ function calcGremiales(){
       if(d.vyc>0) obs.push('ese día ya cobró V y C'); else vyc++;
     });
     const desp=presDe(y), pagar=Math.max(0,desp.pc-actual);
+    const pl=(n,a,b)=>n===1?a:b;
+    const tarde = y.ret<=0? 'no tuvo llegadas tarde' : y.ret<30? `${y.ret} min de llegadas tarde (menos de 30)` : y.ret<60? `${y.ret} min de llegadas tarde (entre 30 y 59: puntualidad al 50%)` : `${y.ret} min de llegadas tarde (60 o más)`;
+    const aus = y.inj>0? `${y.inj} ${pl(y.inj,'ausencia injustificada','ausencias injustificadas')} además del permiso gremial` : x.inj>0? 'su única ausencia fue el permiso gremial' : 'no tuvo ausencias';
+    const malo=[], bueno=[];
+    if(y.inj>0) malo.push(aus); else bueno.push(aus);
+    if(desp.cp===0) malo.push(tarde); else bueno.push(tarde);
+    if(y.enf>2) malo.push(`${y.enf} días de enfermedad (más de 2)`); else if(y.enf>0) bueno.push(`${y.enf} ${pl(y.enf,'día','días')} de enfermedad (presentismo al 50%)`);
+    if(y.art>0) malo.push('licencia por ART'); if(y.sus>0) malo.push('suspensión'); if(y.ju>1) malo.push(`${y.ju} ausencias justificadas (más de 1)`);
+    const motivo = desp.pc===0? 'No corresponde: '+malo.join('; ')
+      : actual>=desp.pc? `Ya cobra presentismo ${pctTxt(actual)} en el F3: no se paga aparte`
+      : `Corresponde ${desp.pc===1?'el 100%':'el 50%'}: `+bueno.join('; ')+(desp.pc===0.5?'. Con puntualidad y presentismo al 50%, cobra la mitad':'');
     if(desp.pc<1){ const m=[]; if(desp.cp===0) m.push(`${y.ret} min de retraso`); if(y.inj>0) m.push(`${y.inj} ausencia(s) injustificada(s)`); if(y.enf>2) m.push(`${y.enf} días de enfermedad`); else if(y.enf>0) m.push(`${y.enf} día(s) de enfermedad (50%)`); if(y.art>0) m.push('ART'); if(y.sus>0) m.push('suspensión'); if(y.ju>1) m.push(`${y.ju} ausencias justificadas`);
       if(m.length) obs.push('Igual no cobra el 100% por: '+m.join(', ')); }
-    return {L,nombre,fechas,cant:fechas.length,vyc,viat:GRE.viat?vyc:0,com:GRE.com?vyc:0,actual,nuevo:desp.pc,pagar,obs,x,y,enF3:!!r};
+    return {L,nombre,fechas,motivo,cant:fechas.length,vyc,viat:GRE.viat?vyc:0,com:GRE.com?vyc:0,actual,nuevo:desp.pc,pagar,obs,x,y,enF3:!!r};
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
 }
 function pintarGremiales(){
@@ -1509,7 +1520,7 @@ function pintarGremiales(){
     <td class="num">${r.cant}</td><td class="num">${r.viat}</td><td class="num">${r.com}</td><td class="num">${pctTxt(r.actual)}</td>
     <td class="num" style="color:${r.nuevo>r.actual?'var(--teal)':r.nuevo===0?'var(--coral)':'inherit'};font-weight:600">${pctTxt(r.nuevo)}</td>
     <td class="num" style="font-weight:700;color:${r.pagar?'var(--teal)':'var(--dim)'}">${r.pagar?pctTxt(r.pagar):'—'}</td>
-    <td style="white-space:normal;max-width:420px;font-size:11.5px;color:var(--mut)">${r.obs.join(' · ')}</td></tr>`).join('')
+    <td style="white-space:normal;max-width:420px;font-size:11.5px;color:var(--mut)"><b style="color:${r.pagar?'var(--teal)':r.nuevo===0?'var(--coral)':'var(--text)'}">${r.motivo}</b><br>${r.obs.join(' · ')}</td></tr>`).join('')
     :'<tr><td colspan="10" class="muted" style="padding:16px">Todavía no cargaste permisos gremiales aparte.</td></tr>';
   $('#greNota').innerHTML=(dia?`Detalle diario de las novedades: ${dmyIso(dia.d0)} al ${dmyIso(dia.d1)}. `:'<span style="color:var(--amber)">El archivo de novedades no trae la hoja diaria (BASE): se supone que el día del permiso era una ausencia a descuento.</span> ')+
     '"A pagar aparte" = presentismo con el gremial − el que ya figura en el F3 (1 = corresponde, 0 = no corresponde). El viático y la comida no se suman si ese día ya cobró V y C.';
@@ -1531,18 +1542,19 @@ async function excelGremiales(){
   const wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
   // hoja 1: lo que falta abonar, con el formato de la planilla de pago
   const ws=wb.addWorksheet('Gremiales',{views:[{state:'frozen',ySplit:1}]});
-  ws.columns=[{width:13},{width:42},{width:13},{width:16},{width:16},{width:22}];
+  ws.columns=[{width:13},{width:42},{width:13},{width:16},{width:16},{width:16},{width:80}];
   const fino={style:'thin',color:{argb:'FF000000'}}, B={top:fino,left:fino,bottom:fino,right:fino};
-  const h=ws.addRow(['Código de empleado','Apellidos Nombre','Permiso Gremial','VIATICO','COMIDA','PRESENTISMO']); h.height=30;
+  const h=ws.addRow(['Código de empleado','Apellidos Nombre','Permiso Gremial','VIATICO','COMIDA','PRESENTISMO','MOTIVO']); h.height=30;
   h.eachCell(c=>{ c.font={name:'Arial',bold:true,size:11}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD8E4BC'}}; c.alignment={vertical:'middle',wrapText:true}; c.border=B; });
-  R.forEach(r=>{ const row=ws.addRow([r.L,r.nombre,r.cant,r.viat,r.com,r.pagar]);
-    row.eachCell({includeEmpty:true},(c,k)=>{ c.font={name:'Arial',size:10}; c.border=B; if(k>=3) c.alignment={horizontal:'right'}; }); });
+  R.forEach(r=>{ const row=ws.addRow([+r.L||r.L,r.nombre,r.cant,r.viat,r.com,r.pagar,r.motivo]);
+    row.eachCell({includeEmpty:true},(c,k)=>{ c.font={name:'Arial',size:10}; c.border=B; c.alignment=k===7?{wrapText:true,vertical:'top'}:{horizontal:k>=3?'right':'left',vertical:'top'}; });
+    row.getCell(7).font={name:'Arial',size:10,color:{argb:r.pagar?'FF166534':'FF991B1B'}}; });
   // hoja 2: de dónde sale cada número (para control interno)
   const wd=wb.addWorksheet('Detalle');
   wd.columns=[{width:13},{width:36},{width:22},{width:14},{width:14},{width:14},{width:90}];
   const hd=wd.addRow(['Código de empleado','Apellidos Nombre','Fechas del permiso','Presentismo en el F3','Presentismo con el gremial','Presentismo a abonar','Detalle']); hd.height=30;
   hd.eachCell(c=>{ c.font={name:'Arial',bold:true,size:10}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD8E4BC'}}; c.alignment={vertical:'middle',wrapText:true}; c.border=B; });
-  R.forEach(r=>{ const row=wd.addRow([r.L,r.nombre,r.fechas.map(dmyIso).join(' · '),r.actual,r.nuevo,r.pagar,r.obs.join(' · ')]);
+  R.forEach(r=>{ const row=wd.addRow([+r.L||r.L,r.nombre,r.fechas.map(dmyIso).join(' · '),r.actual,r.nuevo,r.pagar,r.obs.join(' · ')]);
     row.eachCell({includeEmpty:true},(c,k)=>{ c.font={name:'Arial',size:9.5}; c.border=B; c.alignment={vertical:'top',wrapText:k===7||k===3}; if(k>=4&&k<=6) c.numFmt='0%'; }); });
   wd.addRow([]);
   ['Criterio (acuerdo de presentismo GLD): puntualidad <30 min 100%, 30-59 min 50%, 60+ 0%. Presentismo: 1 ausencia injustificada, más de 1 justificada, ART o suspensión 0%; hasta 2 enfermedades 50%, más de 2, 0%. Si alguno da 0% no cobra; si los dos dan 50% cobra 50%; si no, 100%.',
