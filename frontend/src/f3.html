@@ -224,6 +224,7 @@ td input.ed{border-color:var(--amber);background:rgba(240,160,32,.10);color:var(
   <div id="s4"><b>4</b> Control</div>
   <div id="s5"><b>5</b> Generar F3</div>
   <div id="s6"><b>6</b> Reporte</div>
+  <div id="s7"><b>7</b> Gremiales aparte</div>
 </div>
 
 <!-- 1 · BASE -->
@@ -387,6 +388,28 @@ td input.ed{border-color:var(--amber);background:rgba(240,160,32,.10);color:var(
     <button class="ghost" id="btnRepCsv">Bajar en CSV</button>
   </div>
   <div class="body" id="repBody"></div>
+</section>
+
+<!-- 7 · PERMISOS GREMIALES APARTE -->
+<section id="secGre" class="off">
+  <div class="head"><span class="n">07</span><h2>Permisos gremiales aparte</h2><span class="sp"></span>
+    <span class="muted mono" id="greInfo"></span>
+    <button class="primary" id="btnGreXls">Descargar Excel para pagar aparte</button>
+  </div>
+  <div class="body">
+    <p class="muted" style="margin:0 0 12px">Los efectivos tienen 10 permisos gremiales autorizados por mes. Los que pasan de ese cupo se pagan aparte: elegí la persona y la fecha del permiso. El panel recalcula el presentismo con todas las novedades que ya tiene el F3 (incluidos tus ajustes), como si ese día fuera permiso gremial, y suma un viático y una comida por cada permiso.</p>
+    <div class="row">
+      <label class="f">Colaborador<input id="greEmp" list="greDl" placeholder="legajo o apellido" style="width:300px"><datalist id="greDl"></datalist></label>
+      <label class="f">Fecha del permiso<input id="greFec" type="date" style="width:170px"></label>
+      <button id="btnGreAdd" style="margin-bottom:1px">Agregar permiso</button>
+      <span style="flex:1"></span>
+      <button class="ghost" id="btnGreClr" style="margin-bottom:1px">Vaciar la lista</button>
+    </div>
+    <div class="hr"></div>
+    <div class="stats" id="greStats"></div>
+    <div class="tw"><table id="tGre"><thead></thead><tbody></tbody></table></div>
+    <p class="muted" style="margin:12px 0 0;font-size:12px" id="greNota"></p>
+  </div>
 </section>
 
 <div style="text-align:center;color:var(--dim);font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;margin-top:26px">
@@ -737,13 +760,49 @@ async function cargarNov(file){
       filas[L]=f; orden.push(L);
     }
     if(!orden.length) throw new Error('El Resumen no trae legajos');
-    ST.nov={ archivo:file.name, cols, filas, orden, cLeg, hoja:ws['!ref'] };
+    ST.nov={ archivo:file.name, cols, filas, orden, cLeg, hoja:ws['!ref'], dia:leerDiario(wb) };
     $('#novInfo').textContent=`${file.name} · ${orden.length} legajos`;
     $('#bNov').textContent='novedades: '+orden.length+' leg.'; $('#bNov').className='badge on';
     marcarCarga('#secNov', true);
     refrescar();
     toast(`Novedades cargadas · ${orden.length} legajos`);
   }catch(e){ toast('Novedades: '+e.message, true); }
+}
+
+// detalle día por día (hoja BASE de las novedades): sirve para saber qué tenía cada persona el día de un permiso gremial
+function fechaIso(v){
+  if(typeof v==='number'){ const d=XLSX.SSF.parse_date_code(v); return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:''; }
+  const m=String(v??'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  const i=String(v??'').match(/(\d{4})-(\d{2})-(\d{2})/); return i?i[0]:'';
+}
+// minutos de un valor de tiempo del reloj: '0:43', '1:02:00', fracción de día o '-'
+function minutos(v){
+  if(typeof v==='number') return v<1? Math.round(v*1440) : v;
+  const m=String(v??'').trim().match(/^(\d+):(\d{2})(?::(\d{2}))?$/); return m? (+m[1])*60+(+m[2]) : 0;
+}
+function leerDiario(wb){
+  try{
+    for(const n of wb.SheetNames){
+      const A=aoa(wb.Sheets[n]); if(!A.length) continue;
+      let hr=-1; for(let i=0;i<Math.min(4,A.length);i++){ const h=(A[i]||[]).map(N); if(h.includes('CODIGO DE EMPLEADO')&&h.includes('FECHA')&&h.includes('MOVIMIENTOS')){ hr=i; break; } }
+      if(hr<0) continue;
+      const c={}; (A[hr]||[]).forEach((v,i)=>{ const k=N(v); if(k&&!(k in c)) c[k]=i; });
+      const g=k=>c[k]===undefined?null:c[k];
+      const EV=[['AUSENCIA SIN AVISO EVENTOS','Ausencia sin aviso'],['AUSENCIA CON AVISO EVENTOS','Ausencia con aviso'],['AUSENCIA C AVISO DE ENFERMEDAD EVENTOS','Ausencia c/aviso de enfermedad'],
+        ['ENFERMEDAD EVENTOS','Enfermedad'],['ACCIDENTE ART EVENTOS','ART'],['VACACIONES EVENTOS','Vacaciones'],['PERMISO GREMIAL EVENTOS','Permiso gremial'],['LICENCIA ESPECIAL EVENTOS','Licencia especial'],
+        ['FALLECIMIENTO FLIAR EVENTOS','Fallecimiento familiar'],['NACIMIENTO DE HIJO EVENTOS','Nacimiento de hijo'],['DONACION DE SANGRE EVENTOS','Donación de sangre']];
+      const out={}; let d0='', d1='';
+      for(let i=hr+1;i<A.length;i++){ const f=A[i]||[]; const L=leg(f[g('CODIGO DE EMPLEADO')]); const F=fechaIso(f[g('FECHA')]); if(!L||!F) continue;
+        const mov=String(f[g('MOVIMIENTOS')]??'').replace(/^[.\d\s\u00a0]+/,'').trim(), esAus=/ausencia/i.test(mov)&&!/\|/.test(mov);
+        const ev=EV.filter(([k])=>g(k)!=null&&num(f[g(k)])>0).map(x=>x[1]);
+        const trab=minutos(f[g('HS TRABAJADAS MINUTOS')])>0||minutos(f[g('PRODUCTIVAS EN EL CENTRO MINUTOS')])>0;
+        (out[L]||(out[L]={}))[F]={ desc:g('AUSENCIAS A DESCUENTO')!=null?num(f[g('AUSENCIAS A DESCUENTO')]):0, ret:minutos(f[g('RETRASOS MINUTOS')]),
+          vyc:g('V Y C')!=null?num(f[g('V Y C')]):0, que: esAus? mov : ev.length? ev.join(' + ') : trab? 'Trabajó' : (mov||'Sin marcas') };
+        if(!d0||F<d0) d0=F; if(!d1||F>d1) d1=F; }
+      return {emps:out,d0,d1};
+    }
+  }catch(e){ console.warn('diario',e); }
+  return null;
 }
 
 /* ---------------- 2c · AYUDA SOLIDARIA ---------------- */
@@ -1280,13 +1339,14 @@ function refrescar(){
   $('#secCtl').classList.toggle('off', !listo);
   $('#secGen').classList.toggle('off', !listo);
   $('#secRep').classList.toggle('off', !listo);
-  ['s1','s2','sA','sP','s3','s4','s5','s6'].forEach(id=>$('#'+id).className='');
+  ['s1','s2','sA','sP','s3','s4','s5','s6','s7'].forEach(id=>$('#'+id).className='');
   if(ST.base){$('#s1').className='done';$('#s2').className='act';}
   if(ST.ayuda)$('#sA').className='done';
-  if(listo){$('#s2').className='done';$('#sP').className='done';$('#s3').className='done';$('#s4').className='act';$('#s5').className='act';$('#s6').className='act';}
-  if(!listo){ $('#stats').innerHTML=''; $('#alerts').innerHTML=''; return; }
+  if(listo){$('#s2').className='done';$('#sP').className='done';$('#s3').className='done';$('#s4').className='act';$('#s5').className='act';$('#s6').className='act';if(ST.base.tipo==='GLD')$('#s7').className='act';}
+  if(!listo){ $('#stats').innerHTML=''; $('#alerts').innerHTML=''; $('#secGre').classList.add('off'); return; }
 
   const R=armar(); ST.filas=R.out;
+  try{ pintarGremiales(); }catch(e){ console.warn('gremiales',e); }
   const conNov=R.out.filter(r=>r.conNov).length;
   $('#stats').innerHTML=[
     ['Legajos en el F3', R.out.length,''],
@@ -1385,6 +1445,112 @@ function refrescar(){
 }
 
 /* ---------------- 5 · EXPORTAR ---------------- */
+/* ---------------- 7 · PERMISOS GREMIALES APARTE ---------------- */
+// Acuerdo de presentismo GLD (cláusulas 4 y 5): puntualidad <30 min 100%, 30-59 50%, 60+ 0;
+// presentismo: 1 ausencia injustificada, más de 1 justificada, ART o suspensión = 0; hasta 2 enfermedades 50%, más de 2 = 0.
+// Resultado: si alguno es 0 → 0; si los dos son 50% → 50%; si no → 100%.
+const LSG='panelF3_gremial_v1';
+let GRE=(()=>{ try{ return JSON.parse(localStorage.getItem(LSG))||{it:[]}; }catch(e){ return {it:[]}; } })();
+const guardarGre=()=>{ try{ localStorage.setItem(LSG,JSON.stringify(GRE)); }catch(e){} };
+const pctTxt=v=>v===1?'100%':v===0.5?'50%':'0%';
+const dmyIso=f=>f?f.slice(8,10)+'/'+f.slice(5,7)+'/'+f.slice(0,4):'';
+function presDe(x){
+  const cp = x.ret<30?1 : x.ret<60?0.5 : 0;
+  const pr = (x.inj>=1||x.ju>1||x.art>0||x.sus>0||x.enf>2)?0 : x.enf>0?0.5 : 1;
+  return {cp,pr,pc:(cp===0||pr===0)?0:(cp===0.5&&pr===0.5)?0.5:1};
+}
+function calcGremiales(){
+  const filas=ST.filas||[], porL={};
+  GRE.it.forEach(it=>{ (porL[it.l]||(porL[it.l]=[])).push(it); });
+  return Object.entries(porL).map(([L,its])=>{
+    const r=filas.find(x=>x.legajo===L), v=k=>r?Math.abs(num(r.fila[C(k)])):0;
+    const nombre=r?r.nombre:(its[0].n||'');
+    // lo que ya tiene el F3 (novedades + ajustes manuales)
+    const x={ret:r?minutos(r.fila[C('BJ')]):0, inj:v('BK'), ju:v('BL'), enf:v('AJ'), art:v('AR')+v('AS'), sus:v('AU')};
+    const antes=presDe(x), actual=r&&!esVacio(r.fila[C('BO')])?num(r.fila[C('BO')]):antes.pc;
+    const y=Object.assign({},x), obs=[]; let vyc=0;
+    const fechas=its.map(i=>i.f).sort();
+    fechas.forEach(F=>{
+      const d=ST.nov&&ST.nov.dia&&ST.nov.dia.emps[L]?ST.nov.dia.emps[L][F]:null;
+      if(!d){
+        // sin detalle de ese día: se toma como ausencia a descuento que el permiso justifica
+        if(y.inj>0){ y.inj--; obs.push(`${dmyIso(F)}: sin detalle diario, se toma como ausencia que queda justificada`); }
+        else obs.push(`${dmyIso(F)}: sin detalle diario`);
+        vyc++; return; }
+      if(d.desc>0){ y.inj=Math.max(0,y.inj-d.desc); obs.push(`${dmyIso(F)}: ${d.que} → queda justificado`); }
+      else obs.push(`${dmyIso(F)}: ${d.que}`);
+      if(d.ret>0){ y.ret=Math.max(0,y.ret-d.ret); obs.push(`se descuentan ${d.ret} min de retraso de ese día`); }
+      if(d.vyc>0) obs.push('ese día ya cobró V y C'); else vyc++;
+    });
+    const desp=presDe(y), pagar=Math.max(0,desp.pc-actual);
+    if(desp.pc<1){ const m=[]; if(desp.cp===0) m.push(`${y.ret} min de retraso`); if(y.inj>0) m.push(`${y.inj} ausencia(s) injustificada(s)`); if(y.enf>2) m.push(`${y.enf} días de enfermedad`); else if(y.enf>0) m.push(`${y.enf} día(s) de enfermedad (50%)`); if(y.art>0) m.push('ART'); if(y.sus>0) m.push('suspensión'); if(y.ju>1) m.push(`${y.ju} ausencias justificadas`);
+      if(m.length) obs.push('Igual no cobra el 100% por: '+m.join(', ')); }
+    return {L,nombre,fechas,cant:fechas.length,vyc,actual,nuevo:desp.pc,pagar,obs,x,y,enF3:!!r};
+  }).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+}
+function pintarGremiales(){
+  const ok=ST.base&&ST.nov&&ST.base.tipo==='GLD';
+  $('#secGre').classList.toggle('off',!ok); if(!ok) return;
+  $('#greDl').innerHTML=(ST.filas||[]).map(r=>`<option value="${r.legajo} · ${String(r.nombre).replace(/"/g,'')}">`).join('');
+  const dia=ST.nov.dia; if(dia){ $('#greFec').min=dia.d0; $('#greFec').max=dia.d1; }
+  const enF3=(ST.filas||[]).reduce((a,r)=>a+Math.abs(num(r.fila[C('AK')])),0);
+  $('#greInfo').textContent=`${periodoNov().txt} · ${enF3} permiso(s) gremial(es) ya en el F3`;
+  const R=calcGremiales();
+  $('#greStats').innerHTML=[['Personas',R.length,''],['Permisos aparte',R.reduce((a,r)=>a+r.cant,0),'a'],['Recuperan presentismo',R.filter(r=>r.pagar>0).length,'t'],
+    ['Viáticos y comidas',R.reduce((a,r)=>a+r.vyc,0),''],['Siguen sin presentismo',R.filter(r=>r.nuevo===0).length,R.some(r=>r.nuevo===0)?'c':'']]
+    .map(([k,v,c])=>`<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  $('#tGre thead').innerHTML='<tr><th>Legajo</th><th>Apellido y nombre</th><th>Permisos (fecha)</th><th style="text-align:right">Gremial<br>176</th><th style="text-align:right">Viático<br>612</th><th style="text-align:right">Comida<br>614</th><th style="text-align:right">Presentismo<br>en el F3</th><th style="text-align:right">Con el<br>gremial</th><th style="text-align:right">A pagar<br>aparte</th><th>Detalle</th></tr>';
+  $('#tGre tbody').innerHTML=R.length?R.map(r=>`<tr><td>${r.L}</td><td>${r.nombre}${r.enF3?'':' <span style="color:var(--coral)">(no está en el F3)</span>'}</td>
+    <td>${r.fechas.map(f=>`${dmyIso(f)} <button class="ghost" data-grex="${r.L}|${f}" title="Quitar" style="padding:0 6px;font-size:11px">✕</button>`).join(' ')}</td>
+    <td class="num">${r.cant}</td><td class="num">${r.vyc}</td><td class="num">${r.vyc}</td><td class="num">${pctTxt(r.actual)}</td>
+    <td class="num" style="color:${r.nuevo>r.actual?'var(--teal)':r.nuevo===0?'var(--coral)':'inherit'};font-weight:600">${pctTxt(r.nuevo)}</td>
+    <td class="num" style="font-weight:700;color:${r.pagar?'var(--teal)':'var(--dim)'}">${r.pagar?pctTxt(r.pagar):'—'}</td>
+    <td style="white-space:normal;max-width:420px;font-size:11.5px;color:var(--mut)">${r.obs.join(' · ')}</td></tr>`).join('')
+    :'<tr><td colspan="10" class="muted" style="padding:16px">Todavía no cargaste permisos gremiales aparte.</td></tr>';
+  $('#greNota').innerHTML=(dia?`Detalle diario de las novedades: ${dmyIso(dia.d0)} al ${dmyIso(dia.d1)}. `:'<span style="color:var(--amber)">El archivo de novedades no trae la hoja diaria (BASE): se supone que el día del permiso era una ausencia a descuento.</span> ')+
+    '"A pagar aparte" = presentismo con el gremial − el que ya figura en el F3. El viático y la comida no se suman si ese día ya cobró V y C.';
+}
+function agregarGremial(){
+  const q=$('#greEmp').value.trim(), F=$('#greFec').value;
+  const L=(q.match(/^\d+/)||[''])[0]||((ST.filas||[]).find(r=>N(r.nombre).includes(N(q)))||{}).legajo;
+  const r=(ST.filas||[]).find(x=>x.legajo===L);
+  if(!r){ toast('Elegí un colaborador de la lista del F3',true); return; }
+  if(!F){ toast('Poné la fecha del permiso gremial',true); return; }
+  const dia=ST.nov.dia; if(dia&&(F<dia.d0||F>dia.d1)){ toast(`La fecha tiene que estar dentro de las novedades (${dmyIso(dia.d0)} al ${dmyIso(dia.d1)})`,true); return; }
+  if(GRE.it.some(i=>i.l===L&&i.f===F)){ toast('Ese permiso ya está cargado',true); return; }
+  GRE.it.push({l:L,n:r.nombre,f:F}); guardarGre(); $('#greEmp').value=''; pintarGremiales();
+  const R=calcGremiales().find(x=>x.L===L);
+  toast(`${r.nombre}: con el gremial del ${dmyIso(F)} ${R.pagar?`cobra presentismo ${pctTxt(R.nuevo)} (paga aparte ${pctTxt(R.pagar)})`:`queda en ${pctTxt(R.nuevo)}`}`);
+}
+async function excelGremiales(){
+  const R=calcGremiales(); if(!R.length){ toast('No hay permisos gremiales aparte para descargar',true); return; }
+  const wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
+  const ws=wb.addWorksheet('Gremiales aparte',{views:[{state:'frozen',ySplit:4}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  const cab=['Legajo','Apellido y nombre','Fechas del permiso','Permiso gremial (176)','Viáticos (612)','Comidas (614)','Presentismo en el F3','Presentismo con el gremial','Presentismo a pagar aparte','Detalle'];
+  ws.columns=[{width:10},{width:34},{width:24},{width:13},{width:11},{width:11},{width:13},{width:14},{width:14},{width:70}];
+  ws.mergeCells(1,1,1,cab.length); ws.getCell(1,1).value=`Permisos gremiales fuera de cupo · Efectivos · ${periodoNov().txt}`; ws.getCell(1,1).font={bold:true,size:14,color:{argb:'FF0F172A'}};
+  ws.mergeCells(2,1,2,cab.length); ws.getCell(2,1).value=`Pago adicional: permisos gremiales por encima de los 10 autorizados, con su viático y comida, y el presentismo que se recupera al justificar el día. Emitido ${new Date().toLocaleDateString('es-AR')}`;
+  ws.getCell(2,1).font={size:10,color:{argb:'FF475569'}}; ws.getCell(2,1).alignment={wrapText:true}; ws.getRow(2).height=28;
+  const thin={style:'thin',color:{argb:'FF94A3B8'}}, B={top:thin,left:thin,bottom:thin,right:thin};
+  const h=ws.getRow(4); h.values=cab; h.height=32;
+  h.eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'},size:10}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF12615C'}}; c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.border=B; });
+  R.forEach((r,i)=>{ const row=ws.addRow([+r.L||r.L,r.nombre,r.fechas.map(dmyIso).join(' · '),r.cant,r.vyc,r.vyc,r.actual,r.nuevo,r.pagar,r.obs.join(' · ')]);
+    row.eachCell({includeEmpty:true},(c,k)=>{ c.border=B; c.font={size:10}; c.alignment={vertical:'middle',wrapText:k===10||k===3,horizontal:k>=4&&k<=9?'center':'left'};
+      if(i%2) c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F5F9'}}; });
+    [7,8,9].forEach(k=>row.getCell(k).numFmt='0%');
+    if(r.pagar) row.getCell(9).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD1FAE5'}};
+    row.getCell(9).font={bold:true,size:10,color:{argb:r.pagar?'FF065F46':'FF64748B'}}; });
+  const n0=5, n1=4+R.length, t=ws.addRow(['TOTAL',`${R.length} persona(s)`,'',{formula:`SUM(D${n0}:D${n1})`,result:R.reduce((a,r)=>a+r.cant,0)},{formula:`SUM(E${n0}:E${n1})`,result:R.reduce((a,r)=>a+r.vyc,0)},{formula:`SUM(F${n0}:F${n1})`,result:R.reduce((a,r)=>a+r.vyc,0)},'','',`${R.filter(r=>r.pagar).length} recuperan`,'']);
+  t.eachCell({includeEmpty:true},(c,k)=>{ c.font={bold:true,size:10}; c.border=B; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}}; if(k>=4&&k<=9) c.alignment={horizontal:'center'}; });
+  ws.addRow([]);
+  [['Criterio (acuerdo de presentismo GLD):'],['Puntualidad: menos de 30 min de retraso 100% · 30 a 59 min 50% · 60 o más 0%.'],['Presentismo: una ausencia injustificada, más de una justificada, ART o suspensión 0% · hasta 2 enfermedades 50% · más de 2, 0%.'],
+   ['Si alguno de los dos da 0% no cobra; si los dos dan 50% cobra 50%; en los demás casos cobra 100%.'],['El día del permiso gremial deja de contar como ausencia (y su retraso, si lo hubo). Se recalcula con todas las novedades del F3, incluidos los ajustes manuales.']]
+   .forEach((x,i)=>{ const rr=ws.addRow(x); ws.mergeCells(rr.number,1,rr.number,cab.length); rr.getCell(1).font={size:9.5,bold:i===0,color:{argb:'FF475569'}}; });
+  const buf=await wb.xlsx.writeBuffer();
+  bajar(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`Permisos gremiales aparte ${periodoNov().txt}.xlsx`);
+  toast(`Excel de permisos gremiales aparte: ${R.length} persona(s)`);
+}
+
 const MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO',
              'SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 // saca el período del nombre del archivo de novedades; si no lo encuentra, usa el mes pasado
@@ -1791,6 +1957,11 @@ $('#chkAltas').onchange=refrescar;
 $('#chkPodar').onchange=refrescar;
 $('#inNombre').oninput=e=>{ e.target.dataset.tocado='1'; };
 $('#btnGen').onclick=generar;
+$('#btnGreAdd').onclick=agregarGremial;
+$('#greFec').onkeydown=e=>{ if(e.key==='Enter') agregarGremial(); };
+$('#btnGreXls').onclick=excelGremiales;
+$('#btnGreClr').onclick=()=>{ if(!GRE.it.length){ toast('La lista ya está vacía'); return; } if(!confirm(`¿Vaciar los ${GRE.it.length} permisos gremiales cargados aparte?`)) return; GRE={it:[]}; guardarGre(); pintarGremiales(); };
+$('#tGre').addEventListener('click',e=>{ const b=e.target.closest('[data-grex]'); if(!b) return; const [L,F]=b.dataset.grex.split('|'); GRE.it=GRE.it.filter(i=>!(i.l===L&&i.f===F)); guardarGre(); pintarGremiales(); });
 $('#btnCsv').onclick=bajarCsv;
 $('#btnGuardarBase').onclick=guardarComoBase;
 $('#btnLimpiarBase').onclick=()=>{

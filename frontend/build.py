@@ -120,7 +120,7 @@ js=one(js,"toast('No pude leer el control: '+err.message) }\n});","toast('No pud
 # exportar / importar incluye F3
 js=one(js,"$('#btnExportDB').onclick=()=>download(JSON.stringify(DB),`base_asistencia_${todayISO()}.json`,'application/json');",
 """$('#btnExportDB').onclick=()=>{
-  const f3={}; ['panelF3_base_v1','panelF3_ajustes_v1','panelF3_codigos_v1'].forEach(k=>{ try{ const v=localStorage.getItem(k); if(v!=null) f3[k]=v; }catch(e){} });
+  const f3={}; ['panelF3_base_v1','panelF3_ajustes_v1','panelF3_codigos_v1','panelF3_gremial_v1'].forEach(k=>{ try{ const v=localStorage.getItem(k); if(v!=null) f3[k]=v; }catch(e){} });
   download(JSON.stringify(Object.assign({},DB,{_f3:f3})),`base_panel_rrhh_ic_${todayISO()}.json`,'application/json');
   toast('Respaldo descargado (asistencia, vacaciones, eventuales, anticipos, recordatorios y F3)');
 };""")
