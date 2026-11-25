@@ -54,7 +54,7 @@ function ixCalc(){
       Object.entries(o).forEach(([mc,n])=>{ if(!n) return; const str=((A.progD||{})[l]||{})[mc];
         if(str) for(let i=0;i<str.length;i++){ if(str[i]==='1'){ const k=ixPer(`${mc}-${String(i+1).padStart(2,'0')}`,t); cuenta[k]=(cuenta[k]||0)+1; } }
         else cuenta[mc]=(cuenta[mc]||0)+n; });
-      Object.entries(cuenta).forEach(([m,n])=>{ const x=g(m); x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(t==='EV') x.dotEV=(x.dotEV||0)+1; else x.dotEF=(x.dotEF||0)+1; }); });
+      Object.entries(cuenta).forEach(([m,n])=>{ const x=g(m); x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(t==='EV') x.dotEV=(x.dotEV||0)+1; else if(t==='FC') x.dotFC=(x.dotFC||0)+1; else x.dotEF=(x.dotEF||0)+1; }); });
     const vistos=new Set();
     (A.ev||[]).forEach(e=>{ const c=amCat(e[2]); if(c!=='aus') return; const k=e[0]+'|'+e[1]; if(vistos.has(k)) return; vistos.add(k);
       const x=g(ixPer(e[1],tp(e[0]))); if(IX_NOCONT.has(e[2])) x.dNC=(x.dNC||0)+1; else x.dC=(x.dC||0)+1;
@@ -139,7 +139,7 @@ const IX_BLQ=[
   {id:'liq',t:'Liquidación (F3)',ic:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',sub:'Presentismo, horas extras y viáticos',go:'v-f3',kpi:'pres'},
 ];
 const IX_IND=[
-  {k:'dot',b:'dot',t:'Dotación con jornada',u:'',mejor:null,sub:x=>x.dot?`${ixNum(x.dotEF)} efectivos y fuera de convenio · ${ixNum(x.dotEV)} eventuales`:''},
+  {k:'dot',b:'dot',t:'Dotación con jornada',u:'',mejor:null,sub:x=>x.dot?`${ixNum(x.dotEF||0)} efectivos · ${ixNum(x.dotFC||0)} fuera de convenio · ${ixNum(x.dotEV||0)} eventuales`:''},
   {k:'bajas',b:'dot',t:'Bajas del mes',u:'',mejor:'baja',sub:x=>x.bajas?`${x.bajasEV} eventuales · ${x.bajas-x.bajasEV} efectivos`:'Según fecha de egreso en Nómina y Eventuales'},
   {k:'ing',b:'dot',t:'Ingresos del mes',u:'',mejor:null,sub:()=>'Según fecha de ingreso'},
   {k:'rot',b:'dot',t:'Rotación mensual',u:'%',d:1,mejor:'baja',sub:()=>'Bajas sobre dotación con jornada'},
