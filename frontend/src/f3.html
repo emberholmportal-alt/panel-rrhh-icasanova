@@ -1349,6 +1349,7 @@ function refrescar(){
 
   const R=armar(); ST.filas=R.out;
   try{ pintarGremiales(); }catch(e){ console.warn('gremiales',e); }
+  indicAuto(R);
   const conNov=R.out.filter(r=>r.conNov).length;
   $('#stats').innerHTML=[
     ['Legajos en el F3', R.out.length,''],
@@ -1511,7 +1512,7 @@ function pintarGremiales(){
   const dia=ST.nov.dia; if(dia){ $('#greFec').min=dia.d0; $('#greFec').max=dia.d1; }
   const enF3=(ST.filas||[]).reduce((a,r)=>a+Math.abs(num(r.fila[C('AK')])),0);
   $('#greInfo').textContent=`${periodoNov().txt} · ${enF3} permiso(s) gremial(es) ya en el F3`;
-  const R=calcGremiales();
+  const R=calcGremiales(); clearTimeout(pintarGremiales._t); pintarGremiales._t=setTimeout(indicGremiales,1500);
   $('#greStats').innerHTML=[['Personas',R.length,''],['Permisos aparte',R.reduce((a,r)=>a+r.cant,0),'a'],['Recuperan presentismo',R.filter(r=>r.pagar>0).length,'t'],
     ['Viáticos / comidas',`${R.reduce((a,r)=>a+r.viat,0)} / ${R.reduce((a,r)=>a+r.com,0)}`,''],['Siguen sin presentismo',R.filter(r=>r.nuevo===0).length,R.some(r=>r.nuevo===0)?'c':'']]
     .map(([k,v,c])=>`<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
@@ -1695,9 +1696,21 @@ function aclarar(argb){
   return 'FF'+c.map(v=>Math.round(v+(255-v)*0.60).toString(16).padStart(2,'0')).join('').toUpperCase();
 }
 // resumen del F3 para el tablero de indicadores (se guarda en el servidor, por mes y tipo)
-async function guardarIndicF3(R){
+// con las novedades cargadas el tablero ya se actualiza (no hace falta generar el F3); se manda una sola vez por cada cambio
+let _ixT=null, _ixK='';
+function indicAuto(R){ clearTimeout(_ixT); _ixT=setTimeout(()=>guardarIndicF3(R,true),1500); }
+function indicGremiales(){
   try{
-    if(!(window.SRV&&SRV.mode==='online')) return;
+    if(!(window.SRV&&SRV.mode==='online')||!ST.nov||!ST.base||ST.base.tipo!=='GLD') return;
+    const P=periodoNov(), mes=`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, R=calcGremiales();
+    const snap={cant:R.reduce((a,r)=>a+r.cant,0), personas:R.length, recup:R.filter(r=>r.pagar>0).length, com:R.reduce((a,r)=>a+r.com,0), viat:R.reduce((a,r)=>a+r.viat,0), periodo:P.txt};
+    const k=mes+JSON.stringify(snap); if(k===indicGremiales._k) return; indicGremiales._k=k;
+    fetch('/api/indicadores/f3',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes,tipo:'GRE',snap})}).catch(()=>{});
+  }catch(e){ console.warn('indicadores gremiales',e); }
+}
+async function guardarIndicF3(R,auto){
+  try{
+    if(!(window.SRV&&SRV.mode==='online')||!ST.nov) return;
     const P=periodoNov(), mes=`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, tipo=ST.tipo||'GLD';
     const tot={};
     (ST.mapa||[]).forEach(x=>{ if(['BASE','CONST','BASECOD'].includes(x[3])) return; let s=0, hay=false;
@@ -1708,8 +1721,10 @@ async function guardarIndicF3(R){
       R.out.forEach(r=>{ const v=r.fila[C('BO')]; if(esVacio(v)) return; const n=num(v); if(n>=1) p.c100++; else if(n>=0.5) p.c50++; else p.c0++;
         const m=minutos(r.fila[C('BJ')]); if(m>0){ ret+=m; retN++; } });
       snap.pres=p; snap.retMin=ret; snap.retN=retN; }
+    const kk=mes+tipo+JSON.stringify(snap); if(auto&&kk===guardarIndicF3._k) return; guardarIndicF3._k=kk;
     const r=await fetch('/api/indicadores/f3',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes,tipo,snap})});
-    if(r.ok) toast(`Indicadores de ${P.txt} actualizados con este F3`);
+    if(r.ok&&!auto) toast(`Indicadores de ${P.txt} actualizados con este F3`);
+    else if(r.ok&&_ixK!==mes+tipo){ _ixK=mes+tipo; toast(`Indicadores de ${P.txt} actualizados con lo cargado en el F3`); }
   }catch(e){ console.warn('indicadores F3',e); }
 }
 function bajar(blob,nombre){

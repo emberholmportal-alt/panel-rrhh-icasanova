@@ -808,7 +808,7 @@ async def indicadores_f3(request: Request, u: User = Depends(current_user), db: 
         raise HTTPException(403, "Sin permiso sobre Novedades F3")
     body = json.loads(await request.body() or b"{}")
     mes, tipo, snap = str(body.get("mes") or ""), str(body.get("tipo") or ""), body.get("snap")
-    if not re.fullmatch(r"\d{4}-\d{2}", mes) or tipo not in ("GLD", "EVE", "FC") or not isinstance(snap, dict):
+    if not re.fullmatch(r"\d{4}-\d{2}", mes) or tipo not in ("GLD", "EVE", "FC", "GRE") or not isinstance(snap, dict):
         raise HTTPException(400, "Formato inválido")
     if len(json.dumps(snap)) > 200_000:
         raise HTTPException(400, "Resumen demasiado grande")
