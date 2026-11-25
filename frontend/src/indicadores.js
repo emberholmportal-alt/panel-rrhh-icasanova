@@ -87,8 +87,12 @@ function ixCalc(){
   // ---- dotación del mes en curso y del último cerrado: la nómina activa (efectivos con delegados + fuera de convenio + eventuales, sin externos).
   // Queda guardada en el cálculo, así cada mes conserva la foto de su nómina; los meses sin foto usan "con jornada" (Movimientos).
   try{ const NR=nmRows();
-    if(NR.length&&Object.keys((DB.nomina&&DB.nomina.emps)||{}).length){ const c={EF:0,FC:0,EV:0}; let del=0; const dl=new Set(DELEG);
-      NR.forEach(r=>{ if(c[r.tipo]==null) return; c[r.tipo]++; if(dl.has(String(r.leg))) del++; });
+    if(NR.length&&Object.keys((DB.nomina&&DB.nomina.emps)||{}).length){ const c={EF:0,FC:0,EV:0};
+      // delegados: los cargados a mano en la nómina y los del sector DELEGADOS; si alguno no está en la nómina activa, se suma igual como efectivo
+      const dl=new Set(DELEG.map(String)); NR.forEach(r=>{ if(/DELEGAD/.test(normTxt(r.sector||''))) dl.add(String(r.leg)); });
+      const enNR=new Set();
+      NR.forEach(r=>{ const l=String(r.leg); if(dl.has(l)){ if(r.tipo!=='EXT'){ c.EF++; enNR.add(l); } return; } if(c[r.tipo]==null) return; c[r.tipo]++; });
+      dl.forEach(l=>{ if(!enNR.has(l)&&!EXT.has(l)) c.EF++; }); const del=dl.size;
       const hoyP=ixHoyM(), ant=ixMesAnt(hoyP);
       [ant,hoyP].forEach(m=>{ const x=g(m); x.dotJ=x.dot; Object.assign(x,{dot:c.EF+c.FC+c.EV,dotEF:c.EF,dotFC:c.FC,dotEV:c.EV,deleg:del,dotSrc:'nom',dotAt:hoy()}); }); }
     // fotos de meses anteriores que ya estaban guardadas
