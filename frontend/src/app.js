@@ -863,7 +863,7 @@ const FER_BASE={
     ['2026-06-15','Paso a la Inmortalidad del Gral. Martín Miguel de Güemes','trasladable'],['2026-06-20','Paso a la Inmortalidad del Gral. Manuel Belgrano','inamovible'],
     ['2026-07-09','Día de la Independencia','inamovible'],['2026-07-10','Día no laborable con fines turísticos','no laborable'],
     ['2026-08-17','Paso a la Inmortalidad del Gral. José de San Martín','trasladable'],['2026-10-12','Día del Respeto a la Diversidad Cultural','trasladable'],
-    ['2026-11-09','Feriado nacional por la visita del papa León XIV (Decreto 1103/2026)','inamovible'],    ['2026-11-23','Día de la Soberanía Nacional','trasladable'],['2026-12-07','Día no laborable con fines turísticos','no laborable'],
+    ['2026-11-09','Feriado nacional por la visita del papa León XIV (Decreto 1103/2026)','inamovible'],    ['2026-11-23','Día de la Soberanía Nacional','trasladable'],
     ['2026-12-08','Inmaculada Concepción de María','inamovible'],['2026-12-25','Navidad','inamovible']],
   2027:[['2027-01-01','Año Nuevo','inamovible'],['2027-02-08','Carnaval','inamovible'],['2027-02-09','Carnaval','inamovible'],
     ['2027-03-24','Día Nacional de la Memoria por la Verdad y la Justicia','inamovible'],['2027-03-26','Viernes Santo','inamovible'],
@@ -876,10 +876,13 @@ const FER_BASE={
 };
 // feriados de la provincia de Buenos Aires (Isidro Casanova): la API nacional no los trae
 const FER_LOCAL=[['2026-11-09','Feriado nacional por la visita del papa León XIV (Decreto 1103/2026)','inamovible'],['2026-11-11','Feriado en la provincia de Buenos Aires (visita del papa León XIV)','provincial']];
+// días que la API marca como no laborables/puente pero en el CD se trabajan normalmente (suman jornada)
+const FER_NO=['2026-12-07'];
 let FER={};
 function ferLoadLocal(){ FER={}; for(const y in FER_BASE) FER_BASE[y].forEach(([d,n,t])=>FER[d]={n,t});
   try{ const c=JSON.parse(localStorage.getItem('rrhh-ic-feriados')||'{}'); for(const y in c) (c[y].list||[]).forEach(f=>FER[f.d]={n:f.n,t:f.t}); }catch(e){} 
-  FER_LOCAL.forEach(([d,n,t])=>{ FER[d]={n,t}; }); }
+  FER_LOCAL.forEach(([d,n,t])=>{ FER[d]={n,t}; });
+  FER_NO.forEach(d=>{ delete FER[d]; }); }
 async function ferFetch(){
   const y=new Date().getFullYear(); let cache={};
   try{ cache=JSON.parse(localStorage.getItem('rrhh-ic-feriados')||'{}'); }catch(e){}
@@ -1290,7 +1293,7 @@ function esFrio(leg){ return !!((DB.aptoFrio||{})[String(leg==null?'':leg).trim(
 function FRIO(leg){ return esFrio(leg)?' <span class="frio" title="Apto frío">❄</span>':''; }
 window.esFrio=esFrio; window.FRIO=FRIO;   // también para la sección Eventuales
 const cxCfg=()=>Object.assign({},CX_DEF,(DB.francos&&DB.francos.cxCfg)||{});
-const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable/i.test(f.t||'')?f:null; };
+const cxFer=iso=>{ const f=ferEn(iso); return f&&!/no laborable|puente/i.test(f.t||'')?f:null; };
 function cxPeriodo(){ if(!frState.liq) frState.liq=liqDe(hoy()); return liqPer(frState.liq); }
 // fichadas para Francos: export de Movimientos (si cubre el día) + reportes diarios del reloj (Llegadas tarde)
 // d[fecha]: 'T' trabajó · 'ENF','ART','VAC','AUS','LIC','OTRO' novedad · '' no vino (= franco) · '?' turno no exportado (sin dato)
@@ -1349,7 +1352,7 @@ function frCruce(){
 }
 const CX_LAB={T:'Trabajó',DT:'Domingo trabajado (no suma al tope)',FT:'Feriado trabajado (no suma al tope)',ENF:'Enfermedad (computa)',ART:'Licencia ART',AUS:'Ausencia',VAC:'Vacaciones',LIC:'Licencia',OTRO:'Otra novedad',F:'Franco tomado (no fichó)',DOM:'Domingo',FER:'Feriado',P:'Día de trabajo',PF:'Franco asignado','-':'Fuera de contrato'};
 const CX_TXT={T:'✓',DT:'D',FT:'Fe',ENF:'E',ART:'A',AUS:'X',VAC:'V',LIC:'L',OTRO:'N',F:'F',DOM:'·',FER:'Fe',P:'·',PF:'F','-':'–'};
-const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',AUS:'#fee2e2',VAC:'#e0f2fe',LIC:'#ede9fe',OTRO:'#f1f5f9',F:'#cffafe',DOM:'#f1f5f9',FER:'#fef3c7',P:'#fff',PF:'#ecfeff','-':'#fff'};
+const CX_BG={T:'#dcfce7',DT:'#22c55e',FT:'#22c55e',ENF:'#ede9fe',ART:'#ede9fe',AUS:'#fee2e2',VAC:'#e0f2fe',LIC:'#ede9fe',OTRO:'#f1f5f9',F:'#cffafe',DOM:'#e0e7ff',FER:'#fde68a',P:'#fff',PF:'#ecfeff','-':'#fff'};
 const cxKey=e=>e.legajo||e.nombre;
 const cxFr=c=>c==='F'||c==='PF'||c==='DOM';   // de franco ese día (real o planificado)
 const cxTag=(r,cfg)=>r.sup?`<span class="cx-big s" title="Ya tiene ${r.comp} jornadas computables">superó</span>`:r.pend>0?`<span class="cx-big p">${r.pend}</span>`:`<span class="cx-big z">0</span>`;
@@ -1455,12 +1458,12 @@ function renderFrancos(){
   const EF=(C?C.rows.map(r=>r.e):E.filter(e=>ds.some(d=>e.d[d]!=null))).filter(flt).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const ED=frCanEdit();
   $('#fr-grid').innerHTML=EF.length?`<thead><tr><th class="frn">Empleado</th>${ds.map(d=>{ const w=dObj(d).getDay();
-      return `<th class="frd${d===D?' sel':''}${w===0||w===6?' we':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C?`<th class="frt" title="Francos que faltan asignar para no pasar de ${cfg.obj} jornadas (${C.M?'fichadas y, después, el plan':'suponiendo que trabaja todo el período'}; domingos y feriados no suman)">Faltan</th>`:''}</tr></thead><tbody>`+
+      return `<th class="frd${d===D?' sel':''}${w===6?' we':''}${w===0?' do':''}${cxFer(d)?' fe':''}${C&&d===C.corte?' corte':''}" data-frd="${d}" title="${esc(lblDay(d)+(cxFer(d)?' · '+cxFer(d).n:'')+(C&&d===C.corte?' · último día con fichadas':''))}">${DOW[w].slice(0,2)}<br>${dObj(d).getDate()}</th>`; }).join('')}${C?`<th class="frt" title="Francos que faltan asignar para no pasar de ${cfg.obj} jornadas (${C.M?'fichadas y, después, el plan':'suponiendo que trabaja todo el período'}; domingos y feriados no suman)">Faltan</th>`:''}</tr></thead><tbody>`+
     EF.map(e=>{ const r=C&&C.by[cxKey(e)];
-      return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}${FRIO(e.legajo)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span></td>${ds.map(d=>{ const c=code(e,d);
+      return `<tr><td class="frn" data-cxe="${esc(cxKey(e))}"><b>${esc(e.nombre)}${FRIO(e.legajo)}</b><span>${esc([e.legajo,e.turno,e.sector].filter(Boolean).join(' · '))}</span>${r&&r.pend>0?`<em class="fr-falt" title="Faltan asignar ${r.pend} franco(s) para no pasar de ${cfg.obj} jornadas">faltan asignar ${r.pend} franco${r.pend>1?'s':''}</em>`:''}</td>${ds.map(d=>{ const c=code(e,d);
         const nov=C&&C.M&&C.M.emps[e.legajo]&&C.M.emps[e.legajo].o[d];
         const ed=ED&&(c==='P'||c==='PF'), mt=c==='PF'?frMeta(e,d):null;
-        return `<td class="frc c${c==='-'?'b':c}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C?`<td class="frt">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
+        return `<td class="frc c${c==='-'?'b':c}${dObj(d).getDay()===0?' kdo':''}${cxFer(d)?' kfe':''}${d===D?' sel':''}${C&&d===C.corte?' corte':''}${ed?' ed':''}${mt&&mt.v==='F'?' fa':''}"${ed?` data-fe="${esc(cxKey(e))}|${d}"`:''} data-frtip="${esc(dmy(d)+' · '+(CX_LAB[c]||'sin dato')+(nov?' · '+nov:'')+(c==='PF'?(mt&&mt.v==='F'?'\nCargado por '+mt.by+' · '+fmtAt(mt.at):'\nDel plan de francos'):'')+(ed?'\nClic para asignar o quitar':''))}">${c?CX_TXT[c]:''}</td>`; }).join('')}${C?`<td class="frt" title="${r?esc(`${r.comp} jornadas ya trabajadas + ${r.g.P} días de trabajo por delante = ${r.proy} (tope ${cfg.obj}). Domingos y feriados no suman. Francos ya asignados: ${r.g.PF}`):''}">${r?cxTag(r,cfg):''}</td>`:''}</tr>`; }).join('')+'</tbody>'
     :`<tbody><tr><td><div class="empty">${E.length?'Nadie con ese filtro.':'No hay eventuales: cargá la lista en la sección Eventuales.'}</div></td></tr></tbody>`;
   $('#fr-n').innerHTML=EF.length?`${ED?'<b>Tocá un día</b> para asignar o quitar el franco. ':'Solo lectura: no tenés permiso para asignar francos. '}${EF.length} eventual(es) en pantalla${C&&C.M?` · hasta el ${dm(C.corte)} se ven las fichadas del reloj`:''}`:'';
   $('#fr-cx-ley').innerHTML=(C&&C.M?['PF','P','T','F','DOM','FER','ENF','ART','AUS']:['PF','P','DOM','FER']).map(k=>`<span><i class="fr-lg c${k}">${CX_TXT[k]}</i>${esc(CX_LAB[k])}</span>`).join('');

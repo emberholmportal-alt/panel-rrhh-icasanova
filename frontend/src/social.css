@@ -426,3 +426,13 @@ body.light .fr-tip,html.light .fr-tip{background:#fff;color:#0f172a}
 .vs-nv i{font-style:normal;font-size:20px}
 .vs-nv div{display:flex;flex-direction:column;gap:2px}
 .vs-nv span{font-size:12.5px;color:#94a3b8}
+
+/* francos: domingo y feriado con color propio; faltan a la vista */
+.fr-grid th.frd.do{color:#a5b4fc;background:rgba(99,102,241,.16)}
+.fr-grid th.frd.fe{color:#fcd34d;background:rgba(245,158,11,.2)}
+.fr-grid td.frc.kdo{background:rgba(99,102,241,.22);color:#a5b4fc}
+.fr-grid td.frc.kfe{background:rgba(245,158,11,.16);color:#fcd34d}
+.fr-grid td.frc.kdo.cDT,.fr-grid td.frc.kfe.cFT{color:#000;background:#22c55e}
+.fr-lg.cDOM{background:rgba(99,102,241,.25)!important;color:#a5b4fc!important} .fr-lg.cFER{background:rgba(245,158,11,.25)!important;color:#fcd34d!important}
+.fr-grid th.frt,.fr-grid td.frt{position:sticky;right:0;z-index:2;background:#0f1726;border-left:1px solid var(--stroke2)}
+.fr-falt{display:inline-block;width:max-content;font-style:normal;font-size:10px;font-weight:800;color:#0b1220;background:#fbbf24;border-radius:999px;padding:1px 8px;margin-top:3px;white-space:nowrap}
