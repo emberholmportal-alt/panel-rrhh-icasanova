@@ -1496,7 +1496,8 @@ function calcGremiales(){
     if(y.art>0) malo.push('licencia por ART'); if(y.sus>0) malo.push('suspensión'); if(y.ju>1) malo.push(`${y.ju} ausencias justificadas (más de 1)`);
     const motivo = desp.pc===0? 'No corresponde: '+malo.join('; ')
       : actual>=desp.pc? `Ya cobra presentismo ${pctTxt(actual)} en el F3: no se paga aparte`
-      : `Corresponde ${desp.pc===1?'el 100%':'el 50%'}: `+bueno.join('; ')+(desp.pc===0.5?'. Con puntualidad y presentismo al 50%, cobra la mitad':'');
+      : `Corresponde ${desp.pc===1?'el 100%':'el 50%'}: `+bueno.join('; ')+(desp.pc===0.5?'. Con puntualidad y presentismo al 50%, cobra la mitad'
+        : (desp.cp===0.5||desp.pr===0.5)? `. Aunque ${desp.cp===0.5?'la puntualidad':'el presentismo'} quede al 50%, ${desp.cp===0.5?'el presentismo':'la puntualidad'} está al 100%, y por el acuerdo (cláusula quinta) cobra el 100%` : '');
     if(desp.pc<1){ const m=[]; if(desp.cp===0) m.push(`${y.ret} min de retraso`); if(y.inj>0) m.push(`${y.inj} ausencia(s) injustificada(s)`); if(y.enf>2) m.push(`${y.enf} días de enfermedad`); else if(y.enf>0) m.push(`${y.enf} día(s) de enfermedad (50%)`); if(y.art>0) m.push('ART'); if(y.sus>0) m.push('suspensión'); if(y.ju>1) m.push(`${y.ju} ausencias justificadas`);
       if(m.length) obs.push('Igual no cobra el 100% por: '+m.join(', ')); }
     return {L,nombre,fechas,motivo,cant:fechas.length,vyc,viat:GRE.viat?vyc:0,com:GRE.com?vyc:0,actual,nuevo:desp.pc,pagar,obs,x,y,enF3:!!r};
