@@ -798,7 +798,32 @@ def indicadores_get(u: User = Depends(current_user), db: Session = Depends(get_d
         raise HTTPException(403, "No tenés acceso al tablero de indicadores")
     d = db.get(Doc, "indicadores")
     data = (d.data if d else None) or {}
-    return {"f3": data.get("f3") or {}, "metas": data.get("metas") or {}, "puede_metas": u.rol == "admin" or can_write(u, "indicadores")}
+    return {"f3": data.get("f3") or {}, "metas": data.get("metas") or {}, "calc": data.get("calc"),
+            "puede_metas": u.rol == "admin" or can_write(u, "indicadores")}
+
+
+@app.post("/api/indicadores/calc")
+async def indicadores_calc(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """El cálculo mes a mes que arma el navegador de quien tiene todos los datos (Movimientos, fichadas, nómina...).
+    Lo usan quienes solo tienen permiso para ver el tablero."""
+    if not (can_read(u, "indicadores") and can_read(u, "ausmot") and can_read(u, "ausentismo")):
+        raise HTTPException(403, "Sin permiso")
+    raw = await request.body()
+    if len(raw) > 1_500_000:
+        raise HTTPException(413, "Demasiado grande")
+    body = json.loads(raw or b"{}")
+    M = body.get("M")
+    if not isinstance(M, dict):
+        raise HTTPException(400, "Formato inválido")
+    d = _indic_doc(db, lock=True)
+    data = copy.deepcopy(d.data or {})
+    data["calc"] = {"M": M, "at": iso(now()), "por": u.nombre}
+    d.data = data
+    d.version += 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/indicadores/f3")

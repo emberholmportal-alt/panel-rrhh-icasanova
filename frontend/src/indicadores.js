@@ -3,7 +3,7 @@
 // llegadas tarde y medidas, de las fichadas (Llegadas tarde); bajas e ingresos, de Nómina y Eventuales;
 // lo de liquidación, del resumen que se guarda al cargar las novedades en el F3.
 // Cada mes es un período de liquidación (ver ixPer).
-let IX={sel:'',f3:{},metas:{},puedeMetas:false,cargado:false,editMetas:false};
+let IX={sel:'',f3:{},metas:{},calc:null,puedeMetas:false,cargado:false,editMetas:false};
 const IX_MES=m=>`${MESES_N[+m.slice(5)-1]} ${m.slice(0,4)}`.toLowerCase();
 const IX_MESC=m=>`${MESES_N[+m.slice(5)-1].slice(0,3).toLowerCase()} ${m.slice(2,4)}`;
 const IX_NOCONT=new Set(['Enfermedad','Ausencia c/aviso de enfermedad','Licencia ART']);
@@ -29,7 +29,15 @@ function ixEpisodios(ev,set,tp){
 }
 
 let IXC={k:'',M:null};
+const ixCompleto=()=>!!(DB.ausmot&&DB.ausmot.ev&&DB.records&&Object.keys(DB.records).length);
 function ixCalc(){
+  if(!ixCompleto()){
+    const key='srv|'+((IX.calc||{}).at||'')+JSON.stringify(Object.keys(IX.f3));
+    if(IXC.k===key&&IXC.M) return IXC.M;
+    const M=JSON.parse(JSON.stringify((IX.calc&&IX.calc.M)||{}));
+    Object.values(M).forEach(x=>{ ['presN','pres','pres100','pres50','pres0','hx50','hx100','hx','vyc','com','gremF3','gremAp','gremApP','gremRec','f3tipos','f3n','f3at','f3por'].forEach(k=>delete x[k]); });
+    ixF3(M); ixPost(M); IXC={k:key,M}; return M;
+  }
   const A=DB.ausmot||null, recs=DB.records||{};
   const key=[JSON.stringify(((DB.sanc&&DB.sanc.items)||[]).map(s=>s.id+s.tipo+s.dias+s.fecha)),A&&A.at,A&&A.ev&&A.ev.length,Object.keys(recs).length,JSON.stringify(Object.keys(IX.f3)),(DB.ant&&DB.ant.at)||'',(DB.nomina&&DB.nomina.files||[]).length].join('|');
   if(IXC.k===key&&IXC.M) return IXC.M;
@@ -85,7 +93,11 @@ function ixCalc(){
   Object.keys(M).forEach(m=>{ const x=M[m], b=bajas[m], a=altas[m];
     x.bajas=b?b.size:0; x.bajasEV=b?[...b.values()].filter(t=>t==='EV').length:0; x.ing=a?a.size:0;
     if(x.dot) x.rot=x.bajas/x.dot*100; });
-  // ---- liquidación (resumen de cada F3 generado) ----
+  ixF3(M); ixPost(M);
+  IXC={k:key,M}; ixGuardarCalc(M); return M;
+}
+// ---- liquidación (resumen de cada F3 cargado o generado) ----
+function ixF3(M){ const g=m=>M[m]||(M[m]={m});
   Object.entries(IX.f3||{}).forEach(([m,o0])=>{ const x=g(m), o=Object.fromEntries(Object.entries(o0).filter(([t])=>t!=='GRE')), G=o.GLD, T=Object.values(o);
     if(o0.GRE){ x.gremAp=o0.GRE.cant||0; x.gremApP=o0.GRE.personas||0; x.gremRec=o0.GRE.recup||0; }
     if(!T.length) return;
@@ -93,15 +105,29 @@ function ixCalc(){
     const sum=rx=>T.reduce((a,s)=>a+Object.entries(s.tot||{}).filter(([k])=>rx.test(normTxt(k))).reduce((b,[,v])=>b+(+v||0),0),0);
     x.hx50=sum(/HORAS EXTRAS ?50/); x.hx100=sum(/HORAS EXTRAS ?100/); x.hx=x.hx50+x.hx100;
     x.vyc=sum(/VIATICOS/); x.com=sum(/COMIDA/); x.gremF3=sum(/LICENCIA GREMIAL/);
-    x.f3tipos=Object.keys(o); x.f3n=T.reduce((a,s)=>a+(s.n||0),0); x.f3at=T.map(s=>s.at).sort().pop(); });
+    x.f3tipos=Object.keys(o); x.f3n=T.reduce((a,s)=>a+(s.n||0),0); x.f3at=T.map(s=>s.at).sort().pop(); x.f3por=Object.fromEntries(Object.entries(o).map(([t,s])=>[t,s.at])); });
+}
+function ixPost(M){
   // suspensiones: lo cargado en Sanciones; si no hay, lo de Movimientos; con datos del mes y nada cargado = sin días
   Object.values(M).forEach(x=>{ const hay=x.prog||x.diasFich;
     x.suspD=x.suspS!=null?x.suspS:x.susp!=null?x.susp:hay?0:null; x.suspF=x.suspS!=null?'san':x.susp!=null?'mov':'';
     if(x.med==null&&hay) x.med=0;
-    x.gremT=x.prog?(x.grem||0)+(x.gremAv||0):(x.gremF3!=null||x.gremAp!=null)?(x.gremF3||0)+(x.gremAp||0):null; });
+    // permisos gremiales: lo liquidado en el F3 + lo pagado aparte; sin F3, lo que figura en Movimientos
+    const hayF3=x.f3tipos&&x.f3tipos.includes('GLD');
+    x.gremMov=(x.grem||0)+(x.gremAv||0);
+    x.gremT=hayF3||x.gremAp!=null?(x.gremF3||0)+(x.gremAp||0):x.prog?x.gremMov:null; x.gremSrc=hayF3||x.gremAp!=null?'liq':'mov'; });
   // solo meses con algo de datos
   Object.keys(M).forEach(m=>{ if(!/^\d{4}-\d{2}$/.test(m)) delete M[m]; });
-  IXC={k:key,M}; return M;
+}
+// quien tiene todos los datos deja guardado el cálculo para los que solo ven el tablero
+let _ixSyncK='', _ixSyncT=null;
+function ixGuardarCalc(M){
+  if(!(window.SRV&&SRV.mode==='online')||!IX.cargado) return;
+  const lim={}; Object.entries(M).forEach(([m,x])=>{ lim[m]=Object.fromEntries(Object.entries(x).filter(([k,v])=>typeof v!=='object'||v===null)); });
+  const j=JSON.stringify(lim), k=j.length+'|'+j.slice(0,200)+j.slice(-400); if(k===_ixSyncK) return;
+  if(IX.calc&&IX.calc.M&&JSON.stringify(IX.calc.M)===j){ _ixSyncK=k; return; }
+  clearTimeout(_ixSyncT); _ixSyncT=setTimeout(async()=>{ try{ const r=await fetch('/api/indicadores/calc',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({M:lim})});
+    if(r.ok){ _ixSyncK=k; IX.calc={M:lim,at:new Date().toISOString(),por:(SRV.user||{}).nombre}; } }catch(e){} },2000);
 }
 
 // ---- definición de indicadores ----
@@ -128,7 +154,7 @@ const IX_IND=[
   {k:'pres',b:'liq',t:'Cobran presentismo',u:'%',d:1,mejor:'sube',sub:x=>x.presN?`${x.pres100} al 100% · ${x.pres50} al 50% · ${x.pres0} sin presentismo`:'Efectivos · se completa al cargar las novedades en el F3'},
   {k:'pres0',b:'liq',t:'Pierden presentismo',u:'',mejor:'baja',sub:x=>x.presN?`de ${x.presN} efectivos liquidados`:'Efectivos · se completa al cargar las novedades en el F3'},
   {k:'hx',b:'liq',t:'Horas extras',u:'hs',mejor:'baja',sub:x=>x.f3tipos?`50%: ${ixNum(x.hx50)} · 100%: ${ixNum(x.hx100)}`:'Se completa al cargar las novedades en el F3'},
-  {k:'gremT',b:'liq',t:'Permisos gremiales',u:'',mejor:null,cero:'Sin permisos',sub:x=>[x.gremF3?`${ixNum(x.gremF3)} pagados en el F3`:'',x.gremAp!=null?`${ixNum(x.gremAp)} pagados aparte${x.gremRec?` (${x.gremRec} recuperan presentismo)`:''}`:'',x.gremAv?`${ixNum(x.gremAv)} con aviso de PG sin goce`:''].filter(Boolean).join(' · ')||'Días de permiso gremial según Movimientos'},
+  {k:'gremT',b:'liq',t:'Permisos gremiales',u:'',mejor:null,cero:'Sin permisos',sub:x=>x.gremSrc==='liq'?[`${ixNum(x.gremF3||0)} en la liquidación`,`${ixNum(x.gremAp||0)} pagados aparte${x.gremRec?` (${x.gremRec} recuperan presentismo)`:''}`,x.gremMov?`Movimientos: ${ixNum(x.gremMov)} días`:''].filter(Boolean).join(' · '):x.gremMov?`Según Movimientos (sin F3 de efectivos cargado): ${ixNum(x.grem||0)} con goce · ${ixNum(x.gremAv||0)} con aviso de PG`:'Según Movimientos'},
   {k:'vyc',b:'liq',t:'Viáticos pagados',u:'',mejor:null,sub:x=>x.f3tipos?`${ixNum(x.com)} comidas · F3 ${x.f3tipos.map(t=>({GLD:'efectivos',EVE:'eventuales',FC:'fuera de convenio'}[t]||t)).join(', ')}`:'Se completa al cargar las novedades en el F3'},
 ];
 // metas sugeridas (se cambian desde el tablero)
@@ -171,7 +197,7 @@ function ixCard(I,M,m,meses){
 async function ixCargar(force){
   if(IX.cargado&&!force) return;
   if(window.SRV&&SRV.mode==='online'){
-    try{ const r=await fetch('/api/indicadores',{credentials:'same-origin'}); if(r.ok){ const j=await r.json(); IX.f3=j.f3||{}; IX.metas=j.metas||{}; IX.puedeMetas=!!j.puede_metas; } }catch(e){}
+    try{ const r=await fetch('/api/indicadores',{credentials:'same-origin'}); if(r.ok){ const j=await r.json(); IX.f3=j.f3||{}; IX.metas=j.metas||{}; IX.calc=j.calc||null; IX.puedeMetas=!!j.puede_metas; } }catch(e){}
   } else IX.puedeMetas=true;
   IX.cargado=true; IXC.k='';
 }
@@ -196,15 +222,16 @@ function renderIndic(){
       <div class="ix-bv"><span class="ix-dot" style="--c:${IX_COL[st]}"></span><b style="${sk==='cr'||sk==='at'?`color:${IX_COL[sk]}`:''}">${v==null?'—':ixNum(v,I.d||0)}</b>${v!=null&&I.u?`<small>${I.u}</small>`:''}</div>
       <div class="ix-bl">${esc(I.t)}</div><div class="ix-bs">${esc(b.sub)}</div></button>`; }).join('');
   const secs=IX_BLQ.map(b=>`<div class="ix-sec" id="ix-s-${b.id}"><div class="ix-sh"><svg viewBox="0 0 24 24">${b.ic}</svg>${esc(b.t)}<button class="ix-go" data-ixmod="${b.go}">ver detalle →</button><span></span></div>
-    <div class="ix-grid">${IX_IND.filter(i=>i.b===b.id).map(I=>ixCard(I,M,m,meses)).join('')}</div></div>`).join('');
+    ${b.id==='liq'?ixF3Estado(M[m]||{},m):''}<div class="ix-grid">${IX_IND.filter(i=>i.b===b.id).map(I=>ixCard(I,M,m,meses)).join('')}</div></div>`).join('');
   const metasEd=IX.editMetas?`<div class="card ix-metas"><div class="card-b"><b>Metas</b> <span class="muted">— vacío = se compara contra el promedio de los últimos meses</span>
     <div class="ix-mg">${IX_IND.filter(i=>i.mejor).map(I=>`<label>${esc(I.t)}<span>${I.mejor==='baja'?'≤':'≥'}</span><input type="number" step="any" data-ixmeta="${I.k}" value="${ixMeta(I.k)!=null?ixMeta(I.k):''}">${I.u?`<em>${I.u}</em>`:''}</label>`).join('')}</div>
     <div style="margin-top:10px;display:flex;gap:8px"><button class="btn primary" id="ix-msave">Guardar metas</button><button class="btn ghost" id="ix-mcan">Cancelar</button></div></div></div>`:'';
   const x=M[m]||{};
+  const viejo=!ixCompleto()&&IX.calc?` · cálculo del ${dmy((IX.calc.at||'').slice(0,10))}`:'';
   const fuentes=[x.prog?'Movimientos':'',x.diasFich?`fichadas (${x.diasFich} días)`:'',x.f3tipos?`F3 cargado el ${dmy((x.f3at||'').slice(0,10))}`:''].filter(Boolean).join(' · ');
-  el.innerHTML=`<div class="ix-mes"><span class="ix-ml">MES</span><div class="ix-chips">${chips}</div>${IX.puedeMetas?'<button class="btn ghost ix-mbtn" id="ix-medit">Metas</button>':''}</div>
+  el.innerHTML=`<div class="ix-mes"><span class="ix-ml">MES</span><div class="ix-chips">${chips}</div><button class="btn primary ix-mbtn" id="ix-xls">Descargar informe</button>${IX.puedeMetas?'<button class="btn ghost ix-mbtn" id="ix-medit">Metas</button>':''}</div>
     ${metasEd}
-    <div class="ix-est">ESTADO DE ${IX_MES(m).toUpperCase()} <span>liquidación: efectivos y FC ${ixRango(m,'EF')} · eventuales ${ixRango(m,'EV')} · el semáforo de cada bloque es el peor de sus indicadores${fuentes?' · datos: '+esc(fuentes):''}</span></div>
+    <div class="ix-est">ESTADO DE ${IX_MES(m).toUpperCase()} <span>liquidación: efectivos y FC ${ixRango(m,'EF')} · eventuales ${ixRango(m,'EV')} · el semáforo de cada bloque es el peor de sus indicadores${fuentes?' · datos: '+esc(fuentes):''}${esc(viejo)}</span></div>
     <div class="ix-blqs">${blq}</div>
     <div class="card ix-al"><div class="ix-alh"><span class="ix-alic"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3zM12 10v4M12 17h.01"/></svg></span><div><b>Alertas de ${IX_MES(m)}</b><small>del semáforo y de la variación contra el mes anterior</small></div></div>
       <div class="ix-all">${alertas.length?alertas.map(a=>`<div class="ix-a ${a.st}"><i>${a.st==='cr'?'⊗':'⚠'}</i>${esc(a.t)}</div>`).join(''):'<div class="ix-a ok"><i>✓</i>Ningún indicador en atención este mes.</div>'}</div></div>
@@ -213,11 +240,45 @@ function renderIndic(){
   requestAnimationFrame(()=>requestAnimationFrame(()=>el.querySelectorAll('.ix-bars').forEach(b=>b.classList.add('in'))));
 }
 
+// qué F3 de este mes ya están guardados para el tablero
+function ixF3Estado(x,m){
+  const o=IX.f3[m]||{}, T=[['GLD','Efectivos'],['FC','Fuera de convenio'],['EVE','Eventuales']];
+  return `<div class="ix-f3e">${T.map(([t,n])=>o[t]?`<span class="ok">✓ ${n} <small>${dmy((o[t].at||'').slice(0,10))}${o[t].n?` · ${o[t].n} legajos`:''}</small></span>`:`<span>— ${n} <small>falta cargar sus novedades en el F3</small></span>`).join('')}${o.GRE?`<span class="ok">✓ Gremiales aparte <small>${o.GRE.cant}</small></span>`:''}</div>`;
+}
+// informe descargable del mes elegido (resumen + serie de 12 meses)
+async function ixExcel(){
+  const M=ixCalc(), meses=Object.keys(M).sort(), m=IX.sel; if(!m) return;
+  const wb=new ExcelJS.Workbook(); wb.creator='Panel RRHH I.Casanova';
+  const fino={style:'thin',color:{argb:'FFCBD5E1'}}, B={top:fino,left:fino,bottom:fino,right:fino};
+  const EST={ok:['En meta','FF16A34A'],at:['Atención','FFD97706'],cr:['Crítico','FFDC2626'],na:['—','FF64748B']};
+  const ws=wb.addWorksheet(`Resumen ${IX_MESC(m)}`,{views:[{state:'frozen',ySplit:4}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  ws.columns=[{width:26},{width:32},{width:13},{width:13},{width:13},{width:16},{width:13},{width:60}];
+  ws.mergeCells('A1:H1'); ws.getCell('A1').value=`Indicadores RRHH · CD Isidro Casanova · ${IX_MES(m)}`; ws.getCell('A1').font={bold:true,size:15,color:{argb:'FF0F172A'}};
+  ws.mergeCells('A2:H2'); ws.getCell('A2').value=`Período de liquidación: efectivos y FC ${ixRango(m,'EF')} · eventuales ${ixRango(m,'EV')} · emitido ${new Date().toLocaleDateString('es-AR')}`; ws.getCell('A2').font={size:10,color:{argb:'FF475569'}};
+  const h=ws.getRow(4); h.values=['Bloque','Indicador','Valor',IX_MES(ixMesAnt(m)),'Variación','Meta / promedio','Estado','Detalle']; h.height=22;
+  h.eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'},size:10}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0F766E'}}; c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; c.border=B; });
+  IX_IND.forEach(I=>{ const x=M[m]||{}, v=ixVal(x,I.k), va=ixVal(M[ixMesAnt(m)],I.k), ref=ixRef(I,M,m), st=ixEstado(I,v,ref), b=IX_BLQ.find(q=>q.id===I.b);
+    const fmt=n=>n==null?'—':Math.round(n*10**(I.d||0))/10**(I.d||0);
+    const r=ws.addRow([b.t,I.t+(I.u?` (${I.u})`:''),v==null?'sin datos':(v===0&&I.cero?I.cero:fmt(v)),fmt(va),v!=null&&va!=null?fmt(v-va):'—',ref?`${ref.tipo==='META'?'Meta':'Prom.'} ${fmt(ref.v)}`:'—',EST[st][0],I.sub(x)||'']);
+    r.eachCell({includeEmpty:true},(c,k)=>{ c.border=B; c.font={size:10}; c.alignment={vertical:'middle',horizontal:k>=3&&k<=7?'center':'left',wrapText:k===8}; });
+    r.getCell(7).font={bold:true,size:10,color:{argb:EST[st][1]}}; if(st==='cr'||st==='at') r.getCell(3).font={bold:true,size:10,color:{argb:EST[st][1]}}; });
+  const ser=meses.filter(k=>k<=m).slice(-12), w2=wb.addWorksheet('Serie mensual',{views:[{state:'frozen',xSplit:2,ySplit:1}]});
+  w2.columns=[{width:26},{width:32}].concat(ser.map(()=>({width:11})));
+  const h2=w2.addRow(['Bloque','Indicador'].concat(ser.map(IX_MESC)));
+  h2.eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'},size:10}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0F766E'}}; c.alignment={horizontal:'center'}; c.border=B; });
+  IX_IND.forEach(I=>{ const r=w2.addRow([IX_BLQ.find(q=>q.id===I.b).t,I.t+(I.u?` (${I.u})`:'')].concat(ser.map(k=>{ const v=ixVal(M[k],I.k); return v==null?'':Math.round(v*10**(I.d||0))/10**(I.d||0); })));
+    r.eachCell({includeEmpty:true},(c,k)=>{ c.border=B; c.font={size:10,bold:k-2===ser.length}; if(k>2) c.alignment={horizontal:'center'}; }); });
+  const buf=await wb.xlsx.writeBuffer(), a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=`Indicadores RRHH ${IX_MES(m)}.xlsx`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  App.toast('Informe de indicadores descargado');
+}
+
 document.addEventListener('click',async e=>{
   const v=document.getElementById('v-indic'); if(!v||!v.contains(e.target)) return;
   const c=e.target.closest('[data-ixm]'); if(c){ IX.sel=c.dataset.ixm; renderIndic(); return; }
   const gb=e.target.closest('[data-ixgo]'); if(gb){ const s=document.getElementById('ix-s-'+gb.dataset.ixgo); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); return; }
   const go=e.target.closest('[data-ixmod]'); if(go){ goView(go.dataset.ixmod); return; }
+  if(e.target.id==='ix-xls'){ ixExcel(); return; }
   if(e.target.id==='ix-medit'){ IX.editMetas=!IX.editMetas; renderIndic(); return; }
   if(e.target.id==='ix-mcan'){ IX.editMetas=false; renderIndic(); return; }
   if(e.target.id==='ix-msave'){
@@ -229,3 +290,6 @@ document.addEventListener('click',async e=>{
   }
 });
 const _ovIx=App.onView; App.onView=(id,f)=>{ _ovIx(id,f); if(id==='v-indic'){ renderIndic(); ixCargar(true).then(renderIndic); } };
+
+// quien tiene todos los datos (ej. el administrador) deja el cálculo al día al entrar al panel, para los que solo ven el tablero
+setTimeout(()=>{ try{ if(window.SRV&&SRV.mode==='online'&&puedeMod('indicadores')&&ixCompleto()) ixCargar(true).then(()=>{ IXC.k=''; ixCalc(); }); }catch(e){} },9000);

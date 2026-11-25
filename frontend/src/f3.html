@@ -1702,16 +1702,24 @@ function indicAuto(R){ clearTimeout(_ixT); _ixT=setTimeout(()=>guardarIndicF3(R,
 function indicGremiales(){
   try{
     if(!(window.SRV&&SRV.mode==='online')||!ST.nov||!ST.base||ST.base.tipo!=='GLD') return;
-    const P=periodoNov(), mes=`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, R=calcGremiales();
+    const P=mesLiq(), mes=P.mes, R=calcGremiales();
     const snap={cant:R.reduce((a,r)=>a+r.cant,0), personas:R.length, recup:R.filter(r=>r.pagar>0).length, com:R.reduce((a,r)=>a+r.com,0), viat:R.reduce((a,r)=>a+r.viat,0), periodo:P.txt};
     const k=mes+JSON.stringify(snap); if(k===indicGremiales._k) return; indicGremiales._k=k;
     fetch('/api/indicadores/f3',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes,tipo:'GRE',snap})}).catch(()=>{});
   }catch(e){ console.warn('indicadores gremiales',e); }
 }
+// mes de liquidación de las novedades: por la última fecha del detalle diario (efectivos y FC cortan el 15, eventuales el 22);
+// si el archivo no trae detalle diario, por el nombre del archivo
+function mesLiq(){
+  const t=ST.tipo||(ST.base&&ST.base.tipo)||'GLD', d1=ST.nov&&ST.nov.dia&&ST.nov.dia.d1;
+  if(d1){ let y=+d1.slice(0,4), m=+d1.slice(5,7); const d=+d1.slice(8,10); if(d>=(t==='EVE'?23:16)){ m++; if(m>12){ m=1; y++; } }
+    return {mes:`${y}-${String(m).padStart(2,'0')}`, txt:`${MESES[m-1]} ${y}`}; }
+  const P=periodoNov(); return {mes:`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, txt:P.txt};
+}
 async function guardarIndicF3(R,auto){
   try{
     if(!(window.SRV&&SRV.mode==='online')||!ST.nov) return;
-    const P=periodoNov(), mes=`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, tipo=ST.tipo||'GLD';
+    const P=mesLiq(), mes=P.mes, tipo=ST.tipo||'GLD';
     const tot={};
     (ST.mapa||[]).forEach(x=>{ if(['BASE','CONST','BASECOD'].includes(x[3])) return; let s=0, hay=false;
       R.out.forEach(r=>{ const v=r.fila[C(x[0])]; const n=typeof v==='number'?v:(esVacio(v)?NaN:num(v)); if(isFinite(n)&&n!==0){ s+=n; hay=true; } });

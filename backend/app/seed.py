@@ -90,6 +90,11 @@ MIGRACIONES = [
         ("rcampos", {"ausentismo": "ver", "ausmot": "ver"}),
         ("gmaamari", {"ausentismo": "ver", "ausmot": "ver", "chat": "editar"}),
     ]),
+    ("2026-11-25-indicadores", [
+        # tablero de indicadores: lo ven y descargan Cynthia y Joaquín (además del administrador)
+        ("cbertetti", {"indicadores": "ver"}),
+        ("joliva", {"indicadores": "ver"}),
+    ]),
 ]
 
 
