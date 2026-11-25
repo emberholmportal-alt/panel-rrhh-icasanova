@@ -84,6 +84,17 @@ function ixCalc(){
     const dias={}; Object.values(recs).forEach(r=>{ const k=ixPer(r.fecha,'EF'); (dias[k]||(dias[k]=new Set())).add(r.fecha); });
     Object.entries(dias).forEach(([m,s])=>{ g(m).diasFich=s.size; });
   }catch(e){ console.warn('indicadores tarde',e); }
+  // ---- dotación del mes en curso y del último cerrado: la nómina activa (efectivos con delegados + fuera de convenio + eventuales, sin externos).
+  // Queda guardada en el cálculo, así cada mes conserva la foto de su nómina; los meses sin foto usan "con jornada" (Movimientos).
+  try{ const NR=nmRows();
+    if(NR.length&&Object.keys((DB.nomina&&DB.nomina.emps)||{}).length){ const c={EF:0,FC:0,EV:0}; let del=0; const dl=new Set(DELEG);
+      NR.forEach(r=>{ if(c[r.tipo]==null) return; c[r.tipo]++; if(dl.has(String(r.leg))) del++; });
+      const hoyP=ixHoyM(), ant=ixMesAnt(hoyP);
+      [ant,hoyP].forEach(m=>{ const x=g(m); x.dotJ=x.dot; Object.assign(x,{dot:c.EF+c.FC+c.EV,dotEF:c.EF,dotFC:c.FC,dotEV:c.EV,deleg:del,dotSrc:'nom',dotAt:hoy()}); }); }
+    // fotos de meses anteriores que ya estaban guardadas
+    const CM=(IX.calc&&IX.calc.M)||{};
+    Object.entries(CM).forEach(([m,y])=>{ if(y&&y.dotSrc==='nom'&&M[m]&&M[m].dotSrc!=='nom'){ const x=M[m]; x.dotJ=x.dot; ['dot','dotEF','dotFC','dotEV','deleg','dotSrc','dotAt'].forEach(k=>x[k]=y[k]); } });
+  }catch(e){ console.warn('indicadores nómina',e); }
   // ---- medidas disciplinarias (registro de Sanciones) ----
   const sp={};
   ((DB.sanc&&DB.sanc.items)||[]).filter(s=>noExt(s.leg)).forEach(s=>{ const m=ixPer(s.fecha||'',tp(s.leg)); if(!m) return; const x=g(m);
@@ -145,7 +156,7 @@ const IX_BLQ=[
   {id:'liq',t:'Liquidación (F3)',ic:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',sub:'Presentismo, horas extras y viáticos',go:'v-f3',kpi:'pres'},
 ];
 const IX_IND=[
-  {k:'dot',b:'dot',t:'Dotación con jornada',u:'',mejor:null,sub:x=>x.dot?`${ixNum(x.dotEF||0)} efectivos${x.deleg?` (con ${x.deleg} delegados)`:''} · ${ixNum(x.dotFC||0)} fuera de convenio · ${ixNum(x.dotEV||0)} eventuales`:''},
+  {k:'dot',b:'dot',t:'Dotación',u:'',mejor:null,sub:x=>x.dot?`${x.dotSrc==='nom'?'Nómina activa: ':''}${ixNum(x.dotEF||0)} efectivos${x.deleg?` (con ${x.deleg} delegados)`:''} · ${ixNum(x.dotFC||0)} fuera de convenio · ${ixNum(x.dotEV||0)} eventuales`:''},
   {k:'bajas',b:'dot',t:'Bajas del mes',u:'',mejor:'baja',sub:x=>x.bajas?`${x.bajasEV} eventuales · ${x.bajas-x.bajasEV} efectivos`:'Según fecha de egreso en Nómina y Eventuales'},
   {k:'ing',b:'dot',t:'Ingresos del mes',u:'',mejor:null,sub:()=>'Según fecha de ingreso'},
   {k:'rot',b:'dot',t:'Rotación mensual',u:'%',d:1,mejor:'baja',sub:()=>'Bajas sobre dotación con jornada'},
