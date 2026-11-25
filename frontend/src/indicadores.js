@@ -23,7 +23,7 @@ function ixEpisodios(ev,set){
 let IXC={k:'',M:null};
 function ixCalc(){
   const A=DB.ausmot||null, recs=DB.records||{};
-  const key=[A&&A.at,A&&A.ev&&A.ev.length,Object.keys(recs).length,JSON.stringify(Object.keys(IX.f3)),(DB.ant&&DB.ant.at)||'',(DB.nomina&&DB.nomina.files||[]).length].join('|');
+  const key=[JSON.stringify(((DB.sanc&&DB.sanc.items)||[]).map(s=>s.id+s.tipo+s.dias+s.fecha)),A&&A.at,A&&A.ev&&A.ev.length,Object.keys(recs).length,JSON.stringify(Object.keys(IX.f3)),(DB.ant&&DB.ant.at)||'',(DB.nomina&&DB.nomina.files||[]).length].join('|');
   if(IXC.k===key&&IXC.M) return IXC.M;
   const M={}; const g=m=>M[m]||(M[m]={m});
   // ---- dotación y ausentismo (Movimientos) ----
@@ -45,15 +45,20 @@ function ixCalc(){
   // ---- llegadas tarde y medidas (fichadas) ----
   try{
     const L=typeof lateRecs==='function'?lateRecs():Object.values(recs).filter(r=>r.status==='tarde');
-    const ord=typeof ordinals==='function'?ordinals():{};
     const per={};
     L.forEach(r=>{ const m=r.fecha.slice(0,7), x=g(m); x.tarde=(x.tarde||0)+1; x.tardeMin=(x.tardeMin||0)+(r.atraso||0);
       (per[m]||(per[m]=new Set())).add(r.legajo);
-      if(typeof kindFor==='function'){ const k=kindFor(ord[r.legajo+'|'+r.fecha]||1); x['md_'+k]=(x['md_'+k]||0)+1; x.med=(x.med||0)+1; } });
+    });
     Object.entries(per).forEach(([m,s])=>g(m).tardeP=s.size);
     const dias={}; Object.values(recs).forEach(r=>{ (dias[r.fecha.slice(0,7)]||(dias[r.fecha.slice(0,7)]=new Set())).add(r.fecha); });
     Object.entries(dias).forEach(([m,s])=>{ g(m).diasFich=s.size; });
   }catch(e){ console.warn('indicadores tarde',e); }
+  // ---- medidas disciplinarias (registro de Sanciones) ----
+  const sp={};
+  ((DB.sanc&&DB.sanc.items)||[]).forEach(s=>{ const m=(s.fecha||'').slice(0,7); if(!m) return; const x=g(m);
+    x.med=(x.med||0)+1; x['md_'+s.tipo]=(x['md_'+s.tipo]||0)+1; if(s.tipo==='sus') x.suspS=(x.suspS||0)+(+s.dias||0);
+    (sp[m]||(sp[m]=new Set())).add(s.leg); });
+  Object.entries(sp).forEach(([m,s])=>{ g(m).medP=s.size; });
   // ---- bajas e ingresos (Nómina + Eventuales) ----
   const altas={}, bajas={};
   const add=(o,m,leg,t)=>{ if(!m) return; const k=m.slice(0,7); (o[k]||(o[k]=new Map())).set(leg,t); };
@@ -89,9 +94,9 @@ const IX_IND=[
   {k:'ing',b:'dot',t:'Ingresos del mes',u:'',mejor:null,sub:()=>'Según fecha de ingreso'},
   {k:'rot',b:'dot',t:'Rotación mensual',u:'%',d:1,mejor:'baja',sub:()=>'Bajas sobre dotación con jornada'},
   {k:'tarde',b:'dis',t:'Llegadas tarde',u:'',mejor:'baja',sub:x=>x.tarde?`${ixNum(x.tardeP)} personas · ${ixNum(x.tardeMin)} min en total`:''},
-  {k:'med',b:'dis',t:'Medidas por llegadas tarde',u:'',mejor:'baja',sub:x=>x.med?`PE ${x.md_descargo||0} · APE ${x.md_apercibimiento||0} · SUS ${x.md_sancion||0}`:'Según la escala de Llegadas tarde'},
+  {k:'med',b:'dis',t:'Medidas disciplinarias',u:'',mejor:'baja',go:'v-sanc',sub:x=>x.med?`PE ${x.md_pe||0} · APE ${x.md_ape||0} · SUS ${x.md_sus||0} · ${x.medP} colab.`:'Se cargan en Sanciones'},
   {k:'sinav',b:'dis',t:'Ausencias sin aviso',u:'',mejor:'baja',sub:x=>x.sinav?`${ixNum(x.sinavP)} personas`:''},
-  {k:'susp',b:'dis',t:'Días de suspensión',u:'',mejor:'baja',sub:()=>'Según Movimientos'},
+  {k:'suspS',b:'dis',t:'Días de suspensión',u:'',mejor:'baja',sub:x=>`Según Sanciones${x.susp?` · ${x.susp} en Movimientos`:''}`},
   {k:'ausc',b:'aus',t:'Ausentismo controlable',u:'%',d:1,mejor:'baja',sub:x=>x.prog?`${ixNum(x.dC)} días de ausencia sobre ${ixNum(x.prog)} programados`:''},
   {k:'ausnc',b:'aus',t:'Ausentismo no controlable',u:'%',d:1,mejor:null,sub:x=>x.prog?`Enfermedad y ART · ${ixNum(x.dNC)} días`:''},
   {k:'rep',b:'aus',t:'Reposos médicos iniciados',u:'',mejor:'baja',sub:x=>`${ixNum(x.repD)} días de reposo en el mes`},

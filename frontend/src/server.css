@@ -297,3 +297,16 @@ body.no-cargas #an-drop,body.no-cargas #drop,body.no-cargas #dropVac,body.no-car
 @media (max-width:1100px){.ix-blqs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.ix-blqs{grid-template-columns:1fr}.ix-v{font-size:28px}}
 @media (prefers-reduced-motion:reduce){.ix-b{transition:none;transform:none}.ix-a{animation:none}}
+
+/* ================= SANCIONES ================= */
+.sc-form{margin-bottom:16px}
+.sc-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px}
+.sc-f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text2)} .sc-w2{grid-column:span 2}
+.sc-hist{margin-top:10px;font-size:12.5px;color:var(--acc);min-height:16px}
+.sc-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.sc-k{background:var(--glass);border:1px solid var(--stroke);border-left:3px solid var(--c,var(--stroke2));border-radius:12px;padding:10px 14px}
+.sc-k b{display:block;font-size:24px;font-weight:800;color:var(--c,var(--text))} .sc-k span{font-size:11.5px;color:var(--text3)}
+.sc-fil{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sc-fil select,.sc-fil input{width:auto}
+.sc-tp{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);white-space:nowrap}
+.sc-det{max-width:340px;white-space:normal;font-size:12.5px;color:var(--text2)} .sc-del{padding:2px 8px}
+@media (max-width:900px){.sc-g{grid-template-columns:1fr 1fr}.sc-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}

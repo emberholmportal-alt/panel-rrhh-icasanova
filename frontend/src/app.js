@@ -382,7 +382,7 @@ function hookAnticipos(){
    ================================================================ */
 const REC = () => (DB.recs||(DB.recs=[]));
 // permisos por módulo (en el servidor): cada usuario ve en Inicio solo lo de las secciones a las que accede
-const PV_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-nomina':'nomina','v-cumple':'cumpleanos','v-menu':'menu','v-hextras':'hextras','v-ausmot':'ausmot','v-viandas':'viandas','v-indic':'indicadores'};
+const PV_MOD={'v-ausentismo':'ausentismo','v-vacaciones':'vacaciones','v-bajas':'eventuales','v-francos':'francos','v-ropa':'indumentaria','v-f3':'f3','v-anticipos':'anticipos','v-nomina':'nomina','v-cumple':'cumpleanos','v-menu':'menu','v-hextras':'hextras','v-ausmot':'ausmot','v-viandas':'viandas','v-indic':'indicadores','v-sanc':'sanciones'};
 const AV_MOD={ant:'eventuales',vac:'vacaciones',aus:'ausentismo',f3:'f3',an:'anticipos'};
 const puedeMod=m=>!m||!(window.SRV&&SRV.mode==='online')||!SRV.user||SRV.user.rol==='admin'||!!(SRV.user.perms||{})[m];
 const puedeAviso=a=>puedeMod(AV_MOD[a.m])&&puedeMod(PV_MOD[a.go]);

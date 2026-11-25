@@ -37,6 +37,7 @@ MODULES = {
     "chat": "Chat interno",
     "wagrupo": "Celulares de eventuales",
     "indicadores": "Tablero de indicadores",
+    "sanciones": "Sanciones",
 }
 # Toda sección nueva se agrega acá con su propio permiso: por defecto NADIE la ve (solo el admin)
 # hasta que se le asigna a cada usuario en Configuración → Usuarios y permisos.
