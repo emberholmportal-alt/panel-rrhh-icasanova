@@ -50,7 +50,8 @@ function ixCalc(){
   const tp=l=>TP[l]==='EV'?'EV':TP[l]==='FC'?'FC':'EF';
   // personal externo: no suma en ningún indicador · delegados gremiales: suman a la dotación como efectivos aunque no tengan jornada
   const EXT=new Set(Object.keys(TP).filter(l=>TP[l]==='EXT')), noExt=l=>!EXT.has(String(l));
-  const DELEG=Object.entries((DB.nomina&&DB.nomina.extra)||{}).filter(([,e])=>/DELEGAD/i.test(e.sector||'')).map(([l])=>l);
+  // delegados gremiales (efectivos que no tienen novedades ni jornada en el reloj): los de nomina.extra y, por las dudas, la lista fija del alta
+  const DELEG=[...new Set(['199123','181543','208124'].concat(Object.entries((DB.nomina&&DB.nomina.extra)||{}).filter(([,e])=>/DELEGAD/i.test(e.sector||'')).map(([l])=>l)))];
   const enDot={};
   if(A){
     // días programados, día por día, repartidos por período

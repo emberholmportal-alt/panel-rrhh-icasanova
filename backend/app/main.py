@@ -141,6 +141,22 @@ def startup():
             ed.updated_by = "sistema"
             auth.audit(db, "sistema", "apto_frio", f"{len(legs_af)} eventuales con apto frío")
             nuevas.append(clave_af)
+        # los agregados a mano (ej. delegados) tienen que estar siempre: si un guardado viejo los borró, se reponen
+        nd0 = db.get(Doc, "nomina")
+        if nd0 is not None:
+            nom0 = dict((nd0.data or {}).get("nomina") or {})
+            ex0 = dict(nom0.get("extra") or {})
+            faltan = {leg: e for clave, extra in seed.NOMINA_EXTRA if clave in hechas for leg, e in extra.items() if leg not in ex0}
+            if faltan:
+                for leg, e in faltan.items():
+                    ex0[leg] = {"leg": leg, **e, "at": iso(now()), "por": "sistema"}
+                nom0["extra"] = ex0
+                nd0.data = {**(nd0.data or {}), "nomina": nom0}
+                nd0.version = (nd0.version or 0) + 1
+                nd0.updated_at = now()
+                nd0.updated_by = "sistema"
+                auth.audit(db, "sistema", "nomina_extra", f"repuestos: {', '.join(faltan)}")
+                db.commit()
         for clave, extra in seed.NOMINA_EXTRA:
             if clave in hechas:
                 continue
@@ -757,7 +773,12 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     if base is not None and int(base) != d.version:
         raise HTTPException(409, json.dumps({"msg": f"{d.updated_by or 'Otro usuario'} modificó {MODULES.get(key, key)} mientras trabajabas",
                                               "version": d.version, "updated_by": d.updated_by}))
-    if key == "viandas":
+    if key == "nomina" and d.data:
+        # los agregados a mano (delegados) no se pierden si el navegador guarda una nómina que no los trae
+        ex_cur = ((d.data or {}).get("nomina") or {}).get("extra")
+        if ex_cur and isinstance(data.get("nomina"), dict) and not data["nomina"].get("extra"):
+            data = {**data, "nomina": {**data["nomina"], "extra": ex_cur}}
+    if key == "viandas" and d.data:
         # lo que contó la cocina se carga aparte (/api/comidas/cocina): el recálculo de Comidas no lo pisa
         cur = ((d.data or {}).get("viandas") or {}).get("cocina")
         if cur is not None and isinstance(data.get("viandas"), dict):
