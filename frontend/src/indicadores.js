@@ -1,21 +1,29 @@
 // ===================== TABLERO DE INDICADORES (mes a mes) =====================
 // Salud, ausentismo y dotación salen de los Movimientos del reloj (Ausentismo por motivo);
 // llegadas tarde y medidas, de las fichadas (Llegadas tarde); bajas e ingresos, de Nómina y Eventuales;
-// lo de liquidación, del resumen que se guarda cada vez que se genera un F3.
+// lo de liquidación, del resumen que se guarda al cargar las novedades en el F3.
+// Cada mes es un período de liquidación (ver ixPer).
 let IX={sel:'',f3:{},metas:{},puedeMetas:false,cargado:false,editMetas:false};
 const IX_MES=m=>`${MESES_N[+m.slice(5)-1]} ${m.slice(0,4)}`.toLowerCase();
 const IX_MESC=m=>`${MESES_N[+m.slice(5)-1].slice(0,3).toLowerCase()} ${m.slice(2,4)}`;
 const IX_NOCONT=new Set(['Enfermedad','Ausencia c/aviso de enfermedad','Licencia ART']);
 const ixNum=(v,d=0)=>v==null||!isFinite(v)?'—':Number(v).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const ixMesAnt=m=>{ const d=new Date(+m.slice(0,4),+m.slice(5)-2,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
-const ixHoyM=()=>new Date().toISOString().slice(0,7);
+// Los meses son períodos de liquidación: efectivos y fuera de convenio del 16 al 15; eventuales del 23 al 22.
+// Ej. noviembre = efectivos y FC 16/10 al 15/11 · eventuales 23/10 al 22/11.
+const IX_CORTE={EV:23,EF:16,FC:16};
+function ixPer(f,t){ if(!f||f.length<10) return ''; let y=+f.slice(0,4), m=+f.slice(5,7); const d=+f.slice(8,10);
+  if(d>=(IX_CORTE[t]||16)){ m++; if(m>12){ m=1; y++; } } return `${y}-${String(m).padStart(2,'0')}`; }
+function ixRango(m,t){ const c=IX_CORTE[t]||16, a=new Date(+m.slice(0,4),+m.slice(5)-2,c), b=new Date(+m.slice(0,4),+m.slice(5)-1,c-1);
+  const f=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; return `${f(a)} al ${f(b)}`; }
+const ixHoyM=()=>{ const d=new Date(); return ixPer(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,'EF'); };
 
 // episodios (reposos / accidentes): días seguidos con el mismo tipo de motivo; un hueco de hasta 3 días (franco, finde) no corta
-function ixEpisodios(ev,set){
+function ixEpisodios(ev,set,tp){
   const by={}; ev.forEach(e=>{ if(set.has(e[2])) (by[e[0]]||(by[e[0]]=[])).push(e[1]); });
   const ini={}, dias={};
-  Object.values(by).forEach(fs=>{ fs=[...new Set(fs)].sort(); let prev=null;
-    fs.forEach(f=>{ const m=f.slice(0,7); dias[m]=(dias[m]||0)+1;
+  Object.entries(by).forEach(([l,fs])=>{ fs=[...new Set(fs)].sort(); let prev=null;
+    fs.forEach(f=>{ const m=ixPer(f,tp(l)); dias[m]=(dias[m]||0)+1;
       if(!prev||(dObj(f)-dObj(prev))/864e5>4) ini[m]=(ini[m]||0)+1; prev=f; }); });
   return {ini,dias};
 }
@@ -27,17 +35,25 @@ function ixCalc(){
   if(IXC.k===key&&IXC.M) return IXC.M;
   const M={}; const g=m=>M[m]||(M[m]={m});
   // ---- dotación y ausentismo (Movimientos) ----
+  // tipo de cada persona (define en qué período cae cada día)
+  const TP={}; try{ nmRows().forEach(r=>{ TP[r.leg]=r.tipo; }); }catch(e){}
+  if(A) Object.entries(A.emps||{}).forEach(([l,e])=>{ if(!TP[l]&&e.t) TP[l]=e.t; });
+  ((DB.ant&&DB.ant.rows)||[]).forEach(r=>{ if(!TP[r.legajo]) TP[r.legajo]='EV'; });
+  const tp=l=>TP[l]==='EV'?'EV':TP[l]==='FC'?'FC':'EF';
   if(A){
-    const tp=l=>((A.emps||{})[l]||{}).t||'';
-    Object.entries(A.prog||{}).forEach(([l,o])=>Object.entries(o).forEach(([m,n])=>{ if(!n) return; const x=g(m);
-      x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(tp(l)==='EV') x.dotEV=(x.dotEV||0)+1; else x.dotEF=(x.dotEF||0)+1; }));
+    // días programados, día por día, repartidos por período
+    Object.entries(A.prog||{}).forEach(([l,o])=>{ const t=tp(l), cuenta={};
+      Object.entries(o).forEach(([mc,n])=>{ if(!n) return; const str=((A.progD||{})[l]||{})[mc];
+        if(str) for(let i=0;i<str.length;i++){ if(str[i]==='1'){ const k=ixPer(`${mc}-${String(i+1).padStart(2,'0')}`,t); cuenta[k]=(cuenta[k]||0)+1; } }
+        else cuenta[mc]=(cuenta[mc]||0)+n; });
+      Object.entries(cuenta).forEach(([m,n])=>{ const x=g(m); x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(t==='EV') x.dotEV=(x.dotEV||0)+1; else x.dotEF=(x.dotEF||0)+1; }); });
     const vistos=new Set();
     (A.ev||[]).forEach(e=>{ const c=amCat(e[2]); if(c!=='aus') return; const k=e[0]+'|'+e[1]; if(vistos.has(k)) return; vistos.add(k);
-      const x=g(e[1].slice(0,7)); if(IX_NOCONT.has(e[2])) x.dNC=(x.dNC||0)+1; else x.dC=(x.dC||0)+1;
+      const x=g(ixPer(e[1],tp(e[0]))); if(IX_NOCONT.has(e[2])) x.dNC=(x.dNC||0)+1; else x.dC=(x.dC||0)+1;
       if(e[2]==='Ausencia sin aviso'){ x.sinav=(x.sinav||0)+1; (x._sinP||(x._sinP=new Set())).add(e[0]); }
       if(e[2]==='Suspensión') x.susp=(x.susp||0)+1; });
-    (A.ev||[]).forEach(e=>{ const x=g(e[1].slice(0,7)); if(e[2]==='Permiso gremial') x.grem=(x.grem||0)+1; else if(e[2]==='Ausencia c/aviso de PG') x.gremAv=(x.gremAv||0)+1; });
-    const E=ixEpisodios(A.ev||[],new Set(['Enfermedad','Ausencia c/aviso de enfermedad'])), R=ixEpisodios(A.ev||[],new Set(['Licencia ART']));
+    (A.ev||[]).forEach(e=>{ const x=g(ixPer(e[1],tp(e[0]))); if(e[2]==='Permiso gremial') x.grem=(x.grem||0)+1; else if(e[2]==='Ausencia c/aviso de PG') x.gremAv=(x.gremAv||0)+1; });
+    const E=ixEpisodios(A.ev||[],new Set(['Enfermedad','Ausencia c/aviso de enfermedad']),tp), R=ixEpisodios(A.ev||[],new Set(['Licencia ART']),tp);
     [...new Set(Object.keys(M).concat(Object.keys(E.dias),Object.keys(R.dias)))].forEach(m=>{ const x=g(m);
       x.rep=E.ini[m]||0; x.repD=E.dias[m]||0; x.art=R.ini[m]||0; x.artD=R.dias[m]||0;
       x.sinavP=x._sinP?x._sinP.size:0; delete x._sinP;
@@ -47,24 +63,24 @@ function ixCalc(){
   try{
     const L=typeof lateRecs==='function'?lateRecs():Object.values(recs).filter(r=>r.status==='tarde');
     const per={};
-    L.forEach(r=>{ const m=r.fecha.slice(0,7), x=g(m); x.tarde=(x.tarde||0)+1; x.tardeMin=(x.tardeMin||0)+(r.atraso||0);
+    L.forEach(r=>{ const m=ixPer(r.fecha,tp(r.legajo)), x=g(m); x.tarde=(x.tarde||0)+1; x.tardeMin=(x.tardeMin||0)+(r.atraso||0);
       (per[m]||(per[m]=new Set())).add(r.legajo);
     });
     Object.entries(per).forEach(([m,s])=>g(m).tardeP=s.size);
-    const dias={}; Object.values(recs).forEach(r=>{ (dias[r.fecha.slice(0,7)]||(dias[r.fecha.slice(0,7)]=new Set())).add(r.fecha); });
+    const dias={}; Object.values(recs).forEach(r=>{ const k=ixPer(r.fecha,'EF'); (dias[k]||(dias[k]=new Set())).add(r.fecha); });
     Object.entries(dias).forEach(([m,s])=>{ g(m).diasFich=s.size; });
   }catch(e){ console.warn('indicadores tarde',e); }
   // ---- medidas disciplinarias (registro de Sanciones) ----
   const sp={};
-  ((DB.sanc&&DB.sanc.items)||[]).forEach(s=>{ const m=(s.fecha||'').slice(0,7); if(!m) return; const x=g(m);
+  ((DB.sanc&&DB.sanc.items)||[]).forEach(s=>{ const m=ixPer(s.fecha||'',tp(s.leg)); if(!m) return; const x=g(m);
     x.med=(x.med||0)+1; x['md_'+s.tipo]=(x['md_'+s.tipo]||0)+1; if(s.tipo==='sus') x.suspS=(x.suspS||0)+(+s.dias||0);
     (sp[m]||(sp[m]=new Set())).add(s.leg); });
   Object.entries(sp).forEach(([m,s])=>{ g(m).medP=s.size; });
   // ---- bajas e ingresos (Nómina + Eventuales) ----
   const altas={}, bajas={};
-  const add=(o,m,leg,t)=>{ if(!m) return; const k=m.slice(0,7); (o[k]||(o[k]=new Map())).set(leg,t); };
+  const add=(o,f,leg,t)=>{ const k=ixPer(f||'',t); if(!k) return; (o[k]||(o[k]=new Map())).set(leg,t); };
   ((DB.ant&&DB.ant.rows)||[]).forEach(r=>{ add(altas,r.ingreso,r.legajo,'EV'); add(bajas,r.egreso,r.legajo,'EV'); });
-  Object.entries((DB.nomina&&DB.nomina.emps)||{}).forEach(([lk,e])=>{ const l=e.leg||e.legajo||lk; const t=e.tipo==='EV'?'EV':'EF';
+  Object.entries((DB.nomina&&DB.nomina.emps)||{}).forEach(([lk,e])=>{ const l=e.leg||e.legajo||lk; const t=e.tipo==='EV'?'EV':e.tipo==='FC'?'FC':tp(l);
     add(altas,e.ingreso,l,t); add(bajas,e.egreso,l,t); });
   Object.keys(M).forEach(m=>{ const x=M[m], b=bajas[m], a=altas[m];
     x.bajas=b?b.size:0; x.bajasEV=b?[...b.values()].filter(t=>t==='EV').length:0; x.ing=a?a.size:0;
@@ -188,7 +204,7 @@ function renderIndic(){
   const fuentes=[x.prog?'Movimientos':'',x.diasFich?`fichadas (${x.diasFich} días)`:'',x.f3tipos?`F3 cargado el ${dmy((x.f3at||'').slice(0,10))}`:''].filter(Boolean).join(' · ');
   el.innerHTML=`<div class="ix-mes"><span class="ix-ml">MES</span><div class="ix-chips">${chips}</div>${IX.puedeMetas?'<button class="btn ghost ix-mbtn" id="ix-medit">Metas</button>':''}</div>
     ${metasEd}
-    <div class="ix-est">ESTADO DE ${IX_MES(m).toUpperCase()} <span>el semáforo de cada bloque es el peor de sus indicadores${fuentes?' · datos: '+esc(fuentes):''}</span></div>
+    <div class="ix-est">ESTADO DE ${IX_MES(m).toUpperCase()} <span>liquidación: efectivos y FC ${ixRango(m,'EF')} · eventuales ${ixRango(m,'EV')} · el semáforo de cada bloque es el peor de sus indicadores${fuentes?' · datos: '+esc(fuentes):''}</span></div>
     <div class="ix-blqs">${blq}</div>
     <div class="card ix-al"><div class="ix-alh"><span class="ix-alic"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3zM12 10v4M12 17h.01"/></svg></span><div><b>Alertas de ${IX_MES(m)}</b><small>del semáforo y de la variación contra el mes anterior</small></div></div>
       <div class="ix-all">${alertas.length?alertas.map(a=>`<div class="ix-a ${a.st}"><i>${a.st==='cr'?'⊗':'⚠'}</i>${esc(a.t)}</div>`).join(''):'<div class="ix-a ok"><i>✓</i>Ningún indicador en atención este mes.</div>'}</div></div>
