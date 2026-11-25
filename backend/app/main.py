@@ -780,6 +780,75 @@ async def put_doc(key: str, request: Request, u: User = Depends(current_user), d
     return out
 
 
+# ---------------- Tablero de indicadores ----------------
+# Lo que se calcula con fichadas y movimientos se arma en el navegador con los datos que ya tiene el panel.
+# Acá se guarda solo lo que no queda en ningún otro lado: el resumen de cada F3 generado (por mes y tipo) y las metas.
+def _indic_doc(db: Session, lock: bool = False) -> Doc:
+    q = select(Doc).where(Doc.key == "indicadores")
+    d = db.scalar(q.with_for_update() if lock else q)
+    if d is None:
+        d = Doc(key="indicadores", data={"f3": {}, "metas": {}}, version=0)
+        db.add(d)
+    return d
+
+
+@app.get("/api/indicadores")
+def indicadores_get(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not can_read(u, "indicadores"):
+        raise HTTPException(403, "No tenés acceso al tablero de indicadores")
+    d = db.get(Doc, "indicadores")
+    data = (d.data if d else None) or {}
+    return {"f3": data.get("f3") or {}, "metas": data.get("metas") or {}, "puede_metas": u.rol == "admin" or can_write(u, "indicadores")}
+
+
+@app.post("/api/indicadores/f3")
+async def indicadores_f3(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Al generar un F3 se guarda su resumen (totales por concepto, presentismo) para verlo mes a mes."""
+    if not can_write(u, "f3"):
+        raise HTTPException(403, "Sin permiso sobre Novedades F3")
+    body = json.loads(await request.body() or b"{}")
+    mes, tipo, snap = str(body.get("mes") or ""), str(body.get("tipo") or ""), body.get("snap")
+    if not re.fullmatch(r"\d{4}-\d{2}", mes) or tipo not in ("GLD", "EVE", "FC") or not isinstance(snap, dict):
+        raise HTTPException(400, "Formato inválido")
+    if len(json.dumps(snap)) > 200_000:
+        raise HTTPException(400, "Resumen demasiado grande")
+    d = _indic_doc(db, lock=True)
+    data = copy.deepcopy(d.data or {})
+    data.setdefault("f3", {}).setdefault(mes, {})[tipo] = {**snap, "at": iso(now()), "por": u.nombre}
+    d.data = data
+    d.version += 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    auth.audit(db, u, "guardar", f"Indicadores: resumen del F3 {tipo} {mes}")
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/indicadores/metas")
+async def indicadores_metas(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not (u.rol == "admin" or can_write(u, "indicadores")):
+        raise HTTPException(403, "Solo quien edita el tablero puede cambiar las metas")
+    body = json.loads(await request.body() or b"{}")
+    metas = body.get("metas")
+    if not isinstance(metas, dict):
+        raise HTTPException(400, "Formato inválido")
+    limpio = {}
+    for k, v in metas.items():
+        # None = sin meta (se compara contra el promedio de los meses anteriores)
+        if re.fullmatch(r"[a-z0-9_]{1,20}", str(k)) and (v is None or isinstance(v, (int, float))):
+            limpio[k] = None if v is None else float(v)
+    d = _indic_doc(db, lock=True)
+    data = copy.deepcopy(d.data or {})
+    data["metas"] = limpio
+    d.data = data
+    d.version += 1
+    d.updated_at = now()
+    d.updated_by = u.nombre
+    auth.audit(db, u, "guardar", "Indicadores: metas")
+    db.commit()
+    return {"ok": True, "metas": limpio}
+
+
 @app.post("/api/comidas/cocina")
 async def comidas_cocina(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Lo que contó la cocina en un día, por comedor y servicio. Lo carga quien ve Comidas (ej. Milagros)."""

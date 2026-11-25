@@ -1687,11 +1687,30 @@ async function generar(){
   const buf=await wb.xlsx.writeBuffer();
   bajar(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), nom);
   toast(`F3 generado · ${datos.length} legajos`);
+  guardarIndicF3(R);
 }
 // aclara un ARGB para la fila de códigos
 function aclarar(argb){
   const c=[2,4,6].map(i=>parseInt(argb.slice(i,i+2),16));
   return 'FF'+c.map(v=>Math.round(v+(255-v)*0.60).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+// resumen del F3 para el tablero de indicadores (se guarda en el servidor, por mes y tipo)
+async function guardarIndicF3(R){
+  try{
+    if(!(window.SRV&&SRV.mode==='online')) return;
+    const P=periodoNov(), mes=`${P.anio}-${String(P.mes+1).padStart(2,'0')}`, tipo=ST.tipo||'GLD';
+    const tot={};
+    (ST.mapa||[]).forEach(x=>{ if(['BASE','CONST','BASECOD'].includes(x[3])) return; let s=0, hay=false;
+      R.out.forEach(r=>{ const v=r.fila[C(x[0])]; const n=typeof v==='number'?v:(esVacio(v)?NaN:num(v)); if(isFinite(n)&&n!==0){ s+=n; hay=true; } });
+      if(hay) tot[x[1].trim()]=Math.round(s*100)/100; });
+    const snap={n:R.out.length, archivo:ST.nov?ST.nov.archivo:'', periodo:P.txt, tot};
+    if(tipo==='GLD'){ const p={c100:0,c50:0,c0:0}; let ret=0, retN=0;
+      R.out.forEach(r=>{ const v=r.fila[C('BO')]; if(esVacio(v)) return; const n=num(v); if(n>=1) p.c100++; else if(n>=0.5) p.c50++; else p.c0++;
+        const m=minutos(r.fila[C('BJ')]); if(m>0){ ret+=m; retN++; } });
+      snap.pres=p; snap.retMin=ret; snap.retN=retN; }
+    const r=await fetch('/api/indicadores/f3',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes,tipo,snap})});
+    if(r.ok) toast(`Indicadores de ${P.txt} actualizados con este F3`);
+  }catch(e){ console.warn('indicadores F3',e); }
 }
 function bajar(blob,nombre){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre;
