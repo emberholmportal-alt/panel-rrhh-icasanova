@@ -48,20 +48,26 @@ function ixCalc(){
   if(A) Object.entries(A.emps||{}).forEach(([l,e])=>{ if(!TP[l]&&e.t) TP[l]=e.t; });
   ((DB.ant&&DB.ant.rows)||[]).forEach(r=>{ if(!TP[r.legajo]) TP[r.legajo]='EV'; });
   const tp=l=>TP[l]==='EV'?'EV':TP[l]==='FC'?'FC':'EF';
+  // personal externo: no suma en ningún indicador · delegados gremiales: suman a la dotación como efectivos aunque no tengan jornada
+  const EXT=new Set(Object.keys(TP).filter(l=>TP[l]==='EXT')), noExt=l=>!EXT.has(String(l));
+  const DELEG=Object.entries((DB.nomina&&DB.nomina.extra)||{}).filter(([,e])=>/DELEGAD/i.test(e.sector||'')).map(([l])=>l);
+  const enDot={};
   if(A){
     // días programados, día por día, repartidos por período
-    Object.entries(A.prog||{}).forEach(([l,o])=>{ const t=tp(l), cuenta={};
+    Object.entries(A.prog||{}).forEach(([l,o])=>{ if(!noExt(l)) return; const t=tp(l), cuenta={};
       Object.entries(o).forEach(([mc,n])=>{ if(!n) return; const str=((A.progD||{})[l]||{})[mc];
         if(str) for(let i=0;i<str.length;i++){ if(str[i]==='1'){ const k=ixPer(`${mc}-${String(i+1).padStart(2,'0')}`,t); cuenta[k]=(cuenta[k]||0)+1; } }
         else cuenta[mc]=(cuenta[mc]||0)+n; });
-      Object.entries(cuenta).forEach(([m,n])=>{ const x=g(m); x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(t==='EV') x.dotEV=(x.dotEV||0)+1; else if(t==='FC') x.dotFC=(x.dotFC||0)+1; else x.dotEF=(x.dotEF||0)+1; }); });
+      Object.entries(cuenta).forEach(([m,n])=>{ const x=g(m); (enDot[m]||(enDot[m]=new Set())).add(l); x.dot=(x.dot||0)+1; x.prog=(x.prog||0)+n; if(t==='EV') x.dotEV=(x.dotEV||0)+1; else if(t==='FC') x.dotFC=(x.dotFC||0)+1; else x.dotEF=(x.dotEF||0)+1; }); });
+    Object.keys(enDot).forEach(m=>DELEG.forEach(l=>{ if(enDot[m].has(l)) return; const x=g(m); x.dot++; x.dotEF=(x.dotEF||0)+1; x.deleg=(x.deleg||0)+1; }));
     const vistos=new Set();
-    (A.ev||[]).forEach(e=>{ const c=amCat(e[2]); if(c!=='aus') return; const k=e[0]+'|'+e[1]; if(vistos.has(k)) return; vistos.add(k);
+    const EVS=(A.ev||[]).filter(e=>noExt(e[0]));
+    EVS.forEach(e=>{ const c=amCat(e[2]); if(c!=='aus') return; const k=e[0]+'|'+e[1]; if(vistos.has(k)) return; vistos.add(k);
       const x=g(ixPer(e[1],tp(e[0]))); if(IX_NOCONT.has(e[2])) x.dNC=(x.dNC||0)+1; else x.dC=(x.dC||0)+1;
       if(e[2]==='Ausencia sin aviso'){ x.sinav=(x.sinav||0)+1; (x._sinP||(x._sinP=new Set())).add(e[0]); }
       if(e[2]==='Suspensión') x.susp=(x.susp||0)+1; });
-    (A.ev||[]).forEach(e=>{ const x=g(ixPer(e[1],tp(e[0]))); if(e[2]==='Permiso gremial') x.grem=(x.grem||0)+1; else if(e[2]==='Ausencia c/aviso de PG') x.gremAv=(x.gremAv||0)+1; });
-    const E=ixEpisodios(A.ev||[],new Set(['Enfermedad','Ausencia c/aviso de enfermedad']),tp), R=ixEpisodios(A.ev||[],new Set(['Licencia ART']),tp);
+    EVS.forEach(e=>{ const x=g(ixPer(e[1],tp(e[0]))); if(e[2]==='Permiso gremial') x.grem=(x.grem||0)+1; else if(e[2]==='Ausencia c/aviso de PG') x.gremAv=(x.gremAv||0)+1; });
+    const E=ixEpisodios(EVS,new Set(['Enfermedad','Ausencia c/aviso de enfermedad']),tp), R=ixEpisodios(EVS,new Set(['Licencia ART']),tp);
     [...new Set(Object.keys(M).concat(Object.keys(E.dias),Object.keys(R.dias)))].forEach(m=>{ const x=g(m);
       x.rep=E.ini[m]||0; x.repD=E.dias[m]||0; x.art=R.ini[m]||0; x.artD=R.dias[m]||0;
       x.sinavP=x._sinP?x._sinP.size:0; delete x._sinP;
@@ -71,7 +77,7 @@ function ixCalc(){
   try{
     const L=typeof lateRecs==='function'?lateRecs():Object.values(recs).filter(r=>r.status==='tarde');
     const per={};
-    L.forEach(r=>{ const m=ixPer(r.fecha,tp(r.legajo)), x=g(m); x.tarde=(x.tarde||0)+1; x.tardeMin=(x.tardeMin||0)+(r.atraso||0);
+    L.filter(r=>noExt(r.legajo)).forEach(r=>{ const m=ixPer(r.fecha,tp(r.legajo)), x=g(m); x.tarde=(x.tarde||0)+1; x.tardeMin=(x.tardeMin||0)+(r.atraso||0);
       (per[m]||(per[m]=new Set())).add(r.legajo);
     });
     Object.entries(per).forEach(([m,s])=>g(m).tardeP=s.size);
@@ -80,7 +86,7 @@ function ixCalc(){
   }catch(e){ console.warn('indicadores tarde',e); }
   // ---- medidas disciplinarias (registro de Sanciones) ----
   const sp={};
-  ((DB.sanc&&DB.sanc.items)||[]).forEach(s=>{ const m=ixPer(s.fecha||'',tp(s.leg)); if(!m) return; const x=g(m);
+  ((DB.sanc&&DB.sanc.items)||[]).filter(s=>noExt(s.leg)).forEach(s=>{ const m=ixPer(s.fecha||'',tp(s.leg)); if(!m) return; const x=g(m);
     x.med=(x.med||0)+1; x['md_'+s.tipo]=(x['md_'+s.tipo]||0)+1; if(s.tipo==='sus') x.suspS=(x.suspS||0)+(+s.dias||0);
     (sp[m]||(sp[m]=new Set())).add(s.leg); });
   Object.entries(sp).forEach(([m,s])=>{ g(m).medP=s.size; });
@@ -89,7 +95,7 @@ function ixCalc(){
   const add=(o,f,leg,t)=>{ const k=ixPer(f||'',t); if(!k) return; (o[k]||(o[k]=new Map())).set(leg,t); };
   ((DB.ant&&DB.ant.rows)||[]).forEach(r=>{ add(altas,r.ingreso,r.legajo,'EV'); add(bajas,r.egreso,r.legajo,'EV'); });
   Object.entries((DB.nomina&&DB.nomina.emps)||{}).forEach(([lk,e])=>{ const l=e.leg||e.legajo||lk; const t=e.tipo==='EV'?'EV':e.tipo==='FC'?'FC':tp(l);
-    add(altas,e.ingreso,l,t); add(bajas,e.egreso,l,t); });
+    if(!noExt(l)) return; add(altas,e.ingreso,l,t); add(bajas,e.egreso,l,t); });
   Object.keys(M).forEach(m=>{ const x=M[m], b=bajas[m], a=altas[m];
     x.bajas=b?b.size:0; x.bajasEV=b?[...b.values()].filter(t=>t==='EV').length:0; x.ing=a?a.size:0;
     if(x.dot) x.rot=x.bajas/x.dot*100; });
@@ -139,7 +145,7 @@ const IX_BLQ=[
   {id:'liq',t:'Liquidación (F3)',ic:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',sub:'Presentismo, horas extras y viáticos',go:'v-f3',kpi:'pres'},
 ];
 const IX_IND=[
-  {k:'dot',b:'dot',t:'Dotación con jornada',u:'',mejor:null,sub:x=>x.dot?`${ixNum(x.dotEF||0)} efectivos · ${ixNum(x.dotFC||0)} fuera de convenio · ${ixNum(x.dotEV||0)} eventuales`:''},
+  {k:'dot',b:'dot',t:'Dotación con jornada',u:'',mejor:null,sub:x=>x.dot?`${ixNum(x.dotEF||0)} efectivos${x.deleg?` (con ${x.deleg} delegados)`:''} · ${ixNum(x.dotFC||0)} fuera de convenio · ${ixNum(x.dotEV||0)} eventuales`:''},
   {k:'bajas',b:'dot',t:'Bajas del mes',u:'',mejor:'baja',sub:x=>x.bajas?`${x.bajasEV} eventuales · ${x.bajas-x.bajasEV} efectivos`:'Según fecha de egreso en Nómina y Eventuales'},
   {k:'ing',b:'dot',t:'Ingresos del mes',u:'',mejor:null,sub:()=>'Según fecha de ingreso'},
   {k:'rot',b:'dot',t:'Rotación mensual',u:'%',d:1,mejor:'baja',sub:()=>'Bajas sobre dotación con jornada'},
