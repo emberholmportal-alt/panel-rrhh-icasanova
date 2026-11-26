@@ -168,7 +168,7 @@ function cuRows(mes,sinExt){
   const C=DB.cumple; if(!C) return [];
   const y=+hoy().slice(0,4), nmMap={}; try{ nmRows().forEach(r=>nmMap[sinTilde(r.nombre)]=r); }catch(e){}
   return cuEmps(!sinExt).filter(e=>e.nac&&+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
-    return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:(y-+e.nac.slice(0,4))>=15?y-+e.nac.slice(0,4):null,sector:x.sector||'',turno:x.turno||''}); })
+    return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:+e.nac.slice(0,4)>1900&&(y-+e.nac.slice(0,4))>=15?y-+e.nac.slice(0,4):null,sector:x.sector||'',turno:x.turno||''}); })
     .sort((a,b)=>a.dia-b.dia||a.nombre.localeCompare(b.nombre,'es'));
 }
 const MESES_N=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
