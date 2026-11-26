@@ -83,14 +83,20 @@ async function loadCumple(files){
     for(const sn of usar){ const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:false});
       let hi=-1,H=[]; for(let i=0;i<Math.min(rows.length,10);i++){ H=(rows[i]||[]).map(c=>normTxt(c)); if(H.some(x=>/LEG|APELLIDO|NOMBRE/.test(x))&&H.some(x=>/NACIM|^FECHA|CUMPLE/.test(x))){ hi=i; break; } }
       if(hi<0) continue;
-      const ix=re=>H.findIndex(x=>re.test(x)), cL=ix(/LEG/), cA=ix(/^APELLIDO$/), cN=ix(/^NOMBRE$/), cAN=ix(/APELLIDO Y NOMBRE|APELLIDO, NOMBRE|NOMBRE Y APELLIDO/), cF=ix(/NACIM/)>=0?ix(/NACIM/):ix(/^FECHA|CUMPLE/);
+      const ix=re=>H.findIndex(x=>re.test(x)), cL=ix(/LEG/), cA=ix(/^APELLIDO$/), cN=ix(/^NOMBRE$/), cAN=ix(/APELLIDOS?,? (Y )?NOMBRES?|NOMBRE Y APELLIDO/), cE=ix(/EMPRESA/), cF=ix(/NACIM/)>=0?ix(/NACIM/):ix(/^FECHA|CUMPLE/);
       // hojas sin legajo (ej. personal de Carrefour): se identifican por apellido y nombre
       for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const leg=cL>=0&&r[cL]!=null?nmLeg(r[cL]):'', nac=excelDateToISO(r[cF]); if(!nac) continue;
         const nombre=cAN>=0&&r[cAN]?String(r[cAN]).replace(/\s+/g,' ').trim():[r[cA],r[cN]].filter(Boolean).map(x=>String(x).replace(/\s+/g,' ').trim()).join(', ');
         if(!leg&&!nombre) continue; const k=leg||('n:'+sinTilde(nombre));
-        if(!emps[k]) emps[k]={leg,nombre,nac,tipo:CU_TIPO(sn)||sn}; } }
-    const n=Object.keys(emps).length; if(!n) throw new Error('No encontré columnas de nombre (o legajo) y fecha de nacimiento.');
-    DB.cumple={file:f.name,at:new Date().toISOString(),emps:Object.values(emps)}; await persist(); renderCumple(); App.refresh();
+        const emp=cE>=0&&r[cE]?String(r[cE]).trim().toUpperCase():'';
+        if(!emps[k]) emps[k]={leg,nombre,nac,tipo:CU_TIPO(sn)||sn,emp}; } }
+    const L=Object.values(emps), n=L.length; if(!n) throw new Error('No encontré columnas de nombre (o legajo) y fecha de nacimiento.');
+    // planilla de otra empresa (ej. RUCADE): se suma aparte, sin reemplazar el archivo de cumpleaños del CD
+    const otras=[...new Set(L.map(e=>e.emp).filter(e=>e&&!/^(GL|GLD|FC|GESTION)/.test(e)))];
+    if(otras.length===1&&L.every(e=>e.emp===otras[0])){ const E=otras[0], C=DB.cumple||(DB.cumple={emps:[],file:'',at:''});
+      C.ext=Object.assign({},C.ext||{},{[E]:{file:f.name,at:new Date().toISOString(),emps:L.map(e=>({leg:'',nombre:e.nombre,nac:e.nac,tipo:E}))}});
+      await persist(); renderCumple(); App.toast(`Personal de ${E} sumado a Cumpleaños: ${n} persona(s). Aparecen en el detalle del mes y en los carteles.`); return; }
+    DB.cumple={file:f.name,at:new Date().toISOString(),emps:L.map(({emp,...e})=>e),ext:(DB.cumple||{}).ext}; await persist(); renderCumple(); App.refresh();
     App.toast(`Cumpleaños cargados: ${n} persona(s)`);
   }catch(e){ App.toast(e.message,true); }
 }
@@ -103,7 +109,13 @@ window.cuSyncEv=function(){
   const C=DB.cumple||(DB.cumple={emps:[],file:'',at:''}), k=JSON.stringify([ev,bajas]);
   if(C.evsK!==k){ C.evs=ev; C.evsBajas=bajas; delete C.evsLegs; C.evsK=k; C.evsAt=new Date().toISOString(); }
 };
-function cuEmps(){
+// el personal de otras empresas (ej. RUCADE) va solo en el detalle del mes y en los carteles (no en Inicio)
+function cuEmps(conExt){
+  const L=cuEmpsCD(); if(!conExt) return L;
+  const yaN=new Set(L.map(e=>sinTilde(e.nombre)));
+  return L.concat(Object.values((DB.cumple&&DB.cumple.ext)||{}).flatMap(x=>x.emps||[]).filter(e=>!yaN.has(sinTilde(e.nombre))));
+}
+function cuEmpsCD(){
   const C=DB.cumple; if(!C) return [];
   if(!C.evs) return C.emps||[];
   // con la planilla de Eventuales: salen los dados de baja y se suman los nuevos que tienen fecha de nacimiento
@@ -152,10 +164,10 @@ async function cuCarteles(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`carteles_cumpleanos_${MESES_N[cuState.mes-1].toLowerCase()}.docx`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
   App.toast(`Word con ${R.length} cartel(es) de ${MESES_N[cuState.mes-1]} (${Math.ceil(R.length/4)} hoja(s), 4 por hoja)`);
 }
-function cuRows(mes){
+function cuRows(mes,sinExt){
   const C=DB.cumple; if(!C) return [];
   const y=+hoy().slice(0,4), nmMap={}; try{ nmRows().forEach(r=>nmMap[sinTilde(r.nombre)]=r); }catch(e){}
-  return cuEmps().filter(e=>e.nac&&+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
+  return cuEmps(!sinExt).filter(e=>e.nac&&+e.nac.slice(5,7)===mes).map(e=>{ const dia=+e.nac.slice(8,10), x=nmMap[sinTilde(e.nombre)]||{};
     return Object.assign({},e,{dia,fecha:`${y}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,edad:(y-+e.nac.slice(0,4))>=15?y-+e.nac.slice(0,4):null,sector:x.sector||'',turno:x.turno||''}); })
     .sort((a,b)=>a.dia-b.dia||a.nombre.localeCompare(b.nombre,'es'));
 }
@@ -165,7 +177,9 @@ function renderCumple(){
   if(!cuState.mes) cuState.mes=+hoy().slice(5,7);
   const C=DB.cumple, R=cuRows(cuState.mes), h=hoy(), ed=canEditMod('cumpleanos');
   $('#cu-mes').innerHTML=MESES_N.map((m,i)=>`<option value="${i+1}"${i+1===cuState.mes?' selected':''}>${m}</option>`).join('');
-  $('#cu-st').innerHTML=C?`<b>${cuEmps().length} personas</b> · ${esc(C.file||'')}${C.at?' · '+fmtAt(C.at):''}${C.evs?`<br>Sincronizado con la planilla de Eventuales (${fmtAt(C.evsAt)}): se quitan las bajas y se suman los eventuales nuevos con fecha de nacimiento`:''}`:'Sin cargar';
+  const EX=Object.entries((C&&C.ext)||{});
+  $('#cu-st').innerHTML=(C?`<b>${cuEmps().length} personas</b> · ${esc(C.file||'')}${C.at?' · '+fmtAt(C.at):''}${C.evs?`<br>Sincronizado con la planilla de Eventuales (${fmtAt(C.evsAt)}): se quitan las bajas y se suman los eventuales nuevos con fecha de nacimiento`:''}`:'Sin cargar')+
+    EX.map(([E,x])=>`<br>+ <b>${esc(E)}</b>: ${(x.emps||[]).length} personas · ${esc(x.file||'')} · ${fmtAt(x.at)} (solo en el detalle del mes y en los carteles)${ed?` <button class="btn ghost sm" data-cuext="${esc(E)}">Quitar</button>`:''}`).join('');
   { const b=$('#cu-doc'); if(b) b.style.display=cuCartelOk()?'':'none'; }
   $('#cu-load').style.display=ed?'':'none';
   const hoyN=R.filter(r=>r.fecha===h), sem=R.filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
@@ -192,7 +206,7 @@ function renderHomeCom(){
   parts.push(`<div class="card hc-menu"><div class="card-h"><h3>🍽 Menú de hoy</h3><button class="btn ghost sm" data-go="v-menu">Ver la semana</button></div><div class="card-b">`+
     (M&&(M.m||M.o1)?`<div class="hc-lab">Plato del día</div><div class="hc-main">${esc(M.m||'')}</div><div class="hc-ops">${[['o1','Opción 1'],['o2','Opción 2'],['o3','Opción 3']].filter(([k])=>M[k]).map(([k,l])=>`<div><span>${l}</span>${esc(M[k])}</div>`).join('')}</div>`
       :`<div class="empty" style="padding:14px">${dw===0?'Hoy es domingo: no hay menú.':'Todavía no se cargó el menú de hoy.'}</div>`)+'</div></div>');
-  if(DB.cumple){ const R=cuRows(+h.slice(5,7)).filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
+  if(DB.cumple){ const R=cuRows(+h.slice(5,7),true).filter(r=>r.fecha>=h&&r.fecha<=addD(h,7));
     parts.push(`<div class="card hc-cu"><div class="card-h"><h3>🎂 Cumpleaños</h3><button class="btn ghost sm" data-go="v-cumple">Ver el mes</button></div><div class="card-b">`+
       (R.length?R.slice(0,8).map(r=>`<div class="hc-cur${r.fecha===h?' hoy':''}"><b>${r.fecha===h?'HOY':`${DOW[dObj(r.fecha).getDay()].slice(0,2)} ${r.dia}`}</b><span>${esc(r.nombre)}</span><em>${r.edad!=null?r.edad+' años':''}</em></div>`).join(''):'<div class="empty" style="padding:14px">Nadie cumple años en los próximos 7 días.</div>')+'</div></div>'); }
   box.innerHTML=parts.join('');
@@ -212,6 +226,8 @@ function hookComedor(){
   $('#cu-mes').onchange=e=>{ cuState.mes=+e.target.value; renderCumple(); };
   $('#cu-xls').onclick=cuExcel; { const b=$('#cu-doc'); if(b) b.onclick=cuCarteles; }
   $('#cu-pick').onclick=()=>$('#cu-file').click();
+  $('#cu-st').addEventListener('click',async e=>{ const b=e.target.closest('[data-cuext]'); if(!b) return; const E=b.dataset.cuext;
+    if(!confirm(`¿Quitar de Cumpleaños al personal de ${E}?`)) return; delete DB.cumple.ext[E]; await persist(); renderCumple(); App.toast(`Personal de ${E} quitado`); });
   $('#cu-file').onchange=e=>{ const f=[...e.target.files]; if(f.length) loadCumple(f); e.target.value=''; };
 }
 const _ovCom=App.onView; App.onView=(id,f)=>{ _ovCom(id,f); if(id==='v-menu') renderMenu(); else if(id==='v-cumple') renderCumple(); else if(id==='v-home') renderHomeCom(); };
