@@ -895,6 +895,19 @@ async def indicadores_metas(request: Request, u: User = Depends(current_user), d
     return {"ok": True, "metas": limpio}
 
 
+# modelos de formularios de sanciones (Word base de la empresa, con los campos a completar)
+MODELOS = Path(__file__).parent / "modelos"
+
+
+@app.get("/api/modelos/{nombre}")
+def modelo_sancion(nombre: str, u: User = Depends(current_user)):
+    if nombre not in ("pedido_explicacion", "apercibimiento", "suspension"):
+        raise HTTPException(404, "Modelo inexistente")
+    if not can_read(u, "sanciones"):
+        raise HTTPException(403, "Sin acceso a Sanciones")
+    return FileResponse(MODELOS / f"{nombre}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+
 @app.post("/api/comidas/cocina")
 async def comidas_cocina(request: Request, u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Lo que contó la cocina en un día, por comedor y servicio. Lo carga quien ve Comidas (ej. Milagros)."""

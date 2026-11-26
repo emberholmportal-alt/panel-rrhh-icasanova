@@ -8,7 +8,9 @@ let scF={mes:'',tipo:'',q:''};
 const SC=()=>DB.sanc||(DB.sanc={items:[]});
 const scItems=()=>(SC().items||[]);
 const scHoy=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-function scPersonas(){ const o={}; try{ nmRows().forEach(r=>o[r.leg]={leg:r.leg,nombre:r.nombre,tipo:r.tipo,sector:r.sector,turno:r.turno}); }catch(e){}
+function scPersonas(){ const o={}, tar={}; ((DB.ant&&DB.ant.rows)||[]).forEach(r=>{ if(r.tarea) tar[r.legajo]=r.tarea; });
+  const em=(DB.nomina&&DB.nomina.emps)||{};
+  try{ nmRows().forEach(r=>{ const e=em[r.leg]||{}; o[r.leg]={leg:r.leg,nombre:r.nombre,tipo:r.tipo,sector:r.sector,turno:r.turno,tarea:e.puesto||e.tarea||e.categoria||tar[r.leg]||r.sector||''}; }); }catch(e){}
   scItems().forEach(s=>{ if(s.leg&&!o[s.leg]) o[s.leg]={leg:s.leg,nombre:s.nombre,tipo:'',sector:s.sector||'',turno:''}; }); return o; }
 function scFilas(){ const q=normTxt(scF.q||'');
   return scItems().filter(s=>(!scF.mes||s.fecha.slice(0,7)===scF.mes)&&(!scF.tipo||s.tipo===scF.tipo)&&(!q||normTxt(s.nombre).includes(q)||String(s.leg).includes(q)))
@@ -28,13 +30,18 @@ function renderSanc(){
       <label class="sc-f sc-w2">Colaborador<input type="text" id="sc-emp" list="sc-dl" placeholder="legajo o apellido" autocomplete="off"><datalist id="sc-dl">${Object.values(P).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(p=>`<option value="${esc(p.leg)} · ${esc(p.nombre)}">`).join('')}</datalist></label>
       <label class="sc-f">Fecha de la sanción<input type="date" id="sc-fec" value="${scHoy()}"></label>
       <label class="sc-f">Tipo<select id="sc-tipo">${Object.entries(SC_TIPOS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+      <label class="sc-f">Motivo<select id="sc-mot">${SC_MOT.map(m=>`<option>${m}</option>`).join('')}</select></label>
+      <label class="sc-f sc-ape-t">Tarea<input type="text" id="sc-tar" maxlength="80"></label>
+      <label class="sc-f sc-pe">Turno<input type="text" id="sc-tur" maxlength="40"></label>
+      <label class="sc-f sc-pe">Sector<input type="text" id="sc-sec" maxlength="60"></label>
       <label class="sc-f sc-sus">Días de suspensión<input type="number" id="sc-dias" min="1" max="30" value="1"></label>
       <label class="sc-f sc-sus">Desde<input type="date" id="sc-des"></label>
-      <label class="sc-f">Motivo<select id="sc-mot">${SC_MOT.map(m=>`<option>${m}</option>`).join('')}</select></label>
-      <label class="sc-f sc-w2">Detalle<input type="text" id="sc-det" maxlength="300" placeholder="ej. 3 llegadas tarde en la semana · 05/11 sin aviso"></label>
+      <label class="sc-f sc-sus">Hasta (inclusive)<input type="date" id="sc-has"></label>
+      <label class="sc-f sc-sus">Retoma tareas<input type="date" id="sc-ret"></label>
+      <label class="sc-f sc-w4"><span id="sc-det-l">Hechos</span><textarea id="sc-det" rows="4" maxlength="2000" placeholder="Describí el hecho: qué pasó, cuándo y dónde. Es el texto que va en el formulario."></textarea></label>
     </div>
     <div class="sc-hist" id="sc-hist"></div>
-    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" id="sc-add">Registrar</button></div></div></div>`:'';
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn primary" id="sc-add-w">Registrar y descargar formulario</button><button class="btn ghost" id="sc-add">Solo registrar</button></div></div></div>`:'';
   el.innerHTML=`${form}
     <div class="sc-kpis">${[['Sanciones',R.length,''],['Pedidos de explicación',c.pe,'pe'],['Apercibimientos',c.ape,'ape'],['Suspensiones',c.sus,'sus'],['Días de suspensión',dias,'sus'],['Colaboradores',per.size,'']]
       .map(([k,v,t])=>`<div class="sc-k" style="${t?`--c:${SC_COL[t]}`:''}"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
@@ -43,29 +50,74 @@ function renderSanc(){
       <select id="sc-ft"><option value="">Todos los tipos</option>${Object.entries(SC_TIPOS).map(([k,v])=>`<option value="${k}"${k===scF.tipo?' selected':''}>${v}</option>`).join('')}</select>
       <input type="text" id="sc-fq" placeholder="Buscar apellido o legajo" value="${esc(scF.q)}">
       <span style="flex:1"></span>${ed?'<label class="btn ghost" style="cursor:pointer">Importar planilla<input type="file" id="sc-imp" accept=".xlsx,.xls" hidden></label>':''}<button class="btn ghost" id="sc-xls">Excel</button></div>
-      <div class="tscroll"><table class="nm-t"><thead><tr><th>Fecha</th><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th class="num">Días</th><th>Motivo</th><th>Detalle</th><th>Cargó</th>${ed?'<th></th>':''}</tr></thead><tbody>
+      <div class="tscroll"><table class="nm-t"><thead><tr><th>Fecha</th><th>Legajo</th><th>Apellido y nombre</th><th>Tipo</th><th class="num">Días</th><th>Motivo</th><th>Detalle</th><th>Cargó</th><th></th></tr></thead><tbody>
       ${R.length?R.map(s=>`<tr><td class="mono">${dmy(s.fecha)}</td><td class="mono">${s.leg?esc(s.leg):'<span class="muted" title="No se encontró en la nómina">—</span>'}</td><td><b>${esc(s.nombre)}</b></td>
         <td><span class="sc-tp" style="--c:${SC_COL[s.tipo]}">${SC_TIPOS[s.tipo]}</span></td><td class="num">${s.tipo==='sus'?`${s.dias}${s.desde?`<small> desde ${dmy(s.desde)}</small>`:''}`:''}</td>
         <td>${esc(s.motivo||'')}</td><td class="sc-det">${esc(s.det||'')}</td><td class="muted" style="font-size:12px">${esc(s.por||'')}</td>
-        ${ed?`<td><button class="btn ghost sc-del" data-scdel="${esc(s.id)}" title="Borrar">✕</button></td>`:''}</tr>`).join('')
+        <td style="white-space:nowrap"><button class="btn ghost sc-del" data-scdoc="${esc(s.id)}" title="Descargar el formulario para firmar">Formulario</button>${ed?` <button class="btn ghost sc-del" data-scdel="${esc(s.id)}" title="Borrar">✕</button>`:''}</td></tr>`).join('')
         :`<tr><td colspan="9" class="muted" style="padding:16px">No hay sanciones ${scItems().length?'con estos filtros':'registradas todavía'}.</td></tr>`}
       </tbody></table></div></div>`;
   scTipoUI();
 }
-function scTipoUI(){ const t=$('#sc-tipo'); if(!t) return; document.querySelectorAll('#sc-body .sc-sus').forEach(x=>x.style.display=t.value==='sus'?'':'none'); }
+function scTipoUI(){ const t=$('#sc-tipo'); if(!t) return; const v=t.value;
+  document.querySelectorAll('#sc-body .sc-sus').forEach(x=>x.style.display=v==='sus'?'':'none');
+  document.querySelectorAll('#sc-body .sc-pe').forEach(x=>x.style.display=v==='pe'?'':'none');
+  document.querySelectorAll('#sc-body .sc-ape-t').forEach(x=>x.style.display=v==='ape'?'':'none');
+  const l=$('#sc-det-l'); if(l) l.textContent=v==='pe'?'Punto a explicar':'Hechos'; }
+// suspensión: al poner desde y días, propone hasta y el día que retoma (días corridos; se pueden corregir)
+function scFechasSus(){ const d=$('#sc-des').value, n=+$('#sc-dias').value||0; if(!d||!n) return;
+  const f=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+  const h=dObj(d); h.setDate(h.getDate()+n-1); const r=new Date(h); r.setDate(r.getDate()+1); if(r.getDay()===0) r.setDate(r.getDate()+1);
+  $('#sc-has').value=f(h); $('#sc-ret').value=f(r); }
+function scPrefill(){ const p=scLeg(), h=$('#sc-hist'); if(h) h.textContent=p?`${p.nombre}: ${scHist(p.leg)}`:'';
+  if(!p) return; $('#sc-tar').value=p.tarea||''; $('#sc-tur').value=p.turno||''; $('#sc-sec').value=p.sector||''; }
 function scLeg(){ const q=($('#sc-emp')||{}).value||''; const P=scPersonas(); const L=(q.match(/^\d+/)||[''])[0];
   if(L&&P[L]) return P[L]; const n=normTxt(q); const c=Object.values(P).filter(p=>normTxt(p.nombre).includes(n)); return n&&c.length===1?c[0]:null; }
 
-async function scAgregar(){
-  const p=scLeg(), fecha=$('#sc-fec').value, tipo=$('#sc-tipo').value, dias=+$('#sc-dias').value||0;
+async function scAgregar(conWord){
+  const p=scLeg(), fecha=$('#sc-fec').value, tipo=$('#sc-tipo').value, dias=+$('#sc-dias').value||0, det=$('#sc-det').value.trim();
   if(!p){ App.toast('Elegí un colaborador de la lista',true); return; }
   if(!fecha){ App.toast('Poné la fecha de la sanción',true); return; }
-  if(tipo==='sus'&&!(dias>=1)){ App.toast('Poné los días de suspensión',true); return; }
-  const it={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),leg:p.leg,nombre:p.nombre,sector:p.sector||'',fecha,tipo,
-    dias:tipo==='sus'?dias:0,desde:tipo==='sus'?($('#sc-des').value||''):'',motivo:$('#sc-mot').value,det:$('#sc-det').value.trim(),
-    por:(window.SRV&&SRV.user&&SRV.user.nombre)||'',at:new Date().toISOString()};
+  if(conWord&&!det){ App.toast(tipo==='pe'?'Escribí el punto a explicar':'Escribí los hechos: van en el formulario',true); return; }
+  if(tipo==='sus'){ if(!(dias>=1)){ App.toast('Poné los días de suspensión',true); return; }
+    if(conWord&&!($('#sc-des').value&&$('#sc-has').value&&$('#sc-ret').value)){ App.toast('Completá desde, hasta y el día que retoma',true); return; } }
+  const it={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),leg:p.leg,nombre:p.nombre,sector:$('#sc-sec').value.trim()||p.sector||'',turno:$('#sc-tur').value.trim()||p.turno||'',
+    tarea:$('#sc-tar').value.trim(),fecha,tipo,dias:tipo==='sus'?dias:0,desde:tipo==='sus'?($('#sc-des').value||''):'',hasta:tipo==='sus'?($('#sc-has').value||''):'',retoma:tipo==='sus'?($('#sc-ret').value||''):'',
+    motivo:$('#sc-mot').value,det,por:(window.SRV&&SRV.user&&SRV.user.nombre)||'',at:new Date().toISOString()};
   SC().items=scItems().concat([it]); await persist();
   App.toast(`${SC_TIPOS[tipo]} registrado para ${p.nombre}`); renderSanc();
+  if(conWord) scWord(it);
+}
+// ---- formulario para firmar (Word con los modelos de la empresa) ----
+const SC_MODELO={pe:'pedido_explicacion',ape:'apercibimiento',sus:'suspension'};
+const SC_NUM=['cero','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiún','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve','treinta'];
+function scLlenar(x,V){
+  return x.replace(/\{\{(\w+)\}\}/g,(m,k,i)=>{
+    const v=String(V[k]==null?'':V[k]);
+    const ps=Math.max(x.lastIndexOf('<w:p ',i),x.lastIndexOf('<w:p>',i)), pe=x.indexOf('</w:p>',i), para=x.slice(ps,pe);
+    const ppr=(para.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)||[''])[0], rs=x.lastIndexOf('<w:r>',i), rpr=(x.slice(rs,i).match(/<w:rPr>[\s\S]*?<\/w:rPr>/)||[''])[0];
+    const xe=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // en un párrafo justificado cada renglón va en su párrafo (si no, Word estira la línea); si no, salto de línea
+    const nl=/w:val="both"/.test(ppr)?`</w:t></w:r></w:p><w:p>${ppr}<w:r>${rpr}<w:t xml:space="preserve">`:`</w:t></w:r><w:r>${rpr}<w:br/></w:r><w:r>${rpr}<w:t xml:space="preserve">`;
+    return xe(v).split(/\r?\n/).join(nl); });
+}
+async function scWord(s){
+  if(typeof JSZip==='undefined'){
+    App.toast('Preparando el formulario…');
+    try{ await new Promise((ok,mal)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload=ok; sc.onerror=mal; document.head.appendChild(sc); }); }catch(e){}
+    if(typeof JSZip==='undefined'){ App.toast('No se pudo descargar la librería para armar el Word. Revisá la conexión y probá de nuevo.',true); return; }
+  }
+  try{
+    const r=await fetch(`/api/modelos/${SC_MODELO[s.tipo]}`,{credentials:'same-origin'}); if(!r.ok) throw new Error('No se pudo bajar el modelo del formulario');
+    const z=await JSZip.loadAsync(await r.arrayBuffer());
+    const n=+s.dias||0, V={NOMBRE:s.nombre,LEGAJO:s.leg||'',FECHA:dmy(s.fecha),TAREA:s.tarea||'',TURNO:s.turno||'',SECTOR:s.sector||'',HECHOS:s.det||'',PUNTO:s.det||'',
+      DIAS:`${n} (${n===1?'un':SC_NUM[n]||n}) ${n===1?'día':'días'}`,DESDE:s.desde?dmy(s.desde):'',HASTA:s.hasta?dmy(s.hasta):'',RETOMA:s.retoma?dmy(s.retoma):''};
+    z.file('word/document.xml',scLlenar(await z.file('word/document.xml').async('string'),V));
+    const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`${SC_TIPOS[s.tipo].normalize('NFD').replace(/[\u0300-\u036f]/g,'')} - ${s.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|,]+/g,'').trim()} - ${dmy(s.fecha).replace(/\//g,'-')}.docx`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    App.toast('Formulario descargado: imprimilo para la firma');
+  }catch(e){ App.toast(e.message,true); }
 }
 function scExcel(){
   const R=scFilas(); if(!R.length){ App.toast('No hay sanciones para descargar',true); return; }
@@ -77,7 +129,9 @@ function scExcel(){
 }
 document.addEventListener('click',async e=>{
   const v=document.getElementById('v-sanc'); if(!v||!v.contains(e.target)) return;
-  if(e.target.id==='sc-add'){ scAgregar(); return; }
+  if(e.target.id==='sc-add'){ scAgregar(false); return; }
+  if(e.target.id==='sc-add-w'){ scAgregar(true); return; }
+  const dc=e.target.closest('[data-scdoc]'); if(dc){ const s=scItems().find(x=>x.id===dc.dataset.scdoc); if(s) scWord(s); return; }
   if(e.target.id==='sc-xls'){ scExcel(); return; }
   const d=e.target.closest('[data-scdel]'); if(d){ const s=scItems().find(x=>x.id===d.dataset.scdel); if(!s) return;
     if(!confirm(`¿Borrar ${SC_TIPOS[s.tipo].toLowerCase()} de ${s.nombre} del ${dmy(s.fecha)}?`)) return;
@@ -86,7 +140,8 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',e=>{
   const v=document.getElementById('v-sanc'); if(!v||!v.contains(e.target)) return;
   if(e.target.id==='sc-tipo') scTipoUI();
-  if(e.target.id==='sc-emp'){ const p=scLeg(), h=$('#sc-hist'); if(h) h.textContent=p?`${p.nombre}: ${scHist(p.leg)}`:''; }
+  if(e.target.id==='sc-emp') scPrefill();
+  if(e.target.id==='sc-des'||e.target.id==='sc-dias') scFechasSus();
   if(e.target.id==='sc-fm'){ scF.mes=e.target.value; renderSanc(); }
   if(e.target.id==='sc-ft'){ scF.tipo=e.target.value; renderSanc(); }
 });
